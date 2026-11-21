@@ -169,6 +169,104 @@ func Object[T, S any](name string, field func(*T) *S, schema *Schema[S]) Field[T
 	}
 }
 
+// ObjectDecoder decodes a JSON object into a nested field of type S by
+// delegating to *S's own DecodeJSON and EncodeJSON. It is the delegation
+// counterpart to Object: where Object needs the other package's *Schema,
+// ObjectDecoder needs only that the type is qi-json-aware. A JSON null leaves
+// the field unchanged, and because a struct is never empty, an ObjectDecoder
+// field is never omitted by omitempty.
+//
+// The PS type parameter may be omitted: it is inferred from S, as with Marshal.
+// The constraint requires both Decoder and Encoder, so decode and encode stay
+// symmetric by construction; a type implementing only one does not compile.
+func ObjectDecoder[T, S any, PS interface {
+	*S
+	Decoder
+	Encoder
+}](name string, field func(*T) *S) Field[T] {
+	return Field[T]{
+		Name: name,
+		Decode: func(r *Reader, v *T) error {
+			k, err := r.Peek()
+			if err != nil {
+				return err
+			}
+			if k == scanner.KindNull {
+				return r.ReadNull()
+			}
+			return PS(field(v)).DecodeJSON(r)
+		},
+		Encode: func(w *Writer, v *T) error {
+			return PS(field(v)).EncodeJSON(w)
+		},
+	}
+}
+
+// ObjectDecoderPtr decodes a JSON object into a *S field by delegating to *S's
+// own DecodeJSON and EncodeJSON. A JSON null sets the field to nil; otherwise a
+// nil field is allocated before decoding. On encode a nil field is written as
+// null, and an ObjectDecoderPtr field is empty for omitempty when nil.
+func ObjectDecoderPtr[T, S any, PS interface {
+	*S
+	Decoder
+	Encoder
+}](name string, field func(*T) **S) Field[T] {
+	return Field[T]{
+		Name: name,
+		Decode: func(r *Reader, v *T) error {
+			k, err := r.Peek()
+			if err != nil {
+				return err
+			}
+			if k == scanner.KindNull {
+				if err := r.ReadNull(); err != nil {
+					return err
+				}
+				*field(v) = nil
+				return nil
+			}
+			s := *field(v)
+			if s == nil {
+				s = new(S)
+				*field(v) = s
+			}
+			return PS(s).DecodeJSON(r)
+		},
+		Encode: func(w *Writer, v *T) error {
+			s := *field(v)
+			if s == nil {
+				return w.WriteNull()
+			}
+			return PS(s).EncodeJSON(w)
+		},
+		Empty: func(v *T) bool { return *field(v) == nil },
+	}
+}
+
+// DecoderCodec returns a Codec for an element of type S by delegating to *S's
+// own DecodeJSON and EncodeJSON. It is the delegation counterpart to a
+// struct-backed element codec, for a Slice, Map, or Array of a qi-json-aware
+// type; the PS type parameter must be given explicitly (as with a zero-argument
+// generic function).
+func DecoderCodec[S any, PS interface {
+	*S
+	Decoder
+	Encoder
+}]() Codec[S] {
+	return Codec[S]{
+		Decode: func(r *Reader) (S, error) {
+			var s S
+			if err := PS(&s).DecodeJSON(r); err != nil {
+				return s, err
+			}
+			return s, nil
+		},
+		Encode: func(w *Writer, s S) error {
+			return PS(&s).EncodeJSON(w)
+		},
+	}
+}
+
 // Slice decodes a JSON array into a slice field, decoding each element with the
 // elem codec's Decode. A JSON null leaves the field unchanged; an empty JSON
 // array produces a non-nil empty slice. On encode, a nil slice is written as

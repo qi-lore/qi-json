@@ -7,7 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- `qijson`: delegation constructors for a nested `Decoder`/`Encoder` —
+  `ObjectDecoder` and `ObjectDecoderPtr` for a field, and `DecoderCodec` for a
+  slice, map, or array element. They bind a field or element whose type
+  implements `DecodeJSON`/`EncodeJSON` by calling those methods, the counterpart
+  to `Object` for a type whose Schema is in another package. (Constitution
+  Article VI amendment, v3.4.0.)
+- `cmd/qi-json-gen`: struct fields whose type is a struct from **another
+  package** are now supported, closing the release blocker:
+  - A qi-json-aware foreign type (one implementing `DecodeJSON` and
+    `EncodeJSON`) is bound by delegation (`ObjectDecoder`/`ObjectDecoderPtr`, or
+    `DecoderCodec` as a container element).
+  - A plain foreign struct is bound by a schema the generator synthesizes from
+    its exported fields (a `<pkg><Type>Schema` var in the consumer package). The
+    generator recurses into nested foreign structs and emits a type reachable by
+    several paths once. Unexported foreign fields are skipped (the generated
+    file notes this); an embedded foreign field is a precise error.
+  - A `-foreign=pkg.T=ident` flag lets the consumer point a foreign type at a
+    schema it owns, for a type the generator cannot introspect; a malformed or
+    unused entry is a precise error.
+  - A pointer to a plain foreign struct, `[]T`/`map[string]T` of a foreign
+    struct, and `omitempty` on a foreign field are all supported.
 
 ## [0.1.1] - 2026-11-22
 

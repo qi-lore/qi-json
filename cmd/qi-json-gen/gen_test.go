@@ -312,7 +312,7 @@ type Config struct {
 	}
 }
 
-func TestGenerateCrossPackageUnsupported(t *testing.T) {
+func TestGenerateCrossPackagePlainStruct(t *testing.T) {
 	dir := writePkg(t, `package example
 
 import "time"
@@ -321,12 +321,281 @@ type Config struct {
 	When time.Time
 }
 `)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	// time.Time is a plain foreign struct, so A synthesizes its schema. Every
+	// time.Time field is unexported, so the schema binds no members.
+	want := []string{
+		`"time"`,
+		`var timeTimeSchema = qijson.Struct[time.Time](`,
+		`qijson.Object[Config, time.Time]("When", func(v *Config) *time.Time { return &v.When }, timeTimeSchema)`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+}
+
+func TestGenerateCrossPackageAware(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+
+type Config struct {
+	Aware xtypes.Aware
+	Maybe *xtypes.Aware
+	List  []xtypes.Aware
+	ByKey map[string]xtypes.Aware
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		`"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"`,
+		`qijson.ObjectDecoder[Config, xtypes.Aware]("Aware", func(v *Config) *xtypes.Aware { return &v.Aware })`,
+		`qijson.ObjectDecoderPtr[Config, xtypes.Aware]("Maybe", func(v *Config) **xtypes.Aware { return &v.Maybe })`,
+		`qijson.Slice[Config, xtypes.Aware]("List", func(v *Config) *[]xtypes.Aware { return &v.List }, qijson.DecoderCodec[xtypes.Aware, *xtypes.Aware]())`,
+		`qijson.Map[Config, xtypes.Aware]("ByKey", func(v *Config) *map[string]xtypes.Aware { return &v.ByKey }, qijson.DecoderCodec[xtypes.Aware, *xtypes.Aware]())`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+	if strings.Contains(src, "only basic scalar") {
+		t.Errorf("a qi-json-aware foreign type must not fall through to the struct error:\n%s", src)
+	}
+	if strings.Contains(src, "xtypesAwareSchema") {
+		t.Errorf("a qi-json-aware foreign type must be delegated, not synthesized:\n%s", src)
+	}
+}
+
+func TestGenerateCrossPackageOneSided(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+
+type Config struct {
+	Half xtypes.Half
+}
+`)
 	_, err := generate(dir, []string{"Config"})
 	if err == nil {
-		t.Fatal("generate error = nil, want an error for a cross-package struct type")
+		t.Fatal("generate error = nil, want an error for a one-sided foreign type")
 	}
-	if !strings.Contains(err.Error(), "cross-package") {
-		t.Errorf("error = %q, want it to mention cross-package", err)
+	if !strings.Contains(err.Error(), "compat") && !strings.Contains(err.Error(), "both") {
+		t.Errorf("error = %q, want it to mention that both interfaces are required", err)
+	}
+	if !strings.Contains(err.Error(), "xtypes.Half") {
+		t.Errorf("error = %q, want it to name the type", err)
+	}
+}
+
+func TestGenerateForeignStruct(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+
+type Config struct {
+	Thing xtypes.Thing
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		`"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"`,
+		`var xtypesThingSchema = qijson.Struct[xtypes.Thing](`,
+		`qijson.String[xtypes.Thing]("name", func(v *xtypes.Thing) *string { return &v.Name })`,
+		`qijson.Field[xtypes.Thing]{Name: "count"`,
+		`int64(int(n)) != n`,
+		`qijson.Object[Config, xtypes.Thing]("Thing", func(v *Config) *xtypes.Thing { return &v.Thing }, xtypesThingSchema)`,
+		`var xtypesInnerSchema = qijson.Struct[xtypes.Inner](`,
+		`qijson.Object[xtypes.Thing, xtypes.Inner]("extra", func(v *xtypes.Thing) *xtypes.Inner { return &v.Extra }, xtypesInnerSchema)`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+	if strings.Contains(src, "hidden") {
+		t.Errorf("an unexported foreign field must be skipped:\n%s", src)
+	}
+	if n := strings.Count(src, "var xtypesInnerSchema"); n != 1 {
+		t.Errorf("transitive foreign struct emitted %d times, want once", n)
+	}
+	if !strings.Contains(src, "unexported") {
+		t.Errorf("a bound foreign struct with unexported fields must be noted in the file comment:\n%s", src)
+	}
+}
+
+func TestGenerateForeignStructDeterministic(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+
+type Config struct {
+	Thing xtypes.Thing
+}
+`)
+	a, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	b, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if string(a) != string(b) {
+		t.Errorf("foreign-struct generation is not deterministic")
+	}
+}
+
+func TestGenerateForeignEmbeddedError(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+
+type Config struct {
+	E xtypes.Embedded
+}
+`)
+	_, err := generate(dir, []string{"Config"})
+	if err == nil {
+		t.Fatal("generate error = nil, want a precise error for an embedded foreign field")
+	}
+	if !strings.Contains(err.Error(), "embedded") {
+		t.Errorf("error = %q, want it to mention embedded", err)
+	}
+}
+
+func TestGenerateForeignOverride(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+
+type Config struct {
+	Thing xtypes.Thing
+	Maybe *xtypes.Thing
+	List  []xtypes.Thing
+	ByKey map[string]xtypes.Thing
+}
+`)
+	got, err := generateOptions(dir, []string{"Config"}, false, map[string]string{"xtypes.Thing": "thingSchema"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		`qijson.Object[Config, xtypes.Thing]("Thing", func(v *Config) *xtypes.Thing { return &v.Thing }, thingSchema)`,
+		`thingSchema.Decode(r, e)`,
+		`qijson.Slice[Config, xtypes.Thing]("List", func(v *Config) *[]xtypes.Thing { return &v.List }, qijson.NewCodec(qiDecodeXtypesThing, qiEncodeXtypesThing))`,
+		`qijson.Map[Config, xtypes.Thing]("ByKey", func(v *Config) *map[string]xtypes.Thing { return &v.ByKey }, qijson.NewCodec(qiDecodeXtypesThing, qiEncodeXtypesThing))`,
+		`if err := thingSchema.Decode(r, &v); err != nil {`,
+		`return thingSchema.Encode(w, &v)`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+	if strings.Contains(src, "xtypesThingSchema") {
+		t.Errorf("-foreign must override the synthesized schema (A):\n%s", src)
+	}
+}
+
+func TestGenerateForeignOverrideUnmatched(t *testing.T) {
+	dir := writePkg(t, `package example
+
+type Config struct {
+	Name string
+}
+`)
+	_, err := generateOptions(dir, []string{"Config"}, false, map[string]string{"xtypes.Thing": "thingSchema"})
+	if err == nil {
+		t.Fatal("generate error = nil, want a precise error for an unused -foreign entry")
+	}
+	if !strings.Contains(err.Error(), "not used") {
+		t.Errorf("error = %q, want it to mention that the entry was not used", err)
+	}
+}
+
+func TestParseForeign(t *testing.T) {
+	got, err := parseForeign([]string{"xtypes.Thing=thingSchema", "other.T=otherSchema"})
+	if err != nil {
+		t.Fatalf("parseForeign: %v", err)
+	}
+	if got["xtypes.Thing"] != "thingSchema" || got["other.T"] != "otherSchema" {
+		t.Errorf("parseForeign = %v", got)
+	}
+}
+
+func TestParseForeignMalformed(t *testing.T) {
+	for _, e := range []string{"xtypes.Thing", "=thingSchema", "xtypes.Thing=", "xtypes..Thing=x", "a.b.c=x", "xtypes.Thing=1x"} {
+		if _, err := parseForeign([]string{e}); err == nil {
+			t.Errorf("parseForeign(%q) error = nil, want an error", e)
+		}
+	}
+	if _, err := parseForeign([]string{"xtypes.Thing=a", "xtypes.Thing=b"}); err == nil {
+		t.Error("parseForeign accepted a duplicate entry")
+	}
+}
+
+func TestGenerateForeignInteractions(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+
+type Config struct {
+	Maybe   *xtypes.Thing   `+"`json:\"maybe,omitempty\"`"+`
+	Things  []xtypes.Thing
+	ByKey   map[string]xtypes.Thing
+	Twin    xtypes.Twin
+	Linked  xtypes.Linked
+	Plain   xtypes.Thing    `+"`json:\"plain,omitempty\"`"+`
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		// pointer to a plain foreign struct: null-aware Field literal over its schema.
+		`qijson.Field[Config]{Name: "maybe"`,
+		`xtypesThingSchema.Decode(r, e)`,
+		`v.Maybe = nil`,
+		// slice and map elements use the synthesized helpers.
+		`qijson.Slice[Config, xtypes.Thing]("Things", func(v *Config) *[]xtypes.Thing { return &v.Things }, qijson.NewCodec(qiDecodeXtypesThing, qiEncodeXtypesThing))`,
+		`qijson.Map[Config, xtypes.Thing]("ByKey", func(v *Config) *map[string]xtypes.Thing { return &v.ByKey }, qijson.NewCodec(qiDecodeXtypesThing, qiEncodeXtypesThing))`,
+		// omitempty: a value struct gets the call appended (a no-op at runtime), a
+		// pointer field is empty when nil.
+		`qijson.Object[Config, xtypes.Thing]("plain", func(v *Config) *xtypes.Thing { return &v.Plain }, xtypesThingSchema).OmitEmpty()`,
+		`Empty: func(v *Config) bool { return v.Maybe == nil }`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+	if n := strings.Count(src, "var xtypesInnerSchema"); n != 1 {
+		t.Errorf("a foreign type reachable by two paths must be emitted once; got %d", n)
+	}
+	// Linked.Inner is a pointer to Inner: its schema binds through the same schema.
+	if !strings.Contains(src, `var xtypesLinkedSchema = qijson.Struct[xtypes.Linked](`) {
+		t.Errorf("transitive pointer struct schema missing:\n%s", src)
+	}
+	if !strings.Contains(src, `return xtypesInnerSchema.Encode(w, v.Inner)`) {
+		t.Errorf("transitive pointer field must use the nested schema:\n%s", src)
 	}
 }
 
@@ -477,6 +746,23 @@ func TestGeneratedStrictFixtureUpToDate(t *testing.T) {
 		t.Fatalf("generate: %v", err)
 	}
 	path := filepath.Join(dir, "zz_qi_json_gen_strict.go")
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v (run `make generate`)", path, err)
+	}
+	if string(got) != string(want) {
+		t.Errorf("%s is out of date; run `make generate`\n--- generated ---\n%s", path, got)
+	}
+}
+
+// TestGeneratedForeignFixtureUpToDate is the drift guard for the -foreign fixture.
+func TestGeneratedForeignFixtureUpToDate(t *testing.T) {
+	const dir = "internal/gentest"
+	got, err := generateOptions(dir, []string{"Overridden"}, false, map[string]string{"xtypes.Inner": "overriddenInnerSchema"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	path := filepath.Join(dir, "zz_qi_json_gen_foreign.go")
 	want, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v (run `make generate`)", path, err)

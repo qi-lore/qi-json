@@ -55,6 +55,12 @@ func (g *gen) crossFieldCodec(owner, fname, jname string, sel *ast.SelectorExpr)
 	if !ok {
 		return "", fmt.Errorf("%s.%s: unsupported type %s", owner, fname, typeString(g.fset, sel))
 	}
+	if code, handled := g.overrideField(owner, fname, jname, named, false); handled {
+		return code, nil
+	}
+	if code, handled, err := g.crossDelegation(owner, fname, jname, named, false); handled {
+		return code, err
+	}
 	return g.crossNamedCodec(owner, fname, jname, named, false)
 }
 
@@ -64,7 +70,83 @@ func (g *gen) crossFieldCodecPtr(owner, fname, jname string, sel *ast.SelectorEx
 	if !ok {
 		return "", fmt.Errorf("%s.%s: unsupported pointer type *%s", owner, fname, typeString(g.fset, sel))
 	}
+	if code, handled := g.overrideField(owner, fname, jname, named, true); handled {
+		return code, nil
+	}
+	if code, handled, err := g.crossDelegation(owner, fname, jname, named, true); handled {
+		return code, err
+	}
 	return g.crossNamedCodec(owner, fname, jname, named, true)
+}
+
+// crossDelegation builds a codec for a cross-package named type that implements
+// both qijson.Decoder and qijson.Encoder: a field bound by ObjectDecoder (or
+// ObjectDecoderPtr for a pointer field), calling the type's own methods. It
+// returns handled=false when the type implements neither interface. A type that
+// implements only one of the two is a precise error, so decode and encode stay
+// symmetric.
+func (g *gen) crossDelegation(owner, fname, jname string, named *types.Named, ptr bool) (string, bool, error) {
+	dec, enc := g.decoderEncoder(named)
+	if !dec && !enc {
+		return "", false, nil
+	}
+	obj := named.Obj()
+	pkg := obj.Pkg()
+	if pkg == nil {
+		return "", false, nil
+	}
+	goType := pkg.Name() + "." + obj.Name()
+	if dec != enc {
+		return "", true, fmt.Errorf("%s.%s: cross-package type %s implements only one of DecodeJSON/EncodeJSON; both are required for a symmetric binding", owner, fname, goType)
+	}
+	g.addImport(pkg.Path(), pkg.Name())
+	if ptr {
+		return fmt.Sprintf("qijson.ObjectDecoderPtr[%s, %s](%q, func(v *%s) **%s { return &v.%s })", owner, goType, jname, owner, goType, fname), true, nil
+	}
+	return fmt.Sprintf("qijson.ObjectDecoder[%s, %s](%q, func(v *%s) *%s { return &v.%s })", owner, goType, jname, owner, goType, fname), true, nil
+}
+
+// decoderEncoder reports whether the pointer type *named implements qijson's
+// Decoder and Encoder, by inspecting its method set with go/types. Only methods
+// with the exact qijson signature count.
+func (g *gen) decoderEncoder(named *types.Named) (dec, enc bool) {
+	ms := types.NewMethodSet(types.NewPointer(named))
+	for i := 0; i < ms.Len(); i++ {
+		fn, ok := ms.At(i).Obj().(*types.Func)
+		if !ok {
+			continue
+		}
+		switch fn.Name() {
+		case "DecodeJSON":
+			dec = dec || qijsonMethod(fn, "Reader")
+		case "EncodeJSON":
+			enc = enc || qijsonMethod(fn, "Writer")
+		}
+	}
+	return dec, enc
+}
+
+// qijsonMethod reports whether fn has the shape of a qijson interface method:
+// one parameter that is a pointer to a named type called want in package
+// qijson, and a single error result.
+func qijsonMethod(fn *types.Func, want string) bool {
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || sig.Params().Len() != 1 || sig.Results().Len() != 1 {
+		return false
+	}
+	ptr, ok := sig.Params().At(0).Type().(*types.Pointer)
+	if !ok {
+		return false
+	}
+	named, ok := ptr.Elem().(*types.Named)
+	if !ok {
+		return false
+	}
+	obj := named.Obj()
+	if obj.Pkg() == nil || obj.Pkg().Name() != "qijson" || obj.Name() != want {
+		return false
+	}
+	return types.Identical(sig.Results().At(0).Type(), types.Universe.Lookup("error").Type())
 }
 
 // crossNamedCodec builds a codec for a cross-package named type whose underlying
@@ -80,10 +162,30 @@ func (g *gen) crossNamedCodec(owner, fname, jname string, named *types.Named, pt
 	goType := pkg.Name() + "." + obj.Name()
 	basic, ok := named.Underlying().(*types.Basic)
 	if !ok {
-		return "", fmt.Errorf("%s.%s: unsupported cross-package type %s (only basic scalar underlying types are supported)", owner, fname, goType)
+		if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+			return g.crossStructCodec(owner, fname, jname, named, ptr)
+		}
+		return "", fmt.Errorf("%s.%s: unsupported cross-package type %s (only basic scalar or struct underlying types are supported)", owner, fname, goType)
 	}
 	g.addImport(pkg.Path(), pkg.Name())
 	return g.crossScalarCodec(owner, fname, jname, goType, basic, ptr)
+}
+
+// crossStructCodec builds a codec for a plain cross-package struct (one that is
+// not qi-json-aware, or crossDelegation would have handled it). It synthesizes a
+// schema for the foreign struct's exported fields (approach A) and binds the
+// field with Object.
+func (g *gen) crossStructCodec(owner, fname, jname string, named *types.Named, ptr bool) (string, error) {
+	obj := named.Obj()
+	pkg := obj.Pkg()
+	goType := pkg.Name() + "." + obj.Name()
+	g.addForeign(named)
+	g.addImport(pkg.Path(), pkg.Name())
+	if ptr {
+		return g.schemaPtrCodec(owner, fname, jname, goType, foreignSchemaVar(goType)), nil
+	}
+	return fmt.Sprintf("qijson.Object[%s, %s](%q, func(v *%s) *%s { return &v.%s }, %s)",
+		owner, goType, jname, owner, goType, fname, foreignSchemaVar(goType)), nil
 }
 
 // crossScalarCodec builds a codec for a cross-package named scalar. String and
@@ -110,6 +212,15 @@ func (g *gen) crossElemCodec(sel *ast.SelectorExpr) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unsupported element type %s", typeString(g.fset, sel))
 	}
+	if code, handled := g.overrideElem(named); handled {
+		return code, nil
+	}
+	if code, handled, err := g.crossElemDelegation(named); handled {
+		return code, err
+	}
+	if _, ok := named.Underlying().(*types.Struct); ok {
+		return g.crossElemStruct(named)
+	}
 	dec, err := g.crossElemDecoder(named)
 	if err != nil {
 		return "", err
@@ -119,6 +230,27 @@ func (g *gen) crossElemCodec(sel *ast.SelectorExpr) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("qijson.NewCodec(%s, %s)", dec, enc), nil
+}
+
+// crossElemDelegation returns a DecoderCodec expression for a cross-package
+// element type that implements both qijson.Decoder and qijson.Encoder, or
+// handled=false when it implements neither. A one-sided type is a precise error.
+func (g *gen) crossElemDelegation(named *types.Named) (string, bool, error) {
+	dec, enc := g.decoderEncoder(named)
+	if !dec && !enc {
+		return "", false, nil
+	}
+	obj := named.Obj()
+	pkg := obj.Pkg()
+	if pkg == nil {
+		return "", false, nil
+	}
+	goType := pkg.Name() + "." + obj.Name()
+	if dec != enc {
+		return "", true, fmt.Errorf("cross-package element type %s implements only one of DecodeJSON/EncodeJSON; both are required for a symmetric binding", goType)
+	}
+	g.addImport(pkg.Path(), pkg.Name())
+	return fmt.Sprintf("qijson.DecoderCodec[%s, *%s]()", goType, goType), true, nil
 }
 
 // crossElemDecoder emits, once, a function that decodes a cross-package named

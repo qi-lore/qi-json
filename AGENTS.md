@@ -70,7 +70,10 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   `Writer` and an element `Codec[E]`. A container field constructor
   (`Slice`/`Map`/`Array`) takes a `Codec[E]` carrying both directions; the
   encoder honours `json:",omitempty"` and replaces invalid UTF-8 with `U+FFFD`
-  (the decoder rejects invalid UTF-8). Plans and tasks:
+  (the decoder rejects invalid UTF-8). `ObjectDecoder`/`ObjectDecoderPtr` and
+  `DecoderCodec` bind a field or element whose type implements `DecodeJSON` and
+  `EncodeJSON` by calling them (the delegation path the generator emits for a
+  qi-json-aware foreign type; Article VI, added 2026-11-22). Plans and tasks:
   `.opencode/plan/2026-11-21-json-decoder.md` and
   `.opencode/plan/2026-11-21-json-encoder.md`.
 - `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
@@ -128,9 +131,9 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
     struct fields whose type is a struct from another package (**done
     2026-11-22**; decision is **F**: A + B + C, with D as the escape hatch; E
     rejected).
-  - `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md` — **next task**:
-    implement that decision (TDD tasks T-F1…T-F6; a small Article VI amendment
-    for the delegation constructor C).
+  - `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md` — **done
+    2026-11-22**: implemented that decision (TDD tasks T-F1…T-F6; Article VI
+    amendment v3.4.0 for the delegation constructor C).
   - `.opencode/plan/2026-11-21-package-rename.md` — relocated the semantic layer
     to the module root and renamed it `qijson` (done 2026-11-21).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale

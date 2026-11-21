@@ -222,3 +222,7 @@ amendment. Amend together, before code:
     `string` or `bool` (e.g. `type Label string`) are now generated, as a field,
     pointer field, and slice or map element, matching the cross-package path. See
     `.opencode/plan/2026-11-21-codegen-named-string-bool.md`.
+  - **Done (2026-11-22)** — struct fields whose type is a struct from another
+    package: delegation for a qi-json-aware foreign type, a synthesized schema for
+    a plain foreign struct, and a `-foreign=pkg.T=ident` escape hatch. See
+    `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`.

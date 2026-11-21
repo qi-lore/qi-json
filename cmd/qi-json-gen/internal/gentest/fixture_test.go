@@ -42,6 +42,12 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 		"statuses": ["a", "b"],
 		"mode": true,
 		"modes": {"x": true, "y": false},
+		"thing": {"name": "t", "count": 7, "tiny": 3, "extra": {"code": 9}},
+		"maybe": {"name": "m", "extra": {"code": 1}},
+		"things": [{"name": "a", "extra": {"code": 1}}, {"name": "b", "extra": {"code": 2}}],
+		"twin": {"a": {"code": 11}, "b": [{"code": 12}]},
+		"aware": {"a": 5, "b": "ok"},
+		"aware_map": {"k": {"a": 6, "b": "v"}},
 		"skipped": "ignored"
 	}`)
 
@@ -119,6 +125,27 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 	if c.Skipped != "" || c.hidden != "" {
 		t.Errorf("skipped/unexported fields must stay zero: %q %q", c.Skipped, c.hidden)
 	}
+
+	// Foreign struct fields: A (synthesized) and B (delegated).
+	wantThing := xtypes.Thing{Name: "t", Count: 7, Tiny: 3, Extra: xtypes.Inner{Code: 9}}
+	if c.Thing != wantThing {
+		t.Errorf("Thing = %+v, want %+v", c.Thing, wantThing)
+	}
+	if c.Maybe == nil || c.Maybe.Name != "m" || c.Maybe.Extra.Code != 1 {
+		t.Errorf("Maybe = %+v", c.Maybe)
+	}
+	if len(c.Things) != 2 || c.Things[0].Name != "a" || c.Things[1].Extra.Code != 2 {
+		t.Errorf("Things = %+v", c.Things)
+	}
+	if c.Twin.A.Code != 11 || len(c.Twin.B) != 1 || c.Twin.B[0].Code != 12 {
+		t.Errorf("Twin = %+v", c.Twin)
+	}
+	if c.Aware.A != 5 || c.Aware.B != "ok" {
+		t.Errorf("Aware = %+v", c.Aware)
+	}
+	if c.AwareMap["k"].A != 6 || c.AwareMap["k"].B != "v" {
+		t.Errorf("AwareMap = %+v", c.AwareMap)
+	}
 }
 
 // TestGeneratedDecodeNums exercises the generated element helpers.
@@ -151,6 +178,7 @@ func TestGeneratedRangeErrors(t *testing.T) {
 		{"uint16 overflow", `{"count":65536}`},
 		{"float32 overflow", `{"ratio":1e40}`},
 		{"int32 pointer overflow", `{"limit":2147483648}`},
+		{"foreign int8 overflow", `{"thing":{"tiny":200}}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -167,6 +195,67 @@ func TestGeneratedRangeErrors(t *testing.T) {
 				t.Errorf("Kind = %v, want %v", e.Kind, qijson.KindType)
 			}
 		})
+	}
+}
+
+// TestGeneratedForeignRoundTrip checks the foreign-struct fields survive an encode
+// and decode, exercising A (synthesized) and B (delegated) end to end.
+func TestGeneratedForeignRoundTrip(t *testing.T) {
+	thing := xtypes.Thing{Name: "x", Count: 4, Tiny: -2, Extra: xtypes.Inner{Code: 8}}
+	aware := xtypes.Aware{A: 3, B: "z"}
+	in := Config{
+		Name:     "round",
+		Thing:    thing,
+		Maybe:    &thing,
+		Things:   []xtypes.Thing{thing},
+		Twin:     xtypes.Twin{A: xtypes.Inner{Code: 1}, B: []xtypes.Inner{{Code: 2}}},
+		Aware:    aware,
+		AwareMap: map[string]xtypes.Aware{"k": aware},
+	}
+	data, err := qijson.Marshal[Config](in)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var back Config
+	if err := qijson.UnmarshalInto[Config](data, &back); err != nil {
+		t.Fatalf("UnmarshalInto: %v", err)
+	}
+	if back.Thing != thing {
+		t.Errorf("Thing = %+v, want %+v", back.Thing, thing)
+	}
+	if back.Maybe == nil || *back.Maybe != thing {
+		t.Errorf("Maybe = %+v", back.Maybe)
+	}
+	if len(back.Things) != 1 || back.Things[0] != thing {
+		t.Errorf("Things = %+v", back.Things)
+	}
+	if back.Twin.A != (xtypes.Inner{Code: 1}) || len(back.Twin.B) != 1 || back.Twin.B[0] != (xtypes.Inner{Code: 2}) {
+		t.Errorf("Twin = %+v", back.Twin)
+	}
+	if back.Aware != aware {
+		t.Errorf("Aware = %+v, want %+v", back.Aware, aware)
+	}
+	if back.AwareMap["k"] != aware {
+		t.Errorf("AwareMap = %+v", back.AwareMap)
+	}
+}
+
+// TestGeneratedForeignOverride checks a -foreign binding end to end: the field
+// decodes through the schema the consumer owns.
+func TestGeneratedForeignOverride(t *testing.T) {
+	var o Overridden
+	if err := qijson.UnmarshalInto[Overridden]([]byte(`{"inner":{"code":5}}`), &o); err != nil {
+		t.Fatalf("UnmarshalInto: %v", err)
+	}
+	if o.Inner.Code != 5 {
+		t.Errorf("Inner = %+v, want code 5", o.Inner)
+	}
+	data, err := qijson.Marshal[Overridden](Overridden{Inner: xtypes.Inner{Code: 7}})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(data) != `{"inner":{"code":7}}` {
+		t.Errorf("Marshal = %s, want {\"inner\":{\"code\":7}}", data)
 	}
 }
 
@@ -204,7 +293,9 @@ func TestGeneratedEncodeConfig(t *testing.T) {
 		`"ratio":0,"size":0,"limit":null,"tags":null,"matrix":[0,0],"scores":null,` +
 		`"blob":null,"meta":null,"origin":{"x":0,"y":0},"points":null,"ports":null,` +
 		`"timeout":0,"deadline":null,"durations":null,"label":"","labels":null,"flag":false,` +
-		`"status":"","prev":null,"statuses":null,"mode":false,"modes":null}`
+		`"status":"","prev":null,"statuses":null,"mode":false,"modes":null,` +
+		`"thing":{"name":"","extra":{"code":0}},"things":null,"twin":{"a":{"code":0},"b":null},` +
+		`"aware":{"a":0,"b":""},"aware_map":null}`
 	if string(data) != want {
 		t.Errorf("Marshal:\n got %s\nwant %s", data, want)
 	}

@@ -4,7 +4,7 @@
 //
 // Usage:
 //
-//	qi-json-gen -type=Config [-type=Other] [dir]
+//	qi-json-gen -type=Config [-type=Other] [-foreign=pkg.T=ident] [dir]
 //	qi-json-gen [dir]                 // generate for every type marked //qi-json:generate
 //
 // With -type the named types are generated; the flag may be repeated or hold a
@@ -12,7 +12,9 @@
 // declarations carrying a //qi-json:generate comment. dir defaults to "." and
 // must hold exactly one non-test package. The output file defaults to
 // <dir>/zz_qi_json_gen.go. With -strict every generated schema rejects unknown
-// and duplicate object members.
+// and duplicate object members. With -foreign=pkg.T=ident a field or element of
+// the foreign type pkg.T binds to the Schema named ident, which the consumer
+// owns; the flag is repeatable.
 //
 // The generated code targets only the exported qijson surface; it is ordinary
 // source in the caller's package. The tool is stdlib-only and uses no reflect or
@@ -21,14 +23,17 @@
 // A field whose type is a same-package named type with a basic scalar
 // underlying (string, bool, or a numeric) is resolved from the AST. A field
 // whose type is a named type from another package is resolved with the standard
-// library's type checker when its underlying type is a basic scalar (for
-// example time.Duration, or a named string or bool); a cross-package type with a
-// non-scalar underlying type is reported as an error.
+// library's type checker: a basic scalar underlying (for example time.Duration,
+// or a named string or bool) converts through a shared closure; a struct that
+// implements qijson.Decoder and qijson.Encoder is bound by delegation; a plain
+// struct has a schema synthesized from its exported fields. A -foreign entry
+// overrides all of these for the named type.
 package main
 
 import (
 	"flag"
 	"fmt"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,13 +55,15 @@ func (s *stringList) Set(v string) error {
 
 func main() {
 	var types stringList
+	var foreign stringList
 	var out string
 	var strict bool
 	flag.Var(&types, "type", "type name to generate for; repeatable or comma-separated")
+	flag.Var(&foreign, "foreign", "pkg.T=ident: bind a foreign struct to a caller-supplied Schema; repeatable")
 	flag.StringVar(&out, "o", "", "output file (default <dir>/"+defaultOutput+")")
 	flag.BoolVar(&strict, "strict", false, "generated schemas reject unknown and duplicate members")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: qi-json-gen [-type=T[,T...]] [-strict] [-o file] [dir]")
+		fmt.Fprintln(os.Stderr, "usage: qi-json-gen [-type=T[,T...]] [-foreign=pkg.T=ident] [-strict] [-o file] [dir]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -70,7 +77,13 @@ func main() {
 		dir = flag.Arg(0)
 	}
 
-	src, err := generateWith(dir, types, strict)
+	overrides, err := parseForeign(foreign)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "qi-json-gen: %v\n", err)
+		os.Exit(2)
+	}
+
+	src, err := generateOptions(dir, types, strict, overrides)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "qi-json-gen: %v\n", err)
 		os.Exit(1)
@@ -82,4 +95,32 @@ func main() {
 		fmt.Fprintf(os.Stderr, "qi-json-gen: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// parseForeign builds the override map from -foreign entries of the form
+// pkg.T=ident. A malformed entry is a precise error.
+func parseForeign(entries []string) (map[string]string, error) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+	m := make(map[string]string, len(entries))
+	for _, e := range entries {
+		left, ident, ok := strings.Cut(e, "=")
+		if !ok {
+			return nil, fmt.Errorf("-foreign %q: want pkg.T=ident", e)
+		}
+		pkg, typ, ok := strings.Cut(left, ".")
+		if !ok || !token.IsIdentifier(pkg) || !token.IsIdentifier(typ) {
+			return nil, fmt.Errorf("-foreign %q: want pkg.T=ident with a type pkg.T", e)
+		}
+		if !token.IsIdentifier(ident) {
+			return nil, fmt.Errorf("-foreign %q: %q is not a valid identifier", e, ident)
+		}
+		key := pkg + "." + typ
+		if _, dup := m[key]; dup {
+			return nil, fmt.Errorf("-foreign %q: %s is given more than once", e, key)
+		}
+		m[key] = ident
+	}
+	return m, nil
 }

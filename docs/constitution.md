@@ -52,11 +52,13 @@ implementation and support structural changes with benchmarks.
 it returns the first `parseError` plus whether the input is invalid, so
 diagnostics stay testable without widening the API.
 
-Four further surfaces are sanctioned (amended 2026-11-21; rationale:
+Four further surfaces are sanctioned (amended 2026-11-21; the delegation
+constructor added 2026-11-22; rationale:
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
-`.opencode/plan/2026-11-21-json-encoder.md`; the decoder/encoder package was
-relocated to the module root and renamed `qijson` per
+`.opencode/plan/2026-11-21-json-encoder.md`,
+`.opencode/plan/2026-11-22-third-party-struct-fields.md`; the decoder/encoder
+package was relocated to the module root and renamed `qijson` per
 `.opencode/plan/2026-11-21-package-rename.md`):
 
 - **`scanner` tokenizer** — a `Kind` and a tokenizing type exposing
@@ -65,7 +67,10 @@ relocated to the module root and renamed `qijson` per
 - **`qijson` decoder** — the reflection-free semantic layer: a generic
   `Unmarshal`/`UnmarshalInto` and the non-generic `Decode`, the `Decoder`
   interface (`DecodeJSON(*Reader) error`), `Schema[T]`/`Struct`, the `Field[T]`
-  constructors, `Reader`, and the error types.
+  constructors, a delegation constructor for a nested `Decoder`/`Encoder`
+  (`ObjectDecoder`/`ObjectDecoderPtr`, `DecoderCodec`) so a field or element
+  whose type implements `DecodeJSON`/`EncodeJSON` binds by calling them,
+  `Reader`, and the error types.
 - **`qijson` encoder** — the reflection-free encode layer, the mirror of the
   decoder: the `Encoder` interface (`EncodeJSON(*Writer) error`), `Writer` and
   `NewWriter`, the generic `Marshal` and non-generic `Encode`,
@@ -117,4 +122,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.3.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
+**Version**: 3.4.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22

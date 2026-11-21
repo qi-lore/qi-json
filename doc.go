@@ -56,4 +56,14 @@
 // encoder. The encoder writes a nil slice or map as null, sorts map keys, and
 // replaces invalid UTF-8 in a string with U+FFFD (the decoder, in contrast,
 // rejects invalid UTF-8). It never uses reflection.
+//
+// A field or element whose type is a struct from another package can be bound
+// without hand-written closures. If the foreign type implements Decoder and
+// Encoder, build the field with ObjectDecoder (or ObjectDecoderPtr for a pointer
+// field) and a container element with DecoderCodec, so it delegates to the
+// type's own DecodeJSON/EncodeJSON. The code generator emits exactly these
+// constructors for a qi-json-aware foreign type; for a plain foreign struct it
+// synthesizes a schema from the struct's exported fields. Only a foreign
+// struct's exported fields round-trip: unexported fields are skipped, as with
+// encoding/json.
 package qijson

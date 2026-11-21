@@ -1,10 +1,11 @@
 # qi-json — implementation: foreign struct fields
 
 **Date**: 2026-11-22
-**Status**: **planned — not started.** Implementation of the decisions in
+**Status**: **done (2026-11-22).** Implementation of the decisions in
 `.opencode/plan/2026-11-22-third-party-struct-fields.md` (§11). This plan is the
 TDD task list, the fixtures, the amendment text and the verification steps for
 closing the release blocker (`.opencode/plan/user-scenarios.md` §3.5, D1).
+T-F1…T-F6 are implemented and verified (see §9).
 **Related**: `.opencode/plan/2026-11-22-third-party-struct-fields.md` (research;
 the source of truth for *why*), `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
@@ -106,7 +107,7 @@ Every task ends with the mandated verification (`make verify` in order, then
 `go test -race ./...`); tasks touching decode/encode also re-run the round-trip
 fuzz. Stop at the first failure and restart from `go test ./...`.
 
-### [ ] T-F1 — runtime delegation constructors (C) + amendment
+### [X] T-F1 — runtime delegation constructors (C) + amendment
 
 - **Red**: `object_decoder_test.go` — `ObjectDecoder` decodes/encodes a value
   field through a type implementing both interfaces; JSON null leaves it
@@ -119,7 +120,7 @@ fuzz. Stop at the first failure and restart from `go test ./...`.
 - **Acceptance**: new constructors work end to end; `make verify`, `-race`, fuzz
   green; amendment + `AGENTS.md` updated atomically.
 
-### [ ] T-F2 — generator: delegate to a qi-json-aware foreign type (B)
+### [X] T-F2 — generator: delegate to a qi-json-aware foreign type (B)
 
 - **Red**: `gen_test.go` — a target whose field type is a foreign type that
   implements `DecodeJSON`/`EncodeJSON` generates an `ObjectDecoder` field (and
@@ -136,7 +137,7 @@ fuzz. Stop at the first failure and restart from `go test ./...`.
 - **Acceptance**: B selected only when both interfaces are present; deterministic;
   drift guard green.
 
-### [ ] T-F3 — generator: synthesize a schema for a plain foreign struct (A)
+### [X] T-F3 — generator: synthesize a schema for a plain foreign struct (A)
 
 - **Red**: `gen_test.go` — a target with a foreign struct field generates a
   `<pkg><Type>Schema` var and exported-field accessors in the consumer package;
@@ -152,7 +153,7 @@ fuzz. Stop at the first failure and restart from `go test ./...`.
   round-trips; A never runs when B applies (guarded by selection order);
   drift guard green.
 
-### [ ] T-F4 — generator: caller-supplied schema/codec (D)
+### [X] T-F4 — generator: caller-supplied schema/codec (D)
 
 - **Red**: `gen_test.go` — `-foreign=pkg.T=ident` makes a foreign `pkg.T` field
   emit `qijson.Object[Owner, pkg.T](name, field, ident)`; a `-foreign` entry for a
@@ -163,7 +164,7 @@ fuzz. Stop at the first failure and restart from `go test ./...`.
   `types.go` (resolve `pkg.T` to qualify the emitted type name).
 - **Acceptance**: D overrides A/B; deterministic; no runtime change.
 
-### [ ] T-F5 — interactions
+### [X] T-F5 — interactions
 
 - **Red** (extend T-F2/T-F3 tests): pointer-to-foreign-struct; `[]pkg.T` and
   `map[string]pkg.T`; `omitempty` on a foreign field (no-op for a value struct,
@@ -173,7 +174,7 @@ fuzz. Stop at the first failure and restart from `go test ./...`.
   helpers reuse `DecoderCodec` (B) or the synthesized helper (A).
 - **Acceptance**: all interaction cases generate, compile and round-trip.
 
-### [ ] T-F6 — docs + fixtures + verify
+### [X] T-F6 — docs + fixtures + verify
 
 - Extend the fixture `cmd/qi-json-gen/internal/gentest` (and a sibling package)
   with: a plain foreign struct (exported fields, a `json` tag, a non-canonical
@@ -226,3 +227,39 @@ drift guard. Constraints unchanged: no `reflect`, no `unsafe`, no
 | Non-deterministic foreign-type emission | Process foreign types and fields in sorted order; the drift guard enforces it. |
 | `PS` constraint-inference ergonomics | Falling back to a `Codec[S]` parameter is a one-line change; the T-F1 failing test decides. |
 | Drift between a foreign package's own schema and A's synthesized one | B prefers the foreign type's own methods; A only for non-qi-json types. |
+
+---
+
+## 9. Verification log (Apple M1, go1.27.3)
+
+All six tasks were implemented TDD (failing test first). Files: `field.go` (C:
+`ObjectDecoder`/`ObjectDecoderPtr`/`DecoderCodec`), `object_decoder_test.go`;
+`cmd/qi-json-gen/types.go`, `foreign.go` (new), `gen.go`, `main.go`,
+`gen_test.go`; fixtures `cmd/qi-json-gen/internal/gentest/{fixture.go,
+fixture_test.go, xtypes/xtypes.go}` and the regenerated
+`zz_qi_json_gen.go`/`zz_qi_json_gen_foreign.go`/`zz_qi_json_gen_strict.go`;
+docs `doc.go`, `README.md`, `CHANGELOG.md`, `docs/constitution.md` (v3.4.0),
+`AGENTS.md`.
+
+- `make verify` green: `go test ./...` (all packages), `gofmt -l .` empty,
+  `go vet ./...`, `golangci-lint run` → `0 issues`.
+- `go test -race ./...` green.
+- `make generate` reproduces the checked-in fixtures with no diff (the three
+  drift guards pass).
+- 8s `FuzzMarshalRoundTrip` green.
+- Design resolution notes: one `foreign.go` file holds approach A (a `go/types`
+  walk of a foreign struct's exported fields, memoized by qualified name and
+  emitted in sorted order, with a file-comment note when unexported fields are
+  skipped); D is a repeatable `-foreign=pkg.T=ident` flag consulted first in the
+  selection tree, and an unused/malformed entry is a precise error. A pointer to a
+  plain foreign struct binds through a generated null-aware `Field` literal
+  (`schemaPtrCodec`), since `qijson` has no `ObjectPtr` for a synthesized schema.
+
+### Noted for a future session
+
+- `time.Time` is a plain struct with only unexported fields, so A now synthesizes
+  an empty `timeTimeSchema` for it (an `encoding/json`-visible `time.Time` would
+  need a qi-json-aware type or a `-foreign` entry). This follows the frozen
+  policy (unexported fields skipped, not an error).
+- Embedded-struct promotion inside a foreign struct, and `encoding/json` hook
+  support, remain out of scope (as planned).

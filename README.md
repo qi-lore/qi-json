@@ -148,6 +148,7 @@ may not use reflection.
 | `string`, `bool`, `int64`, `float64` | `String`, `Bool`, `Int`, `Float` |
 | `*string`, `*bool`, `*int64`, `*float64` | `StringPtr`, `BoolPtr`, `IntPtr`, `FloatPtr` |
 | nested struct bound by another `*Schema[S]` | `Object[T, S]` |
+| nested struct whose type implements `DecodeJSON`/`EncodeJSON` | `ObjectDecoder[T, S]`, `ObjectDecoderPtr[T, S]`; element `DecoderCodec[S]` |
 | `[]E`, `map[string]V`, `[N]E` | `Slice`, `Map`, `Array` (with an element `Codec[E]`) |
 | `any` | `Any` |
 | `[]byte` | `Raw` (the value's exact literal bytes, quotes included for a string) |
@@ -258,15 +259,33 @@ integer or float from another package), both as a field and as a slice or map
 element type, using the standard library's type checker. It honours
 `json:"name"`, `json:"-"`, `json:"-,"`, and
 `json:",omitempty"` (which makes the encoder skip an empty field); an untagged
-field uses the field name. Still reported as errors: a cross-package type whose
-underlying type is not a basic scalar (such as a cross-package struct),
-pointer-to-struct fields, embedded fields, non-string map keys, and numbers above
-`2^63-1` in `uint64` fields.
+field uses the field name.
+
+A field whose type is a **struct from another package** is supported too:
+
+- If the foreign type implements both `DecodeJSON` and `EncodeJSON`, the
+  generator binds it by delegation (`ObjectDecoder`/`ObjectDecoderPtr`, or
+  `DecoderCodec` as a container element), so the other package's mapping is used
+  exactly.
+- Otherwise, for a plain foreign struct, the generator synthesizes a
+  `<pkg><Type>Schema` var in your package from the struct's exported fields,
+  recursing into nested foreign structs and emitting a type used on several paths
+  once. Only exported fields round-trip; unexported ones are skipped (the
+  generated file notes this), and an embedded foreign field is an error.
+- For a type the generator cannot introspect, pass
+  `-foreign=pkg.T=ident` to bind it to a `*qijson.Schema[pkg.T]` you own (repeat
+  the flag per type). A malformed or unused entry is an error.
+
+Still reported as errors: a cross-package type whose underlying type is not a
+basic scalar or struct (such as `uuid.UUID`, an array), an unexported foreign
+type, a foreign type implementing only one of `DecodeJSON`/`EncodeJSON`,
+same-package pointer-to-struct fields, embedded fields, non-string map keys, and
+numbers above `2^63-1` in `uint64` fields.
 
 Run it directly as:
 
 ```
-go run qi-json/cmd/qi-json-gen -type=Config[,Other...] [-strict] [-o file] [dir]
+go run qi-json/cmd/qi-json-gen -type=Config[,Other...] [-foreign=pkg.T=ident] [-strict] [-o file] [dir]
 go run qi-json/cmd/qi-json-gen [dir]   # every type marked //qi-json:generate
 ```
 
