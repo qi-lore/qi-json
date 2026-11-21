@@ -88,7 +88,7 @@ results in the final summary.
 - Go >= 1.23 (toolchain in `go.mod`: 1.27.3).
 - Two packages under module `qi-json`, no root Go package:
   - `scanner/` — `Valid` and the tokenizer over the single-pass scanner
-    (`valid.go`, `scan.go`, `token.go`);
+    (`valid.go`, `scan.go`, `token.go`, `doc.go`);
   - `marshal/` — the reflection-free semantic layer (decode now; encode later).
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
@@ -99,4 +99,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.0.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
+**Version**: 3.0.1 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
