@@ -59,8 +59,9 @@ Two further surfaces are sanctioned (amended 2026-11-21; rationale:
   `Peek`/`Read*`/`Begin*`/`End*`/`Skip`/`Offset`/`Err`, so the semantic layer
   consumes the same engine.
 - **`marshal` decoder** — the reflection-free semantic layer: a generic
-  `Unmarshal`/`UnmarshalInto`, `Schema[T]`/`Struct`, the `Field[T]` constructors,
-  `Reader`, and the error types.
+  `Unmarshal`/`UnmarshalInto`, the `Decoder` interface (`DecodeJSON(*Reader)
+  error`), `Schema[T]`/`Struct`, the `Field[T]` constructors, `Reader`, and the
+  error types.
 
 `marshal` is **not** API-compatible with `encoding/json`; that is deliberate. It
 MUST NOT import `encoding/json` and MUST NOT use `reflect` or `unsafe`; struct

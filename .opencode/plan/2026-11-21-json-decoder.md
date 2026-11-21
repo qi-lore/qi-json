@@ -1,7 +1,7 @@
 # qi-json Decoder — decisions, tasks, and handoff
 
 **Date**: 2026-11-21
-**Status**: decisions agreed; T0–T3 done; decoder primitives and struct binding landed.
+**Status**: decisions agreed; T0–T4 done; generic entry point and interface landed.
 **Supersedes (in part)**: `.opencode/plan/2026-11-21-json-unmarshal-research.md`.
 **Related**: `docs/task.md`, `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-scanner-rewrite.md`.
@@ -122,12 +122,12 @@ last-wins/strict; nested object; null into scalar and pointer;
 **Acceptance**: `make verify` green; decode benchmark recorded
 (`BenchmarkStructDecode-8  412.0 ns/op  1048 B/op  4 allocs/op`).
 
-### [ ] T4 — Generic entry point and interface (`unmarshal.go`) — **next**
+### [X] T4 — Generic entry point and interface (`unmarshal.go`) — **done**
 Tests: `Unmarshal[Config]`; `UnmarshalInto` merge; `Decoder` dispatch; invalid
 target (nil pointer, wrong type).
 **Acceptance**: `go doc ./marshal` shows only the intended surface.
 
-### [ ] T5 — Containers (`field.go`) — **pending**
+### [ ] T5 — Containers (`field.go`) — **next**
 Tests: slice of primitives/structs, empty; map of strings/structs, empty; fixed
 arrays overflow/underflow; `any` to map/array/string/float64/bool/nil; `Raw`.
 **Acceptance**: `make verify` green.
@@ -221,10 +221,11 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
 
 ## 8. Session state (handoff) — resume here
 
-- **Repo**: git repository, branch `main`. Last commit `5e2c54a`
-  `feat(scanner): add pull tokenizer over the syntax engine`. T2 and T3
-  (`marshal/reader.go`, `errors.go`, `field.go`, `schema.go`, `doc.go` and their
-  tests) are in the working tree, not yet committed.
+- **Repo**: git repository, branch `main`. Last commit `68eea65`
+  `feat(marshal): add decoder reader, errors, and schema binding` (T2 + T3). T4
+  (`marshal/unmarshal.go`, `marshal/unmarshal_test.go`), the `marshal/doc.go`
+  and `docs/constitution.md` (Article VI: name the `Decoder` interface) edits are
+  in the working tree, not yet committed.
 - **Done**: the scanner — `scanner/scan.go` + `valid.go`: single pass, no `goto`,
   faster than `encoding/json.Valid`, 0 allocs. **T0** (governance: constitution
   Article VI + Additional Constraints, `AGENTS.md`, `marshal/doc.go`). **T1**
@@ -294,12 +295,38 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
     `BenchmarkStructDecode-8  412.0 ns/op  1048 B/op  4 allocs/op` — the four
     allocations are the tokenizer, the reader, the escaped result value, and the
     decoded string.
-- **Not started**: `marshal/unmarshal.go` (T4) and the containers in `field.go`
-  (T5).
-- **Next action**: start **T4**: `marshal/unmarshal.go` — the generic entry point
-  `Unmarshal[T any, PT interface{ *T; Decoder }]` / `UnmarshalInto`, the
-  `Decoder` interface, and invalid-target handling; then confirm `go doc
-  ./marshal` shows only the intended surface.
+- **T4** (`marshal/unmarshal.go` + `marshal/unmarshal_test.go` + `doc.go` +
+  Article VI): the generic entry point and interface.
+  - `Decoder` (`DecodeJSON(*Reader) error`), `Unmarshal[T any, PT interface{ *T;
+    Decoder }]`, and `UnmarshalInto[T, PT]`. The generic form uses the
+    pointer-receiver constraint trick so the type argument alone selects the
+    decoder; `PT(v)` converts the target to the constraint type to call the
+    method. `Unmarshal` starts from a zero T; `UnmarshalInto` decodes in place
+    (merge). Both verify the document holds exactly one value (a trailing `Peek`),
+    matching `Schema.UnmarshalInto`.
+  - **Invalid target**: a nil `*T` returns the unexported sentinel `errNilTarget`
+    (a programming error, not an `*Error`). It adds no exported identifier, so no
+    amendment beyond naming `Decoder`. A JSON type that does not match T still
+    reports `KindType`; invalid JSON reports `KindSyntax`; trailing data reports
+    `KindSyntax`.
+  - **Amendment**: Article VI now names the `Decoder` interface in the sanctioned
+    `marshal` surface (it was implicit in the T0 wording). `AGENTS.md` refers to
+    Article VI generically, so it needed no change.
+  - Tests: `TestUnmarshalGeneric`, `TestUnmarshalIntoMerge`,
+    `TestUnmarshalDecoderDispatch` (a type implementing `DecodeJSON` directly,
+    proving dispatch rather than Schema), `TestUnmarshalInvalidTarget`
+    (nil pointer / wrong type / invalid JSON / trailing data),
+    `TestUnmarshalIntoPreservesTargetOnError`.
+  - `go doc ./marshal` lists exactly the intended surface; `errNilTarget` is
+    unexported and absent.
+  - **Benchmark recorded** (Apple M1, go1.27.3):
+    `BenchmarkUnmarshalGeneric-8  285.2 ns/op  1024 B/op  4 allocs/op` (same four
+    allocations as T3). `Valid` benchmarks unchanged.
+- **Not started**: the containers in `field.go` (T5) and the remaining tasks
+  (T6–T9).
+- **Next action**: start **T5**: the container fields in `marshal/field.go` —
+  `Slice`, `Map`, fixed-size arrays, `Any`, `Raw` — with the tests named in §5
+  (`TestSlice*`, `TestMap*`, `TestArrayFixedSize`, `TestAny`, `TestRaw`).
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add

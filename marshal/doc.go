@@ -23,4 +23,14 @@
 // pointer field to nil. A member that no field matches is ignored unless
 // RejectUnknown is set; a member that repeats is overwritten unless
 // RejectDuplicate is set.
+//
+// A type that implements Decoder can be decoded without naming its Schema. The
+// usual implementation delegates to a Schema:
+//
+//	func (c *Config) DecodeJSON(r *marshal.Reader) error {
+//	    return configSchema.Decode(r, c)
+//	}
+//
+//	cfg, err := marshal.Unmarshal[Config](data)        // fresh value
+//	err = marshal.UnmarshalInto[Config](data, &cfg)    // merge into an existing value
 package marshal
