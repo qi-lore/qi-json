@@ -11,6 +11,7 @@ import (
 )
 
 //go:generate go run qi-json/cmd/qi-json-gen -type=Config,Point,Nums
+//go:generate go run qi-json/cmd/qi-json-gen -strict -type=Strict -o zz_qi_json_gen_strict.go
 
 // Config exercises every field family the generator supports.
 type Config struct {
@@ -55,4 +56,11 @@ type Nums struct {
 	Ints  []int8    `json:"ints"`
 	Uints []uint32  `json:"uints"`
 	Float []float32 `json:"float"`
+}
+
+// Strict is generated with -strict, so its schema rejects unknown and duplicate
+// object members.
+type Strict struct {
+	A int64  `json:"a"`
+	B string `json:"b"`
 }

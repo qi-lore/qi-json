@@ -210,12 +210,14 @@ pointer-to-struct fields, embedded fields, non-string map keys, and numbers abov
 Run it directly as:
 
 ```
-go run qi-json/cmd/qi-json-gen -type=Config[,Other...] [-o file] [dir]
+go run qi-json/cmd/qi-json-gen -type=Config[,Other...] [-strict] [-o file] [dir]
 go run qi-json/cmd/qi-json-gen [dir]   # every type marked //qi-json:generate
 ```
 
-The output is deterministic and checked in; `TestGeneratedFixtureUpToDate` fails
-if it drifts from the generator.
+With `-strict`, every generated schema chains `RejectUnknown` and
+`RejectDuplicate`, so decoding rejects unknown and duplicate object members
+(see [Decoding rules](#decoding-rules)). The output is deterministic and checked
+in; `TestGeneratedFixtureUpToDate` fails if it drifts from the generator.
 
 ## The scanner
 

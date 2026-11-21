@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `marshal`: the decoder rejects invalid UTF-8 in a string value or object
+  member name as a syntax error. The scanner stays syntax-only, so it remains
+  more permissive than the decoder on this one point.
+- `cmd/qi-json-gen`: cross-package named types whose underlying type is a basic
+  scalar (`time.Duration`, or any named `string`/`bool`/integer/float from
+  another package) are now resolved with the standard library's type checker, as
+  fields, pointer fields, and slice or map elements.
+- `cmd/qi-json-gen`: a `-strict` flag that makes every generated schema reject
+  unknown and duplicate object members.
 
 ## [0.1.0] - 2026-11-21
 

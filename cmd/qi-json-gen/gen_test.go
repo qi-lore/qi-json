@@ -250,6 +250,39 @@ type Config struct {
 	}
 }
 
+func TestGenerateStrict(t *testing.T) {
+	dir := writePkg(t, `package example
+
+type Config struct {
+	Name string
+	Port int64
+}
+`)
+	got, err := generateWith(dir, []string{"Config"}, true)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(string(got), ").RejectUnknown().RejectDuplicate()") {
+		t.Errorf("strict output missing the opt-in chain:\n%s", got)
+	}
+}
+
+func TestGenerateNotStrict(t *testing.T) {
+	dir := writePkg(t, `package example
+
+type Config struct {
+	Name string
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if strings.Contains(string(got), "RejectUnknown") {
+		t.Errorf("non-strict output must not chain the strict opt-ins:\n%s", got)
+	}
+}
+
 func TestGenerateErrors(t *testing.T) {
 	cases := []struct {
 		name string
@@ -335,6 +368,23 @@ func TestGeneratedFixtureUpToDate(t *testing.T) {
 		t.Fatalf("generate: %v", err)
 	}
 	path := filepath.Join(dir, defaultOutput)
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v (run `make generate`)", path, err)
+	}
+	if string(got) != string(want) {
+		t.Errorf("%s is out of date; run `make generate`\n--- generated ---\n%s", path, got)
+	}
+}
+
+// TestGeneratedStrictFixtureUpToDate is the drift guard for the -strict fixture.
+func TestGeneratedStrictFixtureUpToDate(t *testing.T) {
+	const dir = "internal/gentest"
+	got, err := generateWith(dir, []string{"Strict"}, true)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	path := filepath.Join(dir, "zz_qi_json_gen_strict.go")
 	want, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v (run `make generate`)", path, err)

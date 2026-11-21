@@ -74,11 +74,20 @@ type gen struct {
 	// extraImports maps an import path to the name it is imported under, for
 	// packages referenced by cross-package field types.
 	extraImports map[string]string
+
+	// strict makes every generated schema reject unknown and duplicate members.
+	strict bool
 }
 
-// generate parses dir and returns the formatted generated source for types. When
-// types is empty, every marked type is generated.
+// generate parses dir and returns non-strict generated source for types.
 func generate(dir string, types []string) ([]byte, error) {
+	return generateWith(dir, types, false)
+}
+
+// generateWith parses dir and returns the formatted generated source for types.
+// When types is empty, every marked type is generated. When strict is set, every
+// schema rejects unknown and duplicate members.
+func generateWith(dir string, types []string, strict bool) ([]byte, error) {
 	g := &gen{
 		fset:          token.NewFileSet(),
 		decls:         map[string]*ast.TypeSpec{},
@@ -88,6 +97,7 @@ func generate(dir string, types []string) ([]byte, error) {
 		known:         map[string]bool{},
 		helpers:       map[string]string{},
 		extraImports:  map[string]string{},
+		strict:        strict,
 	}
 	if err := g.load(dir); err != nil {
 		return nil, err
@@ -282,7 +292,11 @@ func (g *gen) renderType(buf *bytes.Buffer, name string) error {
 			fmt.Fprintf(buf, "\t%s,\n", c.code)
 		}
 	}
-	buf.WriteString(")\n\n")
+	if g.strict {
+		buf.WriteString(").RejectUnknown().RejectDuplicate()\n\n")
+	} else {
+		buf.WriteString(")\n\n")
+	}
 	fmt.Fprintf(buf, "func (v *%s) DecodeJSON(r *marshal.Reader) error {\n\treturn %s.Decode(r, v)\n}\n", name, schemaVar)
 	return nil
 }

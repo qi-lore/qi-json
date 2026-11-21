@@ -11,7 +11,8 @@
 // comma-separated list. Without -type the tool scans the package for type
 // declarations carrying a //qi-json:generate comment. dir defaults to "." and
 // must hold exactly one non-test package. The output file defaults to
-// <dir>/zz_qi_json_gen.go.
+// <dir>/zz_qi_json_gen.go. With -strict every generated schema rejects unknown
+// and duplicate object members.
 //
 // The generated code targets only the exported marshal surface; it is ordinary
 // source in the caller's package. The tool is stdlib-only and uses no reflect or
@@ -48,10 +49,12 @@ func (s *stringList) Set(v string) error {
 func main() {
 	var types stringList
 	var out string
+	var strict bool
 	flag.Var(&types, "type", "type name to generate for; repeatable or comma-separated")
 	flag.StringVar(&out, "o", "", "output file (default <dir>/"+defaultOutput+")")
+	flag.BoolVar(&strict, "strict", false, "generated schemas reject unknown and duplicate members")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: qi-json-gen [-type=T[,T...]] [-o file] [dir]")
+		fmt.Fprintln(os.Stderr, "usage: qi-json-gen [-type=T[,T...]] [-strict] [-o file] [dir]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -65,7 +68,7 @@ func main() {
 		dir = flag.Arg(0)
 	}
 
-	src, err := generate(dir, types)
+	src, err := generateWith(dir, types, strict)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "qi-json-gen: %v\n", err)
 		os.Exit(1)

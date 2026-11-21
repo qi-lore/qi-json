@@ -148,3 +148,26 @@ func TestGeneratedRangeErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestGeneratedStrict checks that a -strict schema rejects unknown and duplicate
+// members end to end.
+func TestGeneratedStrict(t *testing.T) {
+	var s Strict
+	if err := marshal.UnmarshalInto[Strict]([]byte(`{"a":1,"b":"x"}`), &s); err != nil {
+		t.Fatalf("UnmarshalInto: %v", err)
+	}
+	if s.A != 1 || s.B != "x" {
+		t.Errorf("Strict = %+v", s)
+	}
+
+	var e *marshal.Error
+	err := marshal.UnmarshalInto[Strict]([]byte(`{"a":1,"nope":2}`), &s)
+	if !errors.As(err, &e) || e.Kind != marshal.KindUnknownField {
+		t.Errorf("unknown member: err = %v, want KindUnknownField", err)
+	}
+
+	err = marshal.UnmarshalInto[Strict]([]byte(`{"a":1,"a":2}`), &s)
+	if !errors.As(err, &e) || e.Kind != marshal.KindDuplicateField {
+		t.Errorf("duplicate member: err = %v, want KindDuplicateField", err)
+	}
+}

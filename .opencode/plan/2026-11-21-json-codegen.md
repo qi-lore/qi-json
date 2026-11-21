@@ -208,6 +208,6 @@ amendment. Amend together, before code:
 - **Update (2026-11-21)**: cross-package named types with a basic-scalar
   underlying type are now supported via the standard library's type checker (see
   `.opencode/plan/2026-11-21-post-decoder-backlog.md` §4). T10 is done as
-  `marshal.Decode`.
-- **Not done / next**: a `-strict` flag to emit
-  `RejectUnknown`/`RejectDuplicate`.
+  `marshal.Decode`. The `-strict` flag is done (backlog §5).
+- **Not done / next**: none on this plan; the encoder is a separate effort
+  (backlog §6).
