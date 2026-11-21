@@ -1,7 +1,7 @@
 # qi-json Decoder — decisions, tasks, and handoff
 
 **Date**: 2026-11-21
-**Status**: decisions agreed; T0–T4 done; generic entry point and interface landed.
+**Status**: decisions agreed; T0–T6 done; fuzz and differential testing green.
 **Supersedes (in part)**: `.opencode/plan/2026-11-21-json-unmarshal-research.md`.
 **Related**: `docs/task.md`, `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-scanner-rewrite.md`.
@@ -133,12 +133,14 @@ Tests: slice of primitives/structs, empty; map of strings/structs, empty; fixed
 arrays overflow/underflow; `any` to map/array/string/float64/bool/nil; `Raw`.
 **Acceptance**: `make verify` green.
 
-### [ ] T6 — Fuzz and differential testing — **pending**
-`FuzzUnmarshal` (never panics; error offset in range);
-`FuzzUnmarshalMatchesValid`.
-**Acceptance**: 10s fuzz clean.
+### [X] T6 — Fuzz and differential testing — **done**
+`FuzzUnmarshal` (never panics; every failure is an `*Error` with a JSON path
+and an in-range offset; a successful decode is deterministic);
+`FuzzUnmarshalMatchesValid` (success ⇒ `Valid`; a syntax error ⇒ `!Valid`).
+**Acceptance**: 10s fuzz clean on both targets. See §8 for the edge case the
+fuzzer surfaced.
 
-### [ ] T7 — Bulk fast paths (performance) — **pending**
+### [ ] T7 — Bulk fast paths (performance) — **next**
 String/number/whitespace fast paths with a differential test against the
 reference path.
 **Acceptance**: ≥ 1 GB/s on string-heavy documents; 0 allocs; verify green.
@@ -349,9 +351,28 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
     `TestArrayFixedSize` (exact/overflow/underflow), `TestAny`
     (object/array/string/float64/bool/null), `TestRaw`, and
     `TestRawDoesNotAliasInput`. `make verify`, `-race`, `go doc ./marshal` green.
-- **Not started**: the remaining tasks (T6–T9).
-- **Next action**: start **T6**: `FuzzUnmarshal` (never panics; error offset in
-  range) and `FuzzUnmarshalMatchesValid`; 10s fuzz clean.
+- **T6** (`marshal/fuzz_test.go`): fuzz and differential testing.
+  - `fuzzAny` is a Schema-less `Decoder` that decodes any value at the document
+    root with `decodeAny`, so one target exercises the whole semantic layer over
+    arbitrary input.
+  - `FuzzUnmarshal` asserts no panic, that every failure is an `*Error` with a
+    non-empty path and an offset in `0..len(data)`, and that a successful decode
+    is deterministic (checked with a reflection-free `anyEqual`, since `marshal`
+    may not use `reflect`).
+  - `FuzzUnmarshalMatchesValid` asserts the two sound directions: a successful
+    decode proves the document is valid (`Valid`), and a reported syntax error
+    proves it is not. The converse does not hold and is not asserted.
+  - **Edge case the fuzzer surfaced** (`1e700A`): a number that overflows
+    `float64` is rejected as a **type** error before the trailing garbage is
+    reached, so invalid JSON does not always yield a syntax error. The test was
+    corrected to assert only the sound directions; `1e700A`/`1e999x` are kept as
+    seeds. This matches `encoding/json`, which likewise converts the number
+    before checking for trailing data.
+  - `make verify`, `-race`, and 10s fuzz on both targets are green.
+- **Not started**: the remaining tasks (T7–T9).
+- **Next action**: start **T7**: bulk fast paths (string/number/whitespace)
+  behind a differential test against the reference path; ≥ 1 GB/s on
+  string-heavy documents, 0 allocs, verify green.
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add
