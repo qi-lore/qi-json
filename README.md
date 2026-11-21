@@ -1,0 +1,249 @@
+# qi-json
+
+A from-scratch JSON library for Go. No third-party code, no `encoding/json`, and
+no `reflect` or `unsafe`: the decoder binds struct fields with compile-time
+accessor closures, optionally generated from struct tags.
+
+| Package | Import path | Role |
+|---|---|---|
+| `scanner` | `qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
+| `marshal` | `qi-json/marshal` | Semantic layer: the reflection-free decoder |
+| `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
+
+The decoder is complete and benchmarked; the API may still change before a first
+tagged release.
+
+## Why another JSON library
+
+- **Independent implementation.** The scanner and decoder are written from
+  scratch against `docs/task.md`. `encoding/json` is not imported anywhere in the
+  module, including tests and benchmarks.
+- **No reflection.** `marshal` decodes into concrete Go types through accessor
+  closures. That keeps struct decoding predictable and allocation-tight — and it
+  is why the API is deliberately **not** `encoding/json`-compatible.
+- **Fast syntax layer.** `Valid` is a single pass over the byte slice with an
+  explicit container stack; it does no per-byte handler dispatch and allocates
+  nothing for documents nesting up to 32 levels.
+- **Precise errors.** Every decode failure is a `*marshal.Error` carrying the
+  JSON path (`$.items[2].name`), the byte offset, and a failure kind, wrapping a
+  `*marshal.TypeError` for type mismatches.
+- **Boilerplate is optional.** Hand-write the field mapping, or let
+  `qi-json-gen` emit it from `json` struct tags.
+
+## Using it
+
+`qi-json` is a local module (its module path is `qi-json`), so point a `replace`
+directive at the checkout:
+
+```
+require qi-json v0.0.0
+replace qi-json => ../qi-json
+```
+
+## Quick start
+
+Map JSON members to struct fields with a `Schema`, then implement `DecodeJSON`:
+
+```go
+package example
+
+import "qi-json/marshal"
+
+type Config struct {
+	Name string
+	Port int64
+}
+
+var configSchema = marshal.Struct(
+	marshal.String[Config]("name", func(c *Config) *string { return &c.Name }),
+	marshal.Int[Config]("port", func(c *Config) *int64 { return &c.Port }),
+)
+
+func (c *Config) DecodeJSON(r *marshal.Reader) error {
+	return configSchema.Decode(r, c)
+}
+
+func Load(data []byte) (Config, error) {
+	return marshal.Unmarshal[Config](data)   // fresh value
+}
+
+func Merge(data []byte, cfg *Config) error {
+	return marshal.Decode(data, cfg)         // no type argument; in place
+}
+```
+
+`UnmarshalInto[Config](data, &cfg)` is the generic spelling of the in-place
+form. Both the generic and non-generic entry points decode exactly one JSON
+value and reject trailing input.
+
+### Field constructors
+
+| Go field | Constructor |
+|---|---|
+| `string`, `bool`, `int64`, `float64` | `String`, `Bool`, `Int`, `Float` |
+| `*string`, `*bool`, `*int64`, `*float64` | `StringPtr`, `BoolPtr`, `IntPtr`, `FloatPtr` |
+| nested struct bound by another `*Schema[S]` | `Object[T, S]` |
+| `[]E`, `map[string]V`, `[N]E` | `Slice`, `Map`, `Array` (with an element decoder) |
+| `any` | `Any` |
+| `[]byte` | `Raw` (the value's exact literal bytes, quotes included for a string) |
+
+Constructors are generic in the target type and take an accessor, so the field
+set is fixed at compile time. `Array` takes a slice view of the array
+(`func(c *C) []E { return c.V[:] }`) and requires the exact element count.
+
+### Decoding rules
+
+- The document must hold exactly one JSON value; anything after it is a syntax
+  error.
+- A JSON `null` leaves a value field unchanged and sets a pointer field to `nil`.
+- An object member that no field matches is ignored unless `RejectUnknown` is
+  set. A repeated member is overwritten (last one wins) unless
+  `RejectDuplicate` is set. Both are methods on `*Schema[T]`.
+- `ReadInt`/`Int` accept integer literals only: `1.0` and `1e3` are type errors,
+  as is a value outside `int64`. `ReadFloat`/`Float` reject overflow and turn
+  underflow into `0`.
+- Strings are unescaped (`\" \\ \/ \b \f \n \r \t \uXXXX`, including surrogate
+  pairs); a lone surrogate becomes `U+FFFD`. The decoder does not validate
+  UTF-8, matching the syntax-only scanner.
+- `Slice`, `Map`, and `Array` fields build into a temporary and assign only on
+  success, so a failed decode leaves that field unchanged. An `Object` field
+  decodes into the nested struct directly, so a failure partway through can
+  leave its earlier members set.
+
+### Inspecting errors
+
+```go
+var e *marshal.Error
+if errors.As(err, &e) {
+	// e.Path   "$.port"
+	// e.Offset 8
+	// e.Kind   marshal.KindType
+	// e.Err    *marshal.TypeError{Want: "integer", Got: "number 1.5 is not an integer"}
+}
+```
+
+`Error` wraps its cause, so `errors.As`/`errors.Unwrap` also reach the
+`*TypeError` or the scanner's error. `ErrorKind` is one of `KindSyntax`,
+`KindType`, `KindUnknownField`, `KindDuplicateField` (and the reserved
+`KindDepth`; the decoder applies no nesting limit today).
+
+## Code generation
+
+Instead of writing the closures by hand, tag the struct and run the generator:
+
+```go
+//go:generate go run qi-json/cmd/qi-json-gen -type=Config
+
+type Config struct {
+	Name string   `json:"name"`
+	Port int64    `json:"port"`
+	Tags []string `json:"tags"`
+	Blob []byte   `json:"blob"`
+}
+```
+
+`go generate ./...` emits `zz_qi_json_gen.go` in the same package with a
+`configSchema` and a `DecodeJSON` method, after which
+`marshal.Unmarshal[Config](data)` works unchanged.
+
+The generator supports `string`, `bool`, `float32`/`float64`, every signed and
+unsigned integer width (plus pointers), same-package named types with those
+underlying types, `[]E`, `map[string]V`, `[N]E`, `[]byte`, `any`, and nested
+same-package structs that are generated too. It honours `json:"name"`,
+`json:"-"`, and `json:"-,"`; `omitempty` is ignored because it is an encode
+concern, and an untagged field uses the field name. Unsupported in v1 and
+reported as errors: cross-package named types, pointer-to-struct fields, embedded
+fields, non-string map keys, and numbers above `2^63-1` in `uint64` fields.
+
+Run it directly as:
+
+```
+go run qi-json/cmd/qi-json-gen -type=Config[,Other...] [-o file] [dir]
+go run qi-json/cmd/qi-json-gen [dir]   # every type marked //qi-json:generate
+```
+
+The output is deterministic and checked in; `TestGeneratedFixtureUpToDate` fails
+if it drifts from the generator.
+
+## The scanner
+
+```go
+ok := scanner.Valid(data)                         // syntax only
+
+tok := scanner.NewTokenizer(data)
+kind, err := tok.Peek()                           // KindNull ... KindEnd
+raw, err := tok.ReadString()                      // aliases data, still escaped
+```
+
+`Valid` accepts any JSON value at the top level, applies no nesting depth limit,
+and does not check UTF-8 or surrogate pairing. `Tokenizer` is pull-based and
+shares the same scalar scanners and error contract, so a decode failure reports
+the same message and 1-based position as `Valid` would. It is the engine behind
+`marshal`; most callers should use `marshal` instead. Byte slices returned by
+`ReadString`, `ReadNumber`, and `ReadRaw` alias the input. `Valid` is safe for
+concurrent use; a `Tokenizer` must not be copied or shared.
+
+## Design constraints
+
+- Standard library only; no `encoding/json` anywhere, including tests.
+- `marshal` and `cmd/qi-json-gen` use neither `reflect` nor `unsafe`.
+- The scanner's `Valid` hot path stays allocation-free for nesting up to 32
+  levels, with no `goto`, labels, or per-byte handler dispatch.
+- The decoder API is intentionally not a drop-in replacement for
+  `encoding/json`; see `docs/constitution.md` Article VI for the sanctioned
+  surface.
+- Tests are hand-built tables; TDD is mandatory.
+
+## Performance
+
+Measured on an Apple M1 with go1.27.3 (`make bench`). Treat them as ballpark
+numbers, not guarantees.
+
+| Benchmark | Result |
+|---|---|
+| `BenchmarkValidObject` | 844 MB/s, 0 allocs |
+| `BenchmarkValidArrayOfObjects` | 833 MB/s, 0 allocs |
+| `BenchmarkValidNumbers` | 1062 MB/s, 0 allocs |
+| `BenchmarkValidString` | 2625 MB/s, 0 allocs |
+| `BenchmarkDecodeStringsMedium` (10k × 64 B) | 1119 MB/s |
+| `BenchmarkDecodeStringsLong` (2k × 512 B) | 2856 MB/s |
+| `BenchmarkDecodeBigString` (64 KiB) | 4157 MB/s |
+| `BenchmarkStructDecode` | 417 ns/op, 1208 B/op, 4 allocs/op |
+| `BenchmarkDecodeNonGeneric` | 285 ns/op, 1160 B/op, 3 allocs/op |
+
+During development `Valid` was 1.10×–1.77× faster than `encoding/json.Valid` on
+the four benchmark documents. That comparison is not part of the suite because
+the module may not import `encoding/json`.
+
+## Development
+
+Every change must pass the repository's verification sequence, in order:
+
+```
+make verify    # go test ./... -> gofmt -l . -> go vet ./... -> golangci-lint run
+```
+
+Other useful targets:
+
+```
+make race      # go test -race ./...
+make fuzz      # 10s FuzzValid on the scanner
+make bench     # benchmarks with memory stats
+make generate  # regenerate the codegen fixture
+make cover     # coverage profile and per-function output
+```
+
+## Repository layout
+
+```
+scanner/                 Valid, the tokenizer, benchmarks and differential tests
+marshal/                 Reader, Schema, field constructors, entry points, errors, fuzz tests
+cmd/qi-json-gen/         the code generator and its end-to-end fixture
+docs/task.md             scanner specification
+docs/constitution.md     governing rules and the sanctioned public surface
+.opencode/plan/          design decisions, task lists and verification logs
+```
+
+The decoder plan (`.opencode/plan/2026-11-21-json-decoder.md`) is the handoff
+document for the semantic layer; the codegen plan
+(`.opencode/plan/2026-11-21-json-codegen.md`) covers `qi-json-gen`.

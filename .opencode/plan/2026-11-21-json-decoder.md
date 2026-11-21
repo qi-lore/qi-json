@@ -1,8 +1,8 @@
 # qi-json Decoder — decisions, tasks, and handoff
 
 **Date**: 2026-11-21
-**Status**: decisions agreed; T0–T7 done; fuzz, differential testing and the bulk
-fast paths are green.
+**Status**: decisions agreed; T0–T10 done (including T9 documentation); fuzz,
+differential testing and the bulk fast paths are green.
 **Supersedes (in part)**: `.opencode/plan/2026-11-21-json-unmarshal-research.md`.
 **Related**: `docs/task.md`, `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-scanner-rewrite.md`.
@@ -153,7 +153,16 @@ regress and are not shipped (see §8).
 Designed and implemented; see `.opencode/plan/2026-11-21-json-codegen.md` for the
 decisions, tasks and verification log. Adds a third package
 (`cmd/qi-json-gen`, constitution v3.1.0).
-### [ ] T9 — Documentation — **deferred**.
+### [X] T9 — Documentation (`README.md`) — **done**
+Added a root `README.md`: what the library is and why (from scratch, no
+`encoding/json`, no reflection), the three packages, a hand-written quick start
+plus the codegen path and supported tags, decoding rules, error inspection, the
+scanner API, design constraints, measured performance, development commands and
+the repository layout. Package docs (`marshal/doc.go`, `scanner/doc.go`, the
+`cmd/qi-json-gen` doc) were already current, so no Go file changed.
+**Acceptance**: README matches the shipped API and the recorded benchmarks
+(re-measured on an Apple M1, go1.27.3); `make verify` green; changes committed
+locally.
 ### [X] T10 — Non-generic entry point (API ergonomics) — **done**
 Shipped as `marshal.Decode(data []byte, v Decoder) error`: a thin wrapper over
 `newReader` + `DecodeJSON` + the trailing-value check, with `UnmarshalInto`
@@ -457,11 +466,12 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
     `ValidObject` ~831 MB/s, `ValidArrayOfObjects` ~821, `ValidNumbers` ~1039,
     `ValidString` ~2530–2575 MB/s — all `0 B/op`, `0 allocs/op`.
   - `make verify`, `-race`, and 12s fuzz on all three targets are green.
-- **Not started**: **T8** (codegen) and **T10** (non-generic `Decode`) are now
-  **done** — T8 in `cmd/qi-json-gen` (constitution v3.1.0), T10 as
-  `marshal.Decode` (constitution v3.1.1). **T9** (documentation) is optional and
-  the only remaining task.
-- **Next action**: none required. T9 (package docs, README) remains optional.
+- **Not started**: nothing. **T8** (codegen) is done in `cmd/qi-json-gen`
+  (constitution v3.1.0), **T10** (non-generic `Decode`) is done as
+  `marshal.Decode` (constitution v3.1.1), and **T9** (documentation) is the root
+  `README.md`.
+- **Next action**: none. The decoder task list is complete; future work is
+  encoder scope, cross-package codegen types, or a `-strict` generator flag.
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add
