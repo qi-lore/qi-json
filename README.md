@@ -10,18 +10,20 @@ accessor closures, optionally generated from struct tags.
 | `qijson` | `qi-json` | Semantic layer: the reflection-free decoder and encoder |
 | `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.1.1** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.2.0** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.1.1** (2026-11-22).
+Current release: **v0.2.0** (2026-11-22).
 
-v0.1.1 adds the reflection-free encoder, resolves cross-package named scalar
-types in the generator, and relocates the semantic layer to the module root as
-package `qijson` (import path `qi-json`) — a breaking import-path change. Being
-pre-1.0, the exported API may still change in a minor release. See
-[CHANGELOG.md](CHANGELOG.md) for the change history; the git tags record the
+v0.2.0 adds support for struct fields whose type is a struct from another
+package, closing the release blocker: the generator delegates to a qi-json-aware
+foreign type, synthesizes a schema for a plain foreign struct, and accepts a
+`-foreign=pkg.T=ident` escape hatch, backed by the
+`ObjectDecoder`/`ObjectDecoderPtr`/`DecoderCodec` delegation constructors in
+`qijson`. Being pre-1.0, the exported API may still change in a minor release.
+See [CHANGELOG.md](CHANGELOG.md) for the change history; the git tags record the
 release series.
 
 ## Why another JSON library

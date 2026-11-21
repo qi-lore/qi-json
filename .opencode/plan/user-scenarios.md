@@ -1,8 +1,10 @@
 # qi-json — user scenarios
 
 **Date**: 2026-11-22
-**Status**: recorded. The third-party struct-field gap is a **release blocker** and
-drives the next task, `.opencode/plan/2026-11-22-third-party-struct-fields.md`.
+**Status**: recorded. The third-party struct-field gap was a **release blocker**,
+closed in **v0.2.0** (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`);
+the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fields.md`.
+The **next task** is **D3**, the Go-version floor mismatch (§2.5).
 **Related**: `docs/constitution.md`, `README.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
 
@@ -79,7 +81,8 @@ A throwaway copy set to `go 1.23.0` + `toolchain go1.27.3` built and passed
 
 Recorded as a **separate open issue** (D3): candidate fix is
 `go 1.23.0` + `toolchain go1.27.3` in `go.mod`, or correcting the documented
-floor. **Not** the next task.
+floor. **Originally** not the next task; the struct-field blocker closed in
+v0.2.0, so **D3 is now the next task**.
 
 ---
 
@@ -182,7 +185,7 @@ it decodes), but with real limits:
   `DecodeJSON`. Even a `qijson`-aware foreign type has no one-liner; the caller
   writes a raw `Field[T]` closure that calls `DecodeJSON`.
 
-### 3.5 The gap (release blocker)
+### 3.5 The gap (release blocker, closed in v0.2.0)
 
 A struct field whose type is a **struct defined in another package** is the worst
 case for the library:
@@ -194,31 +197,36 @@ case for the library:
   `Decoder`.
 
 Using a struct from another package as a field is a common Go pattern across the
-whole ecosystem. Without support the library is not usable for many real types.
-This gap must be closed before the library can be considered useful.
+whole ecosystem. Without support the library is not usable for many real types;
+this gap was closed in **v0.2.0** (see §3.6 and §4).
 
 ### 3.6 Decision
 
-**D1** — the third-party struct-field gap is a **release blocker** and drives the
-next task: **"Research ways to fix the gap"**
-(`.opencode/plan/2026-11-22-third-party-struct-fields.md`).
+**D1** — the third-party struct-field gap was a **release blocker**. Research
+(`.opencode/plan/2026-11-22-third-party-struct-fields.md`) led to the layered fix,
+and the implementation (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`)
+**closed the blocker in v0.2.0**. The next task is **D3** (§4).
 
 ---
 
 ## 4. Decisions
 
-- **D1 (blocker + next task).** Struct fields whose type is a struct from another
-  package must be supported. Research task opened; see
-  `.opencode/plan/2026-11-22-third-party-struct-fields.md`.
+- **D1 (release blocker — closed).** Struct fields whose type is a struct from
+  another package must be supported. Research task opened; see
+  `.opencode/plan/2026-11-22-third-party-struct-fields.md`. **Closed in v0.2.0**
+  (implementation `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`).
 - **D2 (research constraints).** Any fix must preserve: no `reflect`, no
   `unsafe`, no `encoding/json`; the code generator stays stdlib-only,
   deterministic and drift-guarded; the decoder and encoder stay symmetric; new
   exported identifiers need a constitution amendment.
-- **D3 (Go-version floor).** Recorded, not in scope of the next task. Candidate
-  fix: `go 1.23.0` + `toolchain go1.27.3`; or correct the documented floor to
-  1.27.3. Follow-up, separate from the struct work.
-- **D4 (baseline + handoff).** This session records the scenarios and releases
-  **v0.1.1** as the current baseline; a new session starts the research task.
+- **D3 (Go-version floor — next task).** `docs/constitution.md` documents a
+  `Go >= 1.23` floor but `go.mod` declares `go 1.27.3`. Candidate fix:
+  `go 1.23.0` + `toolchain go1.27.3`; or correct the documented floor to 1.27.3.
+  Separate from the struct work; **picked up next**, with a plan file to be
+  written first.
+- **D4 (baseline + handoff).** This session recorded the scenarios at the
+  **v0.1.1** baseline and opened the research task; the struct work shipped in
+  **v0.2.0**, so the current baseline is now **v0.2.0**.
 
 ---
 

@@ -124,9 +124,11 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   - `.opencode/plan/2026-11-21-json-codegen.md` — the `cmd/qi-json-gen` codegen
     design, tasks and handoff (resume here for codegen work).
   - `.opencode/plan/2026-11-21-post-decoder-backlog.md` — the running backlog of
-    follow-up tasks (resume here for post-decoder work).
+    follow-up tasks (resume here for post-decoder work; its one open item, the
+    Go-version floor mismatch, is the **next task**).
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the
-    gaps they expose (the foreign-struct-field gap is a release blocker).
+    gaps they expose (the foreign-struct-field gap was a release blocker, closed
+    in v0.2.0).
   - `.opencode/plan/2026-11-22-third-party-struct-fields.md` — research for
     struct fields whose type is a struct from another package (**done
     2026-11-22**; decision is **F**: A + B + C, with D as the escape hatch; E
