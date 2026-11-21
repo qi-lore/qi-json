@@ -8,16 +8,17 @@ contract; this document governs how changes are made.
 ### I. Spec First
 
 `docs/task.md` is the authoritative specification. The implementation follows
-its states, opcodes, and invariants. The one deliberate deviation — number
-grammar in §12, rejecting `1.2.3` / `1e1e2` — is recorded in
-`.opencode/plan/2026-11-21-json-scanner.md` and must be preserved.
+its grammar, positions, scanners and invariants. Two strict grammar rules are
+deliberate and must be preserved: a `0` integer part may not be followed by a
+digit (`01` is invalid), and a number allows at most one fraction and one
+exponent (`1.2.3`, `1e1e2` are invalid). Rationale:
+`.opencode/plan/2026-11-21-scanner-rewrite.md`.
 
 ### II. Test-Driven Development (NON-NEGOTIABLE)
 
 Every behavior change starts with a failing test (red), then the minimal
 implementation (green), then refactoring without behavior change. Tests encode
-exact opcode sequences, error messages, and 1-based positions; never weaken
-them to make code pass.
+exact error messages and 1-based positions; never weaken them to make code pass.
 
 ### III. Standard Library Only
 
@@ -25,28 +26,36 @@ No third-party dependencies. `encoding/json` MUST NOT be used anywhere,
 including tests and benchmarks — writing our own validator is the point of the
 project.
 
-### IV. Byte-Level Contract
+### IV. Syntax Contract
 
-The validator is syntax-only: delayed document-end event, exact opcodes, sticky
-first failure, reset preserving the consumed byte count, no UTF-8 or surrogate
-validation, no nesting depth limit. Changing any of these requires updating the
-spec and the tests in the same change.
+The validator is syntax-only: exact error strings and 1-based positions, sticky
+first failure, delayed scalar completion, any top-level JSON value, no UTF-8 or
+surrogate validation, no nesting depth limit. Changing any of these requires
+updating the spec and the tests in the same change.
 
 ### V. Performance Is a Feature
 
-`Valid` must stay allocation-free in steady state, guarded by
-`TestValidDoesNotAllocate`; the state machine is recycled through a
-`sync.Pool`. Prefer the fastest correct implementation and support structural
-changes with benchmarks.
+`Valid` scans the whole slice in one pass and must stay allocation-free for
+documents nesting at most `nestingInline` levels, guarded by
+`TestValidDoesNotAllocate`. Per-byte dispatch through function pointers, closures
+or a handler table is prohibited, and `goto` and statement labels are prohibited
+throughout the scanner. The hot path is a structured pair of loops (see
+`docs/task.md` §6.1); the object-member scanner is written twice on purpose so it
+stays inline, because a shared helper costs about 8% on object-heavy documents.
+Deeper documents may allocate the nesting stack once. Prefer the fastest correct
+implementation and support structural changes with benchmarks.
 
 ### VI. Minimal Public Surface
 
 Exactly one exported identifier module-wide: `scanner.Valid(data []byte) bool`,
-matching `encoding/json.Valid` in name and signature. Package `marshal` may
+matching `encoding/json.Valid` in name and signature. `scanner.validate` is
+unexported and returns the first `parseError` plus whether the input is invalid,
+so diagnostics stay testable without widening the API. Package `marshal` may
 export `Marshal`/`Unmarshal`-style functions only after an amendment. Internal
-identifiers are repo-specific (`machine`, `opcode`/`op*`, `expectation`/
-`expect*`); do not copy `encoding/json` identifiers such as `Scanner`,
-`SyntaxError`, `scanBegin*`, or `stateBegin*`.
+identifiers are repo-specific (`validator`, `container`/`containerObject`/
+`containerArray`, `parseError`, `skipSpace`, `scan*`); do not copy
+`encoding/json` identifiers such as `Scanner`, `SyntaxError`, `scanBegin*`, or
+`stateBegin*`.
 
 ## Verification Workflow (NON-NEGOTIABLE)
 
@@ -65,7 +74,7 @@ results in the final summary.
 
 - Go >= 1.23 (toolchain in `go.mod`: 1.27.3).
 - Two packages under module `qi-json`, no root Go package:
-  - `scanner/` — state machine (`machine.go`) and public `Valid` (`valid.go`);
+  - `scanner/` — public `Valid` (`valid.go`) and the scanner (`scan.go`);
   - `marshal/` — placeholder for the encoding/json-compatible layer, exports
     nothing yet.
 - New packages, files beyond the current layout, exported identifiers, or
@@ -77,4 +86,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 1.2.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
+**Version**: 2.1.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21

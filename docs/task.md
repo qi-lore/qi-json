@@ -2,546 +2,479 @@
 
 ## 1. Purpose
 
-    Implement on **Golang**  a byte-at-a-time JSON syntax scanner as a deterministic state machine.
+Implement, in **Go**, a single-pass JSON syntax scanner that validates a whole
+`[]byte` in one sweep, scanning runs of ordinary bytes in bulk instead of
+dispatching once per byte.
 
 ## 2. Role
 
-You are expert backend and system engineer with wide lowlevel-programming experience. Your mostly preffered language is Golang&
+You are an expert backend and systems engineer with wide low-level programming
+experience. Your preferred language is Go.
 
-## 3. Core Principles
+## 3. Core principles
 
-- use Go >= 1.23.0 with no external dependencies
-- NEVER use `encoding/json`. Our goal - write own implementation — ideally, a faster one
-- when choosing solutions, ALWAYS consider performance. If one implementation runs faster than the others, ALWAYS choose the fastest one.
-- ALWAYS use `https://github.com/uber-go/guide`
-- write clean, human-readable, unambiguous, fault-tolerant code.
-- ALWAYS use a TDD approach: tests MUST be written before production code. The red-green-refactor cycle is
- mandatory:
-   - Write or update a failing test that expresses the requirement.
-   - Confirm the test fails for the expected reason.
-   - Implement the minimum code required to make the test pass.
-   - Refactor without changing behavior.
-   - Re-run all affected tests.
+- Use Go >= 1.23.0 with no external dependencies.
+- NEVER use `encoding/json`. Our goal is to write our own implementation —
+  ideally a faster one.
+- When choosing solutions, ALWAYS consider performance. If one implementation
+  runs faster than another, choose the faster one.
+- ALWAYS follow `https://github.com/uber-go/guide`.
+- Write clean, human-readable, unambiguous, fault-tolerant code.
+- ALWAYS use a TDD approach: tests MUST be written before production code. The
+  red-green-refactor cycle is mandatory:
+  - Write or update a failing test that expresses the requirement.
+  - Confirm the test fails for the expected reason.
+  - Implement the minimum code required to make the test pass.
+  - Refactor without changing behavior.
+  - Re-run all affected tests.
 
-### The scanner must:
+### 3.1 The scanner must
 
-- accept bytes one at a time,
+- consume a whole byte slice in a single pass,
 - validate JSON syntax,
-- report significant parsing events through integer opcodes,
-- maintain a stack of nested contexts,
-- delay the “top-level value complete” event until the byte after the value is known.
+- report a precise, human-readable error for the first failure,
+- maintain a stack of open containers,
+- treat a scalar as complete only when a delimiter or the end of input proves
+  it.
 
-**The caller drives the scanner**:
+### 3.2 The scanner must not
 
-```text
-    reset scanner
-    for each input byte c:
-        op := scanner.step(scanner, c)
-        handle op; if op == scanError, stop
-    after all bytes:
-        op := scanner.eof()
-        handle op
+- dispatch once per byte through function pointers, closures or a handler table,
+- expose parsing events, opcodes or a streaming `step`/`finish` interface,
+- hold a `sync.Pool` or otherwise allocate on the success path.
+
+The previous revision of this document specified a byte-at-a-time state machine
+with opcodes. That architecture was measured at 2.3×–5.1× slower than
+`encoding/json.Valid` on identical inputs and has been replaced. The rationale
+is recorded in `.opencode/plan/2026-11-21-scanner-rewrite.md`.
+
+## 4. Public surface
+
+Exactly one exported identifier, with the same name and signature as
+`encoding/json.Valid`:
+
+```go
+// Valid reports whether data is a syntactically valid JSON text.
+func Valid(data []byte) bool
 ```
 
-## 4. Scanner state
+It is a thin wrapper over an unexported function that returns the failure:
 
-```text
-   scanner {
-     step: function(scanner, byte) -> int   // current state handler
-     endTop: bool                            // top-level value completed
-     parseState: stack of int                // nested contexts
-     err: error                              // first syntax error
-     bytes: int64                            // total bytes consumed
-   }
+```go
+func Valid(data []byte) bool {
+	_, failed := validate(data)
+	return !failed
+}
+
+// validate returns the first syntax error and whether data is invalid. The
+// error is a value type so the validator's inline stack stays on the stack.
+func validate(data []byte) (parseError, bool)
 ```
 
-**Context constants for parseState**:
+`validate` exists so that diagnostics — the error text and the 1-based position
+— remain a testable contract without widening the exported surface.
+
+## 5. Grammar
 
 ```text
-  parseObjectKey   // inside object, expecting a key
-  parseObjectValue // inside object, expecting a value after ':'
-  parseArrayValue  // inside array, expecting a value
+json    = ws value ws
+value   = object | array | string | number | "true" | "false" | "null"
+
+object  = '{' ws ( member ( ws ',' ws member )* )? ws '}'
+member  = string ws ':' ws value
+
+array   = '[' ws ( value ( ws ',' ws value )* )? ws ']'
+
+string  = '"' ( char | escape )* '"'
+char    = any byte except '"', '\\' and the control bytes 0x00–0x1F
+escape  = '\\' ( '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u' hex hex hex hex )
+
+number  = [ '-' ] int [ frac ] [ exp ]
+int     = '0' | [1-9] digit*
+frac    = '.' digit+
+exp     = ( 'e' | 'E' ) [ '+' | '-' ] digit+
+
+ws      = ( ' ' | '\t' | '\n' | '\r' )*
 ```
 
-**reset() must set**:
+Two grammar rules are deliberately strict and must be preserved:
+
+- A `0` integer part may not be followed by another digit, so `01` is invalid.
+- At most one fraction and one exponent are allowed, so `1.2.3` and `1e1e2` are
+  invalid. The offending byte is reported by the *delimiter* rule below, not by
+  the number scanner.
+
+## 6. Scanning model
+
+The scanner walks the slice with an index `i`. The nesting stack holds one
+`container` per open `{` or `[`; its depth is the number of open containers.
 
 ```text
-  step      = stateBeginValue
-  endTop    = false
-  parseState = empty
-  err       = nil
-  // do NOT reset bytes
+container is one of:
+    containerObject   // opened by '{'
+    containerArray    // opened by '['
 ```
 
-## 5. Opcodes
+The nesting stack is a small fixed array on the caller's stack plus an explicit
+depth counter:
 
 ```text
-   scanContinue     // no significant event; continue scanning
-   scanBeginLiteral // beginning of string, number, true, false, null
-   scanBeginObject  // consumed '{'
-   scanBeginArray   // consumed '['
-   scanEndObject    // consumed '}'
-   scanEndArray     // consumed ']'
-   scanEnd          // a complete top-level JSON value was completed
-   scanError        // syntax error; scanner.err is set
+const nestingInline = 32
+
+validator {
+    data    []byte        // the input
+    depth   int           // number of open containers
+    stack   []container   // len == nestingInline until it grows
+    failure *parseError   // first syntax error, or nil
+}
 ```
 
-## 6. Common helpers
+`stack` starts as a slice of a local `[nestingInline]container`. The scanner
+never calls `append` on the hot path; `push` writes `stack[depth]` and increments
+`depth`, and `grow` copies into a heap slice of twice the length only when
+`depth == len(stack)`. This keeps the fixed array on the stack and makes the
+success path allocation-free.
+
+### 6.1 Dispatch
+
+`run` is one function built from two nested loops. There are no labels and no
+`goto`. The outer loop scans exactly one value; the inner loop runs once a value
+is complete, consumes the delimiter that follows it, closes every container that
+ends there, and decides where the next value begins.
+
+The outer loop's switch names what the next non-whitespace byte must be:
 
 ```text
-    isSpace(c) =
-        c == ' ' or c == '\t' or c == '\n' or c == '\r'
-
-    error(s, c, msg):
-        if s.err == nil:
-            s.err = syntax error including c and msg
-    s.step = stateError
-    return scanError
-
-    push(s, context):
-        append context to s.parseState
-
-    pop(s):
-        remove last element from s.parseState
-
-    top(s):
-        return last element of s.parseState
+'{'          open an object; when non-empty, scan its first member
+'['          open an array; when non-empty, scan its first element
+'"'          scan a string value
+'t' 'f' 'n'  scan the true / false / null literal
+'-' '0'..'9' scan a number value
+other        fail with "looking for beginning of value"
 ```
 
-`stateError` always returns `scanError` and never changes state.
-
-## 7. Central value-completion handler: stateEndValue
-
-**This handler processes the byte that follows a completed value**.
+The inner loop, entered after a completed value, does:
 
 ```text
-stateEndValue(s, c) -> opcode:
-    if s.parseState is empty:
-        // Top-level value just completed before byte c.
-        s.endTop = true
-        s.step = stateEndTop
-        return stateEndTop(s, c)
+depth == 0   only whitespace may follow, else "after top-level value"
+object top   ',' -> scan the next member (key, ':', then value)
+             '}' -> close the object and repeat the inner loop
+             else "after object value"
+array top    ',' -> scan the next element in the outer loop
+             ']' -> close the array and repeat the inner loop
+             else "after array value"
+```
 
-    if isSpace(c):
-        s.step = stateEndValue
-        return scanContinue
+There are no function pointers and no per-byte handler table. Measured on the
+same documents, the two-loop form is within about 2% of a former labelled-jump
+form. The "scan an object key and the `:` that follows" block is written twice —
+just after `{` and just after an object `,` — on purpose: a shared helper cannot
+be inlined (it calls `scanString`) and costs roughly 8% on object-heavy
+documents. Keep the two copies in step.
 
-    ctx = top(s)
+## 7. Pseudocode
 
-    if ctx == parseObjectKey:
-        if c == ':':
-            top(s) = parseObjectValue
-            s.step = stateBeginValue
-            return scanContinue
+```text
+run():
+    data = v.data
+    n    = len(data)
+    i    = 0
+
+    outer:                                 // scan exactly one value
+        i = skipSpace(data, i)
+        if i == n: return failEnd(n)
+
+        switch c = data[i]:
+        case '{':
+            i = i + 1
+            push(containerObject)
+            i = skipSpace(data, i)
+            if i == n: return failEnd(n)
+            if data[i] != '}':
+                i = memberStart(i)         // scan the first key and ':'
+                if failure != nil: return false
+                continue outer
+            i = i + 1; pop()
+
+        case '[':
+            i = i + 1
+            push(containerArray)
+            i = skipSpace(data, i)
+            if i == n: return failEnd(n)
+            if data[i] != ']': continue outer
+            i = i + 1; pop()
+
+        case '"':
+            i = scanString(i)
+            if failure != nil: return false
+
+        case 't': i = scanLiteral(i, "true");  if failure != nil: return false
+        case 'f': i = scanLiteral(i, "false"); if failure != nil: return false
+        case 'n': i = scanLiteral(i, "null");  if failure != nil: return false
+
+        case '-', '0'..'9':
+            i = scanNumber(i)
+            if failure != nil: return false
+
+        default:
+            return fail(i, "looking for beginning of value")
+
+        inner:                             // the value is complete
+            if depth == 0:
+                // The top-level value is complete before byte i.
+                i = skipSpace(data, i)
+                if i != n: return fail(i, "after top-level value")
+                return true
+
+            i = skipSpace(data, i)
+            if i == n: return failEnd(n)
+
+            if top() == containerObject:
+                if data[i] == ',':
+                    i = i + 1
+                    i = memberStart(i)     // scan the next key and ':'
+                    if failure != nil: return false
+                    break inner            // scan the member value next
+                if data[i] == '}':
+                    i = i + 1; pop(); continue inner
+                return fail(i, "after object value")
+
+            if data[i] == ',':
+                i = i + 1; break inner
+            if data[i] == ']':
+                i = i + 1; pop(); continue inner
+            return fail(i, "after array value")
+
+// memberStart is written inline at both call sites in scan.go; shown once here.
+memberStart(i):
+    i = skipSpace(data, i)
+    if i == n: failEnd(n); return
+    if data[i] != '"':
+        fail(i, "looking for beginning of object key string"); return
+    i = scanString(i)
+    if failure != nil: return
+    i = skipSpace(data, i)
+    if i == n: failEnd(n); return
+    if data[i] != ':': fail(i, "after object key"); return
+    return i + 1
+```
+
+`skipSpace(data, i)` returns the index of the first byte at or after `i` that is
+not `' '`, `'\t'`, `'\n'` or `'\r'`, or `len(data)` when only whitespace
+remains.
+
+## 8. Scalar scanners
+
+Each scanner takes the index of the literal's first byte and returns the index
+just past the scalar. A scanner that fails records the error in `v.failure` and
+returns `len(data)`; the caller checks `v.failure` after every call.
+
+### 8.1 Strings
+
+```text
+scanString(i):
+    // data[i] == '"'
+    long = false
+    for i = i + 1; ; :
+        if long:
+            while i + 8 <= n and not stringStopWord(word(data[i:])):
+                i = i + 8
+            while i < n and not stringStop[data[i]]: i = i + 1
         else:
-            return error(s, c, "after object key")
+            // Warm up byte by byte: keys and short values end within a few
+            // bytes, so they never pay for the word setup.
+            short = min(i + 8, n)
+            while i < short and not stringStop[data[i]]: i = i + 1
+            if i == short:
+                long = true
+                while i + 8 <= n and not stringStopWord(word(data[i:])):
+                    i = i + 8
+                while i < n and not stringStop[data[i]]: i = i + 1
+        if i == n:
+            return failEnd(n)                 // unterminated string
+        switch data[i]:
+        case '"':  return i + 1
+        case '\\': i = scanEscape(i)
+                   if failure != nil: return n
+                   long = true            // an escape means the string is long
+        default:   fail(i, "in string literal"); return n
 
-    if ctx == parseObjectValue:
-        if c == ',':
-            top(s) = parseObjectKey
-            s.step = stateBeginString
-            return scanContinue
-        if c == '}':
-            pop(s)
-            s.step = stateEndValue
-            return scanEndObject
-        else:
-            return error(s, c, "after object value")
-
-    if ctx == parseArrayValue:
-        if c == ',':
-            s.step = stateBeginValue
-            return scanContinue
-        if c == ']':
-            pop(s)
-            s.step = stateEndValue
-            return scanEndArray
-        else:
-            return error(s, c, "after array value")
+scanEscape(i):
+    // data[i] == '\\'
+    i = i + 1
+    if i == n:
+        failAt(n, "in string escape code"); return n
+    switch data[i]:
+    case '"', '\\', '/', 'b', 'f', 'n', 'r', 't': return i + 1
+    case 'u':
+        for k = 1 .. 4:
+            if i + k == n:
+                failAt(n, "in \u hexadecimal character escape"); return n
+            if not isHexDigit(data[i + k]):
+                fail(i + k, "in \u hexadecimal character escape"); return n
+        return i + 5
+    default:
+        fail(i, "in string escape code"); return n
 ```
 
-**`stateEndTop`**:
+`stringStop` is a 256-entry table marking the bytes that end a plain run: `'"'`,
+`'\\'` and every byte below `0x20`. `stringStopWord` applies the same test to a
+64-bit word using SWAR: a byte is zero when `(v-1) &^ v & 0x80…80` is non-zero,
+so XOR with the replicated quote or backslash byte, or mask with `0xe0…e0` for
+control bytes, finds any terminator in eight bytes at once. Endianness does not
+matter because the constants are byte-replicated. Word-at-a-time scanning lifts
+long strings from about 1.2 GB/s to about 2.6 GB/s; the byte warm-up keeps short
+keys cheap and the `long` flag keeps long strings in word mode after the first
+run or escape.
+
+Only syntax is checked. Raw UTF-8 bytes pass through unvalidated; surrogate
+pairs are not paired or rejected.
+
+### 8.2 Literals
 
 ```text
-stateEndTop(s, c) -> opcode:
-    if not isSpace(c):
-        return error(s, c, "after top-level value")
-    return scanEnd
+scanLiteral(i, lit):
+    // data[i] == lit[0]
+    for k = 1 .. len(lit) - 1:
+        if i + k == n:
+            failAt(n, "in literal " + lit + " (expecting '" + lit[k] + "')")
+            return n
+        if data[i + k] != lit[k]:
+            fail(i + k, "in literal " + lit + " (expecting '" + lit[k] + "')")
+            return n
+    return i + len(lit)
 ```
 
-## 8. Beginning a value: stateBeginValue
+### 8.3 Numbers
 
 ```text
-stateBeginValue(s, c) -> opcode:
-    if isSpace(c):
-        s.step = stateBeginValue
-        return scanContinue
+scanNumber(i):
+    if data[i] == '-':
+        i = i + 1
+        if i == n: failAt(n, "in numeric literal"); return n
 
-    if c == '{':
-        push(s, parseObjectKey)
-        s.step = stateBeginStringOrEmpty
-        return scanBeginObject
+    switch data[i]:
+    case '0':
+        i = i + 1
+        if i < n and isDigit(data[i]):
+            fail(i, "in numeric literal"); return n
+    case '1'..'9':
+        i = i + 1
+        while i < n and isDigit(data[i]): i = i + 1
+    default:
+        fail(i, "in numeric literal"); return n
 
-    if c == '[':
-        push(s, parseArrayValue)
-        s.step = stateBeginValueOrEmpty
-        return scanBeginArray
+    if i < n and data[i] == '.':
+        i = i + 1
+        if i == n: failAt(n, "after decimal point in numeric literal"); return n
+        if not isDigit(data[i]):
+            fail(i, "after decimal point in numeric literal"); return n
+        i = i + 1
+        while i < n and isDigit(data[i]): i = i + 1
 
-    if c == '"':
-        s.step = stateInString
-        return scanBeginLiteral
+    if i < n and data[i] in {'e', 'E'}:
+        i = i + 1
+        if i < n and data[i] in {'+', '-'}: i = i + 1
+        if i == n: failAt(n, "in exponent of numeric literal"); return n
+        if not isDigit(data[i]):
+            fail(i, "in exponent of numeric literal"); return n
+        i = i + 1
+        while i < n and isDigit(data[i]): i = i + 1
 
-    if c == 't':
-        s.step = stateLiteralT
-        return scanBeginLiteral
-
-    if c == 'f':
-        s.step = stateLiteralF
-        return scanBeginLiteral
-
-    if c == 'n':
-        s.step = stateLiteralN
-        return scanBeginLiteral
-
-    if c == '-':
-        s.step = stateNumberNeg
-        return scanBeginLiteral
-
-    if c == '0':
-        s.step = stateNumberZero
-        return scanBeginLiteral
-
-    if c >= '1' and c <= '9':
-        s.step = stateNumberInt
-        return scanBeginLiteral
-
-    return error(s, c, "looking for beginning of value")
+    return i
 ```
 
-## 9. Empty object / empty array handling
+`scanNumber` returns the index of the first byte that cannot extend the number.
+That byte is not consumed: the inner delimiter loop re-reads it, which is what
+makes `1.2.3` fail with `after top-level value` at offset 4 and `[1.2.3]` fail
+with `after array value`.
 
-**After `{`, an object may be empty**:
+## 9. Error contract
+
+`fail(i, context)` records
 
 ```text
-stateBeginStringOrEmpty(s, c) -> opcode:
-    if isSpace(c):
-        s.step = stateBeginStringOrEmpty
-        return scanContinue
-
-    if c == '}':
-        pop(s)
-        s.step = stateEndValue
-        return scanEndObject
-
-    if c == '"':
-        s.step = stateInString
-        return scanBeginLiteral
-
-    return error(s, c, "looking for beginning of object key string")
+invalid character '<c>' <context>
 ```
 
-**After ``[``, an array may be empty**:
+at the 1-based position `i + 1`, where `<c>` is `data[i]` rendered by
+`quoteByte` (a single-quoted Go literal). Only the first error is kept; `run`
+stops at it immediately.
+
+`failEnd(n)` records `unexpected end of JSON input` at position `n`.
+
+`failAt(pos, problem)` records `problem` verbatim at position `pos`.
+
+Positions are 1-based offsets into `data`. An end-of-input error is reported at
+`len(data)`, so an empty document fails at position 0.
+
+The exact strings asserted by the test suite must be preserved:
 
 ```text
-stateBeginValueOrEmpty(s, c) -> opcode:
-    if isSpace(c):
-        s.step = stateBeginValueOrEmpty
-        return scanContinue
-
-    if c == ']':
-        pop(s)
-        s.step = stateEndValue
-        return scanEndArray
-
-    return stateBeginValue(s, c)
+looking for beginning of value
+looking for beginning of object key string
+after object key
+after object value
+after array value
+after top-level value
+in string literal
+in string escape code
+in \u hexadecimal character escape
+in literal true (expecting 'r')
+in literal true (expecting 'u')
+in literal true (expecting 'e')
+in literal false (expecting 'a')
+in literal false (expecting 'l')
+in literal false (expecting 's')
+in literal false (expecting 'e')
+in literal null (expecting 'u')
+in literal null (expecting 'l')
+in numeric literal
+after decimal point in numeric literal
+in exponent of numeric literal
+unexpected end of JSON input
 ```
 
-## 10. String scanning
+## 10. Invariants
+
+1. **Delayed completion.** A number or literal is complete only once a delimiter
+   or the end of input follows it. `scanNumber` and `scanLiteral` never consume
+   the delimiter; the inner delimiter loop judges it.
+2. **Sticky first failure.** `run` returns at the first error and never
+   overwrites `failure`.
+3. **Top level.** Any JSON value is a valid document. Only JSON whitespace may
+   follow it; anything else fails with `after top-level value`.
+4. **Syntax only.** No UTF-8 validation, no surrogate pairing, no nesting depth
+   limit.
+5. **Allocation-free success path.** For documents nesting at most
+   `nestingInline` levels, `Valid` allocates nothing. Deeper documents allocate
+   the nesting stack once and grow it geometrically.
+6. **Deterministic.** The same input always produces the same verdict.
+
+## 11. File layout
 
 ```text
-stateInString(s, c) -> opcode:
-    if c == '"':
-        s.step = stateEndValue
-        return scanContinue
-    if c == '\\':
-        s.step = stateInStringEsc
-        return scanContinue
-    if c < 0x20:
-        return error(s, c, "in string literal")
-    s.step = stateInString
-    return scanContinue
+scanner/
+  valid.go   // package doc, Valid, validate
+  scan.go    // validator, dispatch, scanners, tables, parseError
+  *_test.go  // tests and benchmarks
+marshal/
+  doc.go     // placeholder for the encoding layer; exports nothing
 ```
 
-**Escape handling**:
+## 12. Verification
+
+Every task finishes by running, in order: `go test ./...`, `gofmt -l .`,
+`go vet ./...`, `golangci-lint run`. Shortcut: `make verify`.
+
+Additional commands:
 
 ```text
-stateInStringEsc(s, c) -> opcode:
-    if c in {'"', '\\', '/', 'b', 'f', 'n', 'r', 't'}:
-        s.step = stateInString
-        return scanContinue
-    if c == 'u':
-        s.step = stateInStringEscU
-        return scanContinue
-    return error(s, c, "in string escape code")
+go test -race ./...
+go test ./scanner -run '^TestInvalidDocuments$'
+go test -run=^$ -fuzz=FuzzValid -fuzztime=10s ./scanner
+go test -run=^$ -bench=. -benchmem ./scanner
 ```
 
-**Unicode escape \uXXXX requires exactly four hexadecimal digits**:
-
-```text
-stateInStringEscU(s, c):
-    if isHex(c):
-        s.step = stateInStringEscU1
-        return scanContinue
-    return error(s, c, "in \\u hexadecimal character escape")
-
-stateInStringEscU1(s, c):
-    if isHex(c):
-        s.step = stateInStringEscU2
-        return scanContinue
-    return error(...)
-
-stateInStringEscU2(s, c):
-    if isHex(c):
-        s.step = stateInStringEscU3
-        return scanContinue
-    return error(...)
-
-stateInStringEscU3(s, c):
-    if isHex(c):
-        s.step = stateInString
-        return scanContinue
-    return error(...)
-```
-
-## 11. Literals: true, false, null
-
-**Each literal is consumed character by character. 
-The first character returns scanBeginLiteral; 
-subsequent characters return scanContinue; 
-after the last character, set step = stateEndValue.**
-
-```text
-stateLiteralT(s, c):
-    if c == 'r': s.step = stateLiteralTr; return scanContinue
-    return error(...)
-
-stateLiteralTr(s, c):
-    if c == 'u': s.step = stateLiteralTru; return scanContinue
-    return error(...)
-
-stateLiteralTru(s, c):
-    if c == 'e':
-        s.step = stateEndValue
-        return scanContinue
-    return error(...)
-```
-
-**Analogous chains**:
-
-```text
-f -> a -> l -> s -> e -> stateEndValue
-n -> u -> l -> l -> stateEndValue
-```
-
-## 12. Number scanning
-
-### JSON number grammar:
-
-```text
-number = [ '-' ] int [ frac ] [ exp ]
-int    = '0' | [1-9] digit*
-frac   = '.' digit+
-exp    = ('e'|'E') [ '+' | '-' ] digit+
-```
-#### States:
-
-```text
-stateNumberNeg(s, c):
-    if c == '0': s.step = stateNumberZero; return scanContinue
-    if '1' <= c <= '9': s.step = stateNumberInt; return scanContinue
-    return error(s, c, "in numeric literal")
-
-stateNumberZero(s, c):
-    // '0' cannot be followed by another digit
-    if '0' <= c <= '9':
-        return error(s, c, "in numeric literal")
-    return handleNumberContinuation(s, c)
-
-stateNumberInt(s, c):
-    if '0' <= c <= '9':
-        s.step = stateNumberInt
-        return scanContinue
-    return handleNumberContinuation(s, c)
-```
-
-#### Fraction:
-
-```text
-stateNumberDot(s, c):
-    if '0' <= c <= '9':
-        s.step = stateNumberFrac
-        return scanContinue
-    return error(s, c, "after decimal point in numeric literal")
-
-stateNumberFrac(s, c):
-    if '0' <= c <= '9':
-        s.step = stateNumberFrac
-        return scanContinue
-    if c == 'e' or c == 'E':
-        s.step = stateNumberExp
-        return scanContinue
-    return handleNumberContinuation(s, c)
-```
-
-#### Exponent:
-
-```text
-stateNumberExp(s, c):
-    if c == '+' or c == '-':
-        s.step = stateNumberExpSign
-        return scanContinue
-    if '0' <= c <= '9':
-        s.step = stateNumberExpDigits
-        return scanContinue
-    return error(s, c, "in exponent of numeric literal")
-
-stateNumberExpSign(s, c):
-    if '0' <= c <= '9':
-        s.step = stateNumberExpDigits
-        return scanContinue
-    return error(s, c, "in exponent of numeric literal")
-
-stateNumberExpDigits(s, c):
-    if '0' <= c <= '9':
-        s.step = stateNumberExpDigits
-        return scanContinue
-    return handleNumberContinuation(s, c)
-```
-
-#### Continuation after a valid number:
-
-```text
-handleNumberContinuation(s, c):
-    if c == '.':
-        s.step = stateNumberDot
-        return scanContinue
-    if c == 'e' or c == 'E':
-        s.step = stateNumberExp
-        return scanContinue
-    // The number is complete before byte c; let stateEndValue
-    // process c as the delimiter after the value.
-    s.step = stateEndValue
-    return stateEndValue(s, c)
-```
-
-**Important**: the delimiter byte is processed by stateEndValue, not consumed separately.
-
-## 13. EOF handling
-
-**EOF must force completion of any pending value, especially numbers and literals.**
-
-```text
-eof(s) -> opcode:
-    if s.err != nil:
-        return scanError
-
-    if s.endTop:
-        return scanEnd
-
-    // Feed a synthetic space to finish the current state.
-    op := s.step(s, ' ')
-
-    if s.err != nil:
-        return scanError
-
-    if s.endTop:
-        return scanEnd
-
-    return error(s, 0, "unexpected end of JSON input")
-```
-
-**The synthetic space is not a real input byte; it is only used to force delimiter handling.**
-
-## 14. Main loop contract
-
-```text
-scan(s, data):
-    s.reset()
-
-    for each byte c in data:
-        s.bytes++
-        op := s.step(s, c)
-
-        if op == scanError:
-            return s.err
-
-        // The caller may react to scanBeginObject, scanEndArray,
-        // scanBeginLiteral, scanEnd, etc.
-
-    op := s.eof()
-    if op == scanError:
-        return s.err
-
-    return nil
-```
-
-### 15. Critical invariant: delayed scanEnd
-
-`scanEnd means`:
-
-> A complete top-level JSON value has been completed before the byte just passed to the scanner.
-
-**Do not return scanEnd immediately after
-reading the last digit of a number or the last character of a literal.
-Wait until the next byte — or EOF — proves that the value has ended.**
-
-Example:
-
-```text
-input: 123
-```
-
-After reading 1, 2, 3, the scanner cannot yet know whether 123 is complete or whether the next byte is 4 making 1234. Only when the next byte is a space, EOF, ], }, or , can the scanner decide that 123 is complete.
-
-Therefore:
-
-```text
-number state sees delimiter c
--> set step = stateEndValue
--> return stateEndValue(s, c)
-```
-
-If this is the top level, `stateEndValue` sets `endTop` = true, moves to `stateEndTop`, and returns `scanEnd` for the delimiter byte.
-
-## 16. Summary of state transition rules
-
-```text
-Whitespace:
-    allowed between tokens; ignored in begin/end states.
-
-Object:
-    '{' push parseObjectKey -> beginStringOrEmpty
-    key string -> endValue -> ':' -> parseObjectValue
-    object value -> ',' -> parseObjectKey
-                  -> '}' -> pop -> endValue
-
-Array:
-    '[' push parseArrayValue -> beginValueOrEmpty
-    array value -> ',' -> beginValue
-                -> ']' -> pop -> endValue
-
-String:
-    '"' -> inString -> escapes -> '"' -> endValue
-
-Literal:
-    exact match true/false/null -> endValue
-
-Number:
-    optional '-' -> int -> optional fraction -> optional exponent
-    on first non-number byte -> endValue(delimiter)
-
-Top level:
-    after top-level value -> endTop = true
-    stateEndTop accepts only whitespace
-    EOF after complete value -> scanEnd
-```
+Performance is a feature: `BenchmarkValid*` must not regress, and the success
+path must stay allocation-free (`TestValidDoesNotAllocate`).

@@ -1,52 +1,35 @@
 // Package scanner validates JSON syntax.
 //
 // The package exposes a single function, Valid, whose name and signature match
-// encoding/json.Valid. The implementation is a from-scratch byte-at-a-time
-// state machine: it does not use encoding/json, does not build values, and
-// does not validate UTF-8 or surrogate pairs.
+// encoding/json.Valid. The implementation is a from-scratch single-pass
+// validator: it walks the byte slice with an index, scans strings, numbers,
+// whitespace and literals in bulk, and keeps an explicit stack of open
+// containers. It does not use encoding/json, does not build values, and does not
+// validate UTF-8 or surrogate pairs.
 //
 // Unlike encoding/json, Valid accepts any JSON value at the top level and
 // intentionally applies no nesting depth limit.
 package scanner
 
-import "sync"
-
-// machinePool recycles machines so that steady-state validation does not
-// allocate. Like encoding/json, the pool bounds retained memory by dropping
-// oversized context stacks before returning a machine.
-var machinePool = sync.Pool{
-	New: func() any { return new(machine) },
-}
-
 // Valid reports whether data is a syntactically valid JSON text.
 //
-// Valid ignores surrounding whitespace, performs a single pass over data, and
-// is safe for concurrent use. Steady-state calls do not allocate for typical
-// documents. Input that is not valid UTF-8 may still be reported as valid
-// because only JSON syntax is checked.
+// Valid ignores surrounding whitespace, performs a single pass over data, and is
+// safe for concurrent use. Steady-state calls do not allocate for documents that
+// nest no deeper than nestingInline levels. Input that is not valid UTF-8 may
+// still be reported as valid because only JSON syntax is checked.
 func Valid(data []byte) bool {
-	m := machinePool.Get().(*machine)
-	m.reset()
-
-	ok := true
-	for _, c := range data {
-		if m.step(c) == opFailure {
-			ok = false
-			break
-		}
-	}
-	if ok {
-		ok = m.finish() != opFailure
-	}
-
-	m.release()
-	return ok
+	_, failed := validate(data)
+	return !failed
 }
 
-// release returns m to the pool, dropping an oversized context stack.
-func (m *machine) release() {
-	if cap(m.stack) > 1024 {
-		m.stack = nil
+// validate scans data and returns the first syntax error together with whether
+// the input is invalid. The error is returned by value so that the validator's
+// inline stack does not escape to the heap.
+func validate(data []byte) (parseError, bool) {
+	var inline [nestingInline]container
+	v := validator{data: data, stack: inline[:nestingInline]}
+	if v.run() {
+		return parseError{}, false
 	}
-	machinePool.Put(m)
+	return *v.failure, true
 }

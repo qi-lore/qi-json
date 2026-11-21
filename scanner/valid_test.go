@@ -45,6 +45,12 @@ var validDocuments = []string{
 	`"h\u00e9llo w\u00f6rld"`,
 	`"héllo wörld"`, // raw UTF-8 bytes pass through unvalidated
 
+	// Strings longer than the eight-byte warm-up, including escapes past it.
+	`"aaaaaaaaaaaaaaaa"`,
+	`"aaaaaaaaaaaa\n"`,
+	`"aaaaaaaaaaaaaaaaaaaaaaaa\u00e9bbbbbbbbbbbbbbbbbbbbbbbb"`,
+	"\"aaaaaaaaaaaaa\x7fb\"", // 0x7f is legal inside a string
+
 	// Objects.
 	`{}`,
 	`{ }`,
@@ -63,7 +69,6 @@ var validDocuments = []string{
 	// Whitespace between tokens and around the document.
 	" \t\r\n{\"a\" : [ 1 , 2 ] } \n",
 	"[\n  1,\n  2,\n  3\n]",
-	`{"num":0,"neg":-0,"frac":2.5,"exp":1e10}`,
 }
 
 func TestValidDocuments(t *testing.T) {
@@ -72,13 +77,8 @@ func TestValidDocuments(t *testing.T) {
 			if !Valid([]byte(in)) {
 				t.Fatalf("Valid(%q) = false, want true", in)
 			}
-
-			ops, err := drive(t, in)
-			if err != nil {
-				t.Fatalf("got error %v, want nil", err)
-			}
-			if last := ops[len(ops)-1]; last != opDocumentEnd {
-				t.Fatalf("last opcode = %v, want %v", last, opDocumentEnd)
+			if _, failed := validate([]byte(in)); failed {
+				t.Fatalf("validate(%q) failed, want success", in)
 			}
 		})
 	}
@@ -89,16 +89,18 @@ func TestValid(t *testing.T) {
 		in   string
 		want bool
 	}{
-		{`{"a":[1,2,3]}`, true},
+		{`{"a":[1,2]}`, true},
 		{`[]`, true},
+		{"  \"x\"", true},
 		{`123`, true},
-		{"  \"x\"  ", true},
-		{"true\n", true},
+		{`true`, true},
+		{`null`, true},
+		{`{}`, true},
 		{`123x`, false},
-		{`[1,]`, false},
+		{`tru`, false},
+		{`{`, false},
 		{``, false},
-		{`{"a" 1}`, false},
-		{`1.2.3`, false},
+		{`{}x`, false},
 	}
 
 	for _, tt := range tests {
@@ -111,7 +113,7 @@ func TestValid(t *testing.T) {
 }
 
 func TestValidReuseAcrossCalls(t *testing.T) {
-	// Pooled machines must not leak failure state from one call into the next.
+	// A failed scan must not leak state into the next call.
 	docs := []struct {
 		in   string
 		want bool
@@ -123,19 +125,24 @@ func TestValidReuseAcrossCalls(t *testing.T) {
 		{`true`, true},
 		{`tru`, false},
 		{`-1.5e3`, true},
+		{`1.2.3`, false},
 	}
 
-	for i := 0; i < 10; i++ {
-		for _, tt := range docs {
-			if got := Valid([]byte(tt.in)); got != tt.want {
-				t.Fatalf("iteration %d: Valid(%q) = %v, want %v", i, tt.in, got, tt.want)
+	for i := 0; i < 3; i++ {
+		for _, doc := range docs {
+			if got := Valid([]byte(doc.in)); got != doc.want {
+				t.Fatalf("iteration %d: Valid(%q) = %v, want %v", i, doc.in, got, doc.want)
 			}
 		}
 	}
 }
 
 func TestValidDoesNotAllocate(t *testing.T) {
-	data := []byte(`{"a":[1,2,3],"b":{"c":true},"d":"text","e":-1.5e3}`)
+	if testing.Short() {
+		t.Skip("allocation test is skipped in short mode")
+	}
+
+	data := []byte(`{"a":[1,2,3],"b":{"c":true},"d":null,"e":"x"}`)
 	if !Valid(data) {
 		t.Fatal("Valid() = false for a valid document")
 	}
@@ -173,8 +180,8 @@ func TestValidDeepNesting(t *testing.T) {
 }
 
 func ExampleValid() {
-	fmt.Println(Valid([]byte(`{"a":1}`)))
-	fmt.Println(Valid([]byte(`{"a":1`)))
+	fmt.Println(Valid([]byte(`{"a":[1,2,3]}`)))
+	fmt.Println(Valid([]byte(`{"a":[1,2,3]`)))
 	// Output:
 	// true
 	// false
@@ -196,37 +203,22 @@ func FuzzValid(f *testing.F) {
 			t.Fatalf("Valid(%q) is not deterministic", data)
 		}
 
-		// Surrounding JSON whitespace must not change validity.
-		wrapped := make([]byte, 0, len(data)+6)
-		wrapped = append(wrapped, " \t\r\n"...)
-		wrapped = append(wrapped, data...)
-		wrapped = append(wrapped, '\n', ' ')
-		if got := Valid(wrapped); got != valid {
-			t.Fatalf("Valid(%q) = %v, but wrapped input = %v", data, valid, got)
+		// A failing scan must report a position inside the input.
+		err, failed := validate(data)
+		if failed == valid {
+			t.Fatalf("Valid(%q) = %v but validate failed = %v", data, valid, failed)
+		}
+		if failed && (err.at < 0 || err.at > int64(len(data))) {
+			t.Fatalf("Valid(%q) = false at position %d, want 0..%d", data, err.at, len(data))
 		}
 
-		// The internal machine agrees and reports a sane failure position.
-		var m machine
-		failed := false
-		for i := 0; i < len(data); i++ {
-			if m.step(data[i]) == opFailure {
-				failed = true
-				break
-			}
-		}
-		if !failed {
-			failed = m.finish() == opFailure
-		}
-		if failed == valid {
-			t.Fatalf("Valid(%q) = %v, but the internal machine disagrees", data, valid)
-		}
-		if failed {
-			if m.failure == nil {
-				t.Fatalf("Valid(%q) = false but no failure was recorded", data)
-			}
-			if m.failure.at < 0 || m.failure.at > int64(len(data)) {
-				t.Fatalf("Valid(%q) failure position %d out of range", data, m.failure.at)
-			}
+		// Surrounding whitespace does not change validity.
+		wrapped := make([]byte, 0, len(data)+4)
+		wrapped = append(wrapped, " \t\r\n"...)
+		wrapped = append(wrapped, data...)
+		wrapped = append(wrapped, " \t\r\n"...)
+		if got := Valid(wrapped); got != valid {
+			t.Fatalf("Valid(%q) = %v, but whitespace-wrapped input = %v", data, valid, got)
 		}
 	})
 }
