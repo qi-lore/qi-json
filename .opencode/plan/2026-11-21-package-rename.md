@@ -1,8 +1,8 @@
-# qi-json — rename the `marshal` package
+# qi-json — relocate and rename the public API package
 
-**Date**: 2026-11-21
-**Status**: **proposed** — recorded, not started. Needs a name decision (this doc)
-and a constitution amendment before any code.
+**Date**: 2026-11-21 (decision updated 2026-11-21)
+**Status**: **decided, not started.** Destination and name chosen (§2); needs a
+constitution amendment before any code.
 **Related**: `AGENTS.md`, `docs/constitution.md` (Article VI), `marshal/doc.go`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
 
@@ -19,52 +19,54 @@ therefore misleading, and it is asymmetrical with the package's own API, which
 exports `Marshal`/`Unmarshal`, `Encoder`/`Decoder`, and `Writer`/`Reader` in
 equal measure.
 
-The sibling package is `scanner` — the **syntax** layer. The rename should name
-the **semantic** layer so it pairs with `scanner` and captures the bidirectional
-essence.
+Two problems, one change: the name is wrong, and the public API lives one
+directory too deep. The library should sit at the **module root** so a caller
+writes `import "qi-json"` and reaches the API directly, while the syntax layer
+stays a subpackage that pairs with it.
 
-## 2. Naming
+## 2. Decision (2026-11-21)
 
-Criteria: (a) means *both* encode and decode; (b) idiomatic Go; (c) not a copy of
-an `encoding/json` identifier (constitution VI); (d) reads well in call position
-(`x.Marshal(...)`, `x.Schema`, `x.Reader`); (e) ideally no collision with the
-existing exported `Codec[E]` type.
+- **Destination — the repository root.** The package's files move from
+  `marshal/` to the module root (or, equivalently, are created there). The module
+  root currently holds no Go package; this change introduces one, so callers
+  `import "qi-json"` instead of `"qi-json/marshal"`.
+- **Package clause — `qijson`.** The import path is fixed at `qi-json` by the
+  module path, but `qi-json` is **not a valid Go identifier** (hyphens are illegal
+  in identifiers), so `package qi-json` will not compile. The root package is
+  therefore declared `package qijson`, giving call sites
+  `qijson.Marshal(...)`, `qijson.Unmarshal[Config](data)`, `qijson.Schema`,
+  `qijson.Reader`, and so on. (This is the same situation as any hyphenated
+  module whose root is a library, e.g. `go.uber.org/zap` declares
+  `package zap`.)
+- **Only the semantic layer moves.** `scanner` stays a subpackage
+  (`qi-json/scanner`). The root is exactly one package, so the syntax/semantic
+  split is preserved rather than merged.
+- **`Codec[E]` keeps its name.** The only earlier reason to rename it to
+  `Element[E]` was the awkward `codec.Codec`; `qijson.Codec[E]` reads fine, so the
+  element type is unchanged and the rename is smaller.
 
-| Candidate | Rationale | Con |
-|---|---|---|
-| **`codec`** (recommended) | Literally *coder–decoder*: one word for both directions; standard Go use for a JSON ⇄ value layer; pairs conceptually with `scanner`. | Overlaps the existing `Codec[E]` type (`codec.Codec`), so that type should be renamed too (see §3). |
-| `serde` | Serialisation **+** deserialisation, exactly bidirectional; `serde.Codec[E]` composes cleanly. | Borrowed (Rust) term, not idiomatic Go. |
-| `binding` | Names the defining technique — compile-time accessor-closure binding. | Leans decode-only ("bind input"), under-sells encoding. |
-| `mapping` | JSON ⇄ Go mapping. | Vague; close to Go's `map`. |
-
-**Recommendation: `codec`.** It is *decode + encode* in one idiomatic word and
-pairs with `scanner` (syntax vs. codec). Its only cost is the overlap with the
-element type `Codec[E]`; resolve it by renaming that type to **`Element[E]`**
-(`codec.Element[E]`, `codec.NewElement(...)`), which also reads better — it is
-the decode/encode closure pair for a *single element type*. If a single rename is
-preferred, **`serde`** avoids the overlap entirely (`serde.Codec[E]`).
-
-Call sites afterwards: `codec.Marshal(cfg)`, `codec.Unmarshal[Config](data)`,
-`codec.Decode(data, v)`, `codec.Encode(w, v)`, `codec.Schema`/`codec.Struct`,
-`codec.Reader`/`codec.Writer`, `codec.Encoder`/`codec.Decoder`.
+Call sites afterwards: `qijson.Marshal(cfg)`, `qijson.Unmarshal[Config](data)`,
+`qijson.Decode(data, v)`, `qijson.Encode(w, v)`, `qijson.Schema`/`qijson.Struct`,
+`qijson.Reader`/`qijson.Writer`, `qijson.Encoder`/`qijson.Decoder`,
+`qijson.Codec[E]`, with `scanner.Valid` still at `qi-json/scanner`.
 
 ## 3. Scope
 
 Mechanical but wide; it must land in **one commit** (the module will not build at
 an intermediate step):
 
-- Rename the directory `marshal/` → `codec/` and the `package marshal` clause in
-  every file.
-- Update the import path `qi-json/marshal` → `qi-json/codec` everywhere:
-  `cmd/qi-json-gen` (generator and emitted import/qualifier), the `gentest`
-  fixtures and their checked-in generated files, `README.md`, `AGENTS.md`,
-  `docs/constitution.md`, and the plans' pointers.
+- Move `marshal/*.go` (source and tests) to the module root and change the
+  `package marshal` clause to `package qijson` in every file. The root gains its
+  first Go package.
+- Update the import path `qi-json/marshal` → `qi-json` everywhere:
+  `cmd/qi-json-gen` (the generator and the emitted import/qualifier), the
+  `gentest` fixtures and their checked-in generated files, `README.md`,
+  `AGENTS.md`, `docs/constitution.md`, and the plans' pointers.
+- Update every qualifier `marshal.` → `qijson.` in Go source (fixtures,
+  generated files, the generator's emitted text).
 - Regenerate the fixtures (`make generate`); the generator emits the new import
-  path and `codec.` qualifier.
+  path and `qijson.` qualifier.
 - `Makefile`, `go:generate` directives, and the tool's usage strings.
-- If `Codec[E]` → `Element[E]`: update `marshal/field.go`
-  (`Slice`/`Map`/`Array` signatures), `marshal/encode.go` (`NewCodec`), the
-  generator's `marshal.NewCodec(...)` emissions, and all tests.
 - `CHANGELOG.md`: an entry under Unreleased noting the import-path break (the
   module is pre-1.0 and deliberately not `encoding/json`-compatible).
 
@@ -72,9 +74,10 @@ an intermediate step):
 
 The constitution names `marshal` explicitly — Article VI ("the `marshal`
 decoder", "the `marshal` encoder") and Additional Constraints ("`marshal` and
-`cmd/qi-json-gen` use neither `reflect` nor `unsafe`"). The rename is therefore a
-**constitution amendment** (a rename, no new surface) plus a footer version bump,
-done in the same change, with `AGENTS.md` updated to match.
+`cmd/qi-json-gen` use neither `reflect` nor `unsafe`"). The rename-and-relocate is
+therefore a **constitution amendment** (a rename and a relocation, no new
+surface) plus a footer version bump, done in the same change, with `AGENTS.md`
+updated to match.
 
 ## 5. Verification
 
@@ -84,11 +87,13 @@ historical plan docs (which are a log and stay as written, with a one-line note)
 
 ## 6. Subtasks (when started)
 
-- **R1 — decide and sign off** the final name (this doc); note the Article VI
-  amendment and `AGENTS.md` update as prerequisites.
-- **R2 — rename** the package/dir; update the generator and regenerate the
+- **R1 — decide and sign off** (done 2026-11-21): destination = repo root, package
+  clause = `qijson`, only the semantic layer moves, `Codec[E]` unchanged. Note the
+  Article VI amendment and `AGENTS.md` update as prerequisites.
+- **R2 — relocate and rename** the package (move `marshal/*.go` to the root,
+  `package marshal` → `package qijson`); update the generator and regenerate the
   fixtures; fix tests (red → green). One commit.
-- **R3 — docs**: `README.md`, `CHANGELOG.md`, `marshal/doc.go`; a superseded-note
-  in the plan docs that name the old package.
+- **R3 — docs**: `README.md`, `CHANGELOG.md`, `marshal/doc.go` (moved to the
+  root); a superseded-note in the plan docs that name the old package.
 - **R4 — governance + verify**: amend Article VI and the footer version, run the
   full mandated verification, commit (no push).

@@ -243,8 +243,10 @@ the decoder or scanner. Results are recorded in each task's handoff.
 
 Not started; recorded so a later session can pick them up.
 
-- **Package rename** — rename `marshal` to a name that reflects that it both
-  decodes *and* encodes (recommended: `codec`). Needs a name decision and a
+- **Package relocation + rename** — move the semantic layer from `marshal/` to
+  the module root and rename it: the root package is `qijson` at import path
+  `qi-json` (`qi-json` is not a valid Go identifier, so the clause differs from
+  the path); `scanner` stays a subpackage and `Codec[E]` keeps its name. Needs a
   constitution amendment (Article VI names the package). Plan:
   `.opencode/plan/2026-11-21-package-rename.md`.
 - **Codegen named `string`/`bool` types** — **done (2026-11-21)**: a
