@@ -38,6 +38,39 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - `go generate ./...` — regenerate `cmd/qi-json-gen` fixtures — no other package
   emits generated code
 
+## Git and review discipline
+
+- Branching: `main` is production, `dev` is integration. Create feature/task
+  branches from the current `main` (after `git fetch` and a fast-forward
+  update) and target `dev`; only the `dev` → `main` pull request may merge into
+  `main`. Branch names follow Conventional Branch
+  (https://conventionalbranch.org/).
+- Commits: strict Conventional Commits with a full body (what changed, why, and
+  any non-obvious decision).
+- Pull requests: start the description with `Closes: #<n>` when it closes an
+  issue, state the problem and the solution, and confirm suggested labels with
+  the user before applying.
+- CI (`.github/workflows/ci.yml`) enforces the branch name, the target branch,
+  the commit messages, and the verification sequence.
+
+## Code quality
+
+All Go code follows the Uber Go Style Guide
+(https://github.com/uber-go/guide/blob/master/style.md) without exception, plus:
+
+- Wrap errors with context: `fmt.Errorf("...: %w", err)`; never return a bare
+  error from a deeper layer.
+- Define a sentinel in the owning package (the `qijson` root or `scanner`) when a
+  caller must inspect it; there is no `core` package.
+- Public APIs document ownership, concurrency safety, and lifecycle.
+- Goroutines need clear ownership and shutdown paths; no leaks.
+- Propagate context explicitly; blocking operations accept `context.Context`.
+- No panics in library code for recoverable conditions.
+
+The library is synchronous (no goroutines, no blocking calls), so the goroutine
+and context rules bind only when such code is added. Open gaps are tracked in
+`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`.
+
 ## API and naming
 
 - `scanner.Valid(data []byte) bool` is the scanner's headline export — the same
@@ -136,6 +169,10 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   - `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md` — **done
     2026-11-22**: implemented that decision (TDD tasks T-F1…T-F6; Article VI
     amendment v3.4.0 for the delegation constructor C).
+  - `.opencode/plan/2026-11-22-git-and-code-quality-reglament.md` — the **Git
+    and Review Discipline** and **Rigorous Code Quality** rules added to the
+    constitution (v3.5.0) and `AGENTS.md`, plus the audit and the refactoring
+    tasks T-Q1…T-Q4 they imply (resume here for code-quality work).
   - `.opencode/plan/2026-11-21-package-rename.md` — relocated the semantic layer
     to the module root and renamed it `qijson` (done 2026-11-21).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
