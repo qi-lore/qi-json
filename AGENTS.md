@@ -124,8 +124,13 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   - `.opencode/plan/2026-11-21-json-codegen.md` — the `cmd/qi-json-gen` codegen
     design, tasks and handoff (resume here for codegen work).
   - `.opencode/plan/2026-11-21-post-decoder-backlog.md` — the running backlog of
-    follow-up tasks (resume here for post-decoder work; its one open item, the
-    Go-version floor mismatch, is the **next task**).
+    follow-up tasks (resume here for post-decoder work; its last open item, the
+    Go-version floor mismatch, is **done** per
+    `.opencode/plan/2026-11-22-go-version-floor.md`).
+  - `.opencode/plan/2026-11-22-go-version-floor.md` — **done 2026-11-22**:
+    `go.mod` now reads `go 1.23.0` + `toolchain go1.27.3`, matching the
+    documented `Go >= 1.23` floor (a 1.23 consumer is no longer silently
+    upgraded or blocked). Guarded by `TestGoModGoDirectiveFloor`.
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the
     gaps they expose (the foreign-struct-field gap was a release blocker, closed
     in v0.2.0).

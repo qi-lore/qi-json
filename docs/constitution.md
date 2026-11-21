@@ -106,7 +106,9 @@ results in the final summary.
 
 ## Additional Constraints
 
-- Go >= 1.23 (toolchain in `go.mod`: 1.27.3).
+- Go >= 1.23: the `go.mod` `go` directive is the language floor
+  (`go 1.23.0`); its `toolchain` line (`go1.27.3`) names the toolchain used to
+  develop the project and is ignored by consumers.
 - Three packages under module `qi-json` (the module root is a package):
   - `.` (module root) — `qijson`, the reflection-free semantic layer (decode
     and encode);
@@ -122,4 +124,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.4.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.4.1 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22

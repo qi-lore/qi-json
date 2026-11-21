@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- `go.mod`: the module's `go` directive is now `go 1.23.0` (with a
+  `toolchain go1.27.3` line) instead of `go 1.27.3`. Since Go 1.21 a
+  dependency's `go` directive is a hard minimum, so the enforced floor was 1.27.3
+  while the documentation promised Go >= 1.23: a 1.23 consumer was silently
+  upgraded by `go mod tidy` or hard-blocked (`requires go >= 1.27.3`). The source
+  is 1.23-language-compatible, so the floor now matches the documentation; the
+  `toolchain` line names the toolchain used to develop the project and is ignored
+  by consumers.
 
 ## [0.2.0] - 2026-11-22
 

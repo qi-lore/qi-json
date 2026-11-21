@@ -1,3 +1,5 @@
 module qi-json
 
-go 1.27.3
+go 1.23.0
+
+toolchain go1.27.3

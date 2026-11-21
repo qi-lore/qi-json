@@ -53,6 +53,11 @@ require qi-json v0.0.0
 replace qi-json => ../qi-json
 ```
 
+The module requires **Go 1.23 or newer**. Its `go.mod` sets `go 1.23.0` (the
+language floor) and adds a `toolchain go1.27.3` line, which merely names the
+toolchain used to develop the project — a dependency's `toolchain` line is
+ignored, so it does not raise the floor for a consumer.
+
 ## Quick start
 
 Map JSON members to struct fields with a `Schema`, then implement `DecodeJSON`:
