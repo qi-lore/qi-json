@@ -1,8 +1,8 @@
 # qi-json — post-decoder backlog (T11+)
 
 **Date**: 2026-11-21
-**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done. This backlog is
-complete.
+**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done. Two open
+follow-ups remain, tracked in §9.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -235,3 +235,17 @@ fuzz target are green.
 Every task finishes with `make verify` in order (test → gofmt → vet →
 golangci-lint), plus `go test -race ./...` and a fuzz run where the task touches
 the decoder or scanner. Results are recorded in each task's handoff.
+
+---
+
+## 9. Open follow-ups (T12+)
+
+Not started; recorded so a later session can pick them up.
+
+- **Package rename** — rename `marshal` to a name that reflects that it both
+  decodes *and* encodes (recommended: `codec`). Needs a name decision and a
+  constitution amendment (Article VI names the package). Plan:
+  `.opencode/plan/2026-11-21-package-rename.md`.
+- **Codegen named `string`/`bool` types** — generate for a same-package named
+  type whose underlying type is `string` or `bool` (D8.2 covers numeric
+  underlyings only). Recorded in `.opencode/plan/2026-11-21-json-codegen.md` §8.

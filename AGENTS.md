@@ -119,6 +119,10 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
     handoff (resume here for decoder work).
   - `.opencode/plan/2026-11-21-json-codegen.md` — the `cmd/qi-json-gen` codegen
     design, tasks and handoff (resume here for codegen work).
+  - `.opencode/plan/2026-11-21-post-decoder-backlog.md` — the running backlog of
+    follow-up tasks (resume here for post-decoder work).
+  - `.opencode/plan/2026-11-21-package-rename.md` — proposed rename of the
+    `marshal` package (proposed, not started).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
     and verification log.
   - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research
