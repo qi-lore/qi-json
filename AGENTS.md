@@ -122,6 +122,10 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
     design, tasks and handoff (resume here for codegen work).
   - `.opencode/plan/2026-11-21-post-decoder-backlog.md` — the running backlog of
     follow-up tasks (resume here for post-decoder work).
+  - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the
+    gaps they expose (the foreign-struct-field gap is a release blocker).
+  - `.opencode/plan/2026-11-22-third-party-struct-fields.md` — **next task**:
+    research a fix for struct fields whose type is a struct from another package.
   - `.opencode/plan/2026-11-21-package-rename.md` — relocated the semantic layer
     to the module root and renamed it `qijson` (done 2026-11-21).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale

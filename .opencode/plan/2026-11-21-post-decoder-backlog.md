@@ -241,8 +241,21 @@ the decoder or scanner. Results are recorded in each task's handoff.
 
 ## 9. Open follow-ups (T12+)
 
-Not started; recorded so a later session can pick them up.
+Recorded so a later session can pick them up. Two items are **open** (2026-11-22);
+the rest are done.
 
+- **Foreign struct fields — release blocker (OPEN, next task).** A struct field
+  whose type is a struct from another package cannot be bound: the generator
+  refuses it (`unsupported cross-package type …`) and the manual fallback is
+  limited (exported fields only, no one-liner for non-canonical widths, no
+  `Decoder`-based constructor). Research task:
+  `.opencode/plan/2026-11-22-third-party-struct-fields.md`; user evidence:
+  `.opencode/plan/user-scenarios.md` §3.
+- **Go-version floor mismatch (OPEN).** `docs/constitution.md` documents a
+  `Go >= 1.23` floor but `go.mod` declares `go 1.27.3`, so a 1.23 consumer is
+  silently upgraded or blocked. Candidate fix: `go 1.23.0` +
+  `toolchain go1.27.3`; or correct the documented floor. Evidence:
+  `.opencode/plan/user-scenarios.md` §2.
 - **Package relocation + rename** — **done (2026-11-21)**: the semantic layer
   moved from `marshal/` to the module root and is now `package qijson` at import
   path `qi-json` (`qi-json` is not a valid Go identifier, so the clause differs
