@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- Governance: `docs/constitution.md` gains two sections (v3.5.0) — **Git and
+  Review Discipline** (two-branch model, Conventional Branch names,
+  Conventional Commits, PR conventions, CI enforcement) and **Rigorous Code
+  Quality** (Uber Go Style Guide, error wrapping, sentinel placement, public-API
+  ownership/concurrency/lifecycle, goroutine and context rules, no panics in
+  library code). The same rules are mirrored in `AGENTS.md` and `README.md`.
+- CI: `.github/workflows/ci.yml` runs the verification sequence (test → gofmt →
+  vet → golangci-lint) and checks Conventional Branch names, the target branch
+  (`main` only from `dev`) and Conventional Commits with a non-empty body.
+- `.opencode/plan/2026-11-22-git-and-code-quality-reglament.md` records the
+  audit of the code against the new rules and the follow-up refactoring tasks
+  T-Q1…T-Q4.
 
 ## [0.2.0] - 2026-11-22
 
