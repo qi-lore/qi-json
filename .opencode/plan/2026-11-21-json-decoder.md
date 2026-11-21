@@ -151,6 +151,34 @@ regress and are not shipped (see §8).
 
 ### [ ] T8 — Optional codegen (`cmd/qi-json-gen`) — **deferred**.
 ### [ ] T9 — Documentation — **deferred**.
+### [ ] T10 — Non-generic entry point (API ergonomics) — **deferred**
+
+Today every decoder entry point is generic, so a caller must name an
+instantiation: `marshal.Unmarshal[Config](data)`,
+`marshal.String[Config](…)`. A caller can already write a non-generic wrapper
+(`func decodeConfig(data []byte) (Config, error) { return
+marshal.Unmarshal[Config](data) }`), but that is boilerplate repeated per type.
+
+Add a package-level non-generic entry point so the common case needs no type
+arguments. It **cannot** return a fresh value — that needs reflection, which
+`marshal` forbids — so the reflection-free shape is **decode-into**, and the
+name cannot be `Unmarshal`/`UnmarshalInto` (Go has no overloading). Candidate:
+
+```go
+func Decode(data []byte, v Decoder) error   // v is e.g. &cfg
+```
+
+A target already implements `Decoder` when it has a `DecodeJSON` method, so no
+new machinery is needed: it is a thin wrapper over `newReader` + `DecodeJSON` +
+the same trailing-value check `UnmarshalInto` performs.
+
+**Blocked on governance**: this is a new exported identifier, which
+`docs/constitution.md` (Article VI; Additional Constraints) says requires an
+amendment. Amend Article VI and `AGENTS.md` together before shipping.
+
+**Acceptance**: `marshal.Decode(data, &cfg)` decodes and reports trailing data
+and syntax/type errors exactly like `UnmarshalInto`; the generic API is
+unchanged; amendment recorded; `make verify`, `-race`, fuzz green.
 
 ## 6. Open questions still to settle (from research §10)
 
@@ -422,10 +450,14 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
     `ValidObject` ~831 MB/s, `ValidArrayOfObjects` ~821, `ValidNumbers` ~1039,
     `ValidString` ~2530–2575 MB/s — all `0 B/op`, `0 allocs/op`.
   - `make verify`, `-race`, and 12s fuzz on all three targets are green.
-- **Not started**: the remaining tasks (T8–T9), both deferred.
-- **Next action**: none required for the decoder; T8 (codegen) and T9
-  (documentation) are optional. If resumed, T9 first (package docs, README, and
-  folding §8's results into `doc.go`).
+- **Not started**: the remaining tasks (T8–T10), all deferred. T8 (codegen) and
+  T9 (documentation) are optional. **T10** (a non-generic entry point such as
+  `marshal.Decode(data, &cfg)`) is a small, high-value ergonomics task but is
+  **blocked on a constitution amendment**, because it adds an exported
+  identifier; the design is in §5 T10.
+- **Next action**: none required for the decoder. If resumed, T9 (package docs,
+  README, and folding §8's results into `doc.go`) and then T10 (amendment
+  first).
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add
