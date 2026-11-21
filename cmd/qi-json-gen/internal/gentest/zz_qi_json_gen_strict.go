@@ -14,3 +14,7 @@ var strictSchema = marshal.Struct[Strict](
 func (v *Strict) DecodeJSON(r *marshal.Reader) error {
 	return strictSchema.Decode(r, v)
 }
+
+func (v *Strict) EncodeJSON(w *marshal.Writer) error {
+	return strictSchema.Encode(w, v)
+}

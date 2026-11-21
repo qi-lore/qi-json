@@ -10,9 +10,13 @@ import (
 
 // typecheck fills g.info by type-checking the package files with the standard
 // library's source importer. Cross-package named types need this: the AST alone
-// cannot tell that time.Duration is an int64. It is best-effort — when the
-// package does not type-check, g.info stays nil and a cross-package field
-// reports a precise unsupported-type error instead.
+// cannot tell that time.Duration is an int64.
+//
+// It is best-effort. Type errors are collected rather than fatal, so an unrelated
+// error elsewhere in the package (for example a stale generated file) still
+// leaves the resolvable types in g.info; an expression the checker could not
+// resolve is simply missing from g.info and its field reports a precise
+// unsupported-type error.
 //
 // The importer is the stdlib source importer, so no third-party code is involved
 // and module mode is handled by the toolchain. Type checking runs once per
@@ -22,10 +26,11 @@ func (g *gen) typecheck(files []*ast.File) {
 		return
 	}
 	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
-	conf := types.Config{Importer: importer.ForCompiler(g.fset, "source", nil)}
-	if _, err := conf.Check("qi-json-gen/target", g.fset, files, info); err != nil {
-		return
+	conf := types.Config{
+		Importer: importer.ForCompiler(g.fset, "source", nil),
+		Error:    func(error) {}, // keep going; g.info holds what resolved
 	}
+	_, _ = conf.Check("qi-json-gen/target", g.fset, files, info)
 	g.info = info
 }
 
@@ -88,12 +93,12 @@ func (g *gen) crossScalarCodec(owner, fname, jname, goType string, basic *types.
 	switch basic.Kind() {
 	case types.String:
 		g.needScanner = true
-		return g.crossScalarClosure(owner, fname, jname, goType, ptr,
+		return g.crossScalarClosure(owner, fname, jname, goType, ptr, "string",
 			"\ts, err := r.ReadString()\n\tif err != nil {\n\t\treturn err\n\t}\n",
 			"s"), nil
 	case types.Bool:
 		g.needScanner = true
-		return g.crossScalarClosure(owner, fname, jname, goType, ptr,
+		return g.crossScalarClosure(owner, fname, jname, goType, ptr, "bool",
 			"\tb, err := r.ReadBool()\n\tif err != nil {\n\t\treturn err\n\t}\n",
 			"b"), nil
 	}
@@ -104,10 +109,10 @@ func (g *gen) crossScalarCodec(owner, fname, jname, goType string, basic *types.
 	return g.numericCodec(owner, fname, jname, goType, name, ptr), nil
 }
 
-// crossScalarClosure builds a Field closure for a cross-package named string or
-// bool type. read is the statement that reads the value into `name`, and name is
-// the local holding it.
-func (g *gen) crossScalarClosure(owner, fname, jname, goType string, ptr bool, read, name string) string {
+// crossScalarClosure builds a Field literal for a cross-package named string or
+// bool type. read is the statement that reads the value into `name`, name is the
+// local holding it, and kind is "string" or "bool".
+func (g *gen) crossScalarClosure(owner, fname, jname, goType string, ptr bool, kind, read, name string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "marshal.Field[%s]{Name: %q, Decode: func(r *marshal.Reader, v *%s) error {\n", owner, jname, owner)
 	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
@@ -123,17 +128,50 @@ func (g *gen) crossScalarClosure(owner, fname, jname, goType string, ptr bool, r
 	} else {
 		fmt.Fprintf(&b, "\tv.%s = %s(%s)\n", fname, goType, name)
 	}
-	b.WriteString("\treturn nil\n}}")
+	b.WriteString("\treturn nil\n\t},\n")
+
+	access := "v." + fname
+	fmt.Fprintf(&b, "\tEncode: func(w *marshal.Writer, v *%s) error {\n", owner)
+	if ptr {
+		fmt.Fprintf(&b, "\t\tif %s == nil {\n\t\t\treturn w.WriteNull()\n\t\t}\n", access)
+		access = "*" + access
+	}
+	if kind == "string" {
+		fmt.Fprintf(&b, "\t\treturn w.WriteString(string(%s))\n", access)
+	} else {
+		fmt.Fprintf(&b, "\t\treturn w.WriteBool(bool(%s))\n", access)
+	}
+	b.WriteString("\t},\n")
+
+	switch {
+	case ptr:
+		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == nil },\n", owner, fname)
+	case kind == "string":
+		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == \"\" },\n", owner, fname)
+	default:
+		// Unary ! keeps the named boolean type, so compare instead.
+		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == false },\n", owner, fname)
+	}
+	b.WriteString("}")
 	return b.String()
 }
 
-// crossElemDecoderExpr returns a decoder for a cross-package element type.
-func (g *gen) crossElemDecoderExpr(sel *ast.SelectorExpr) (string, error) {
+// crossElemCodec returns a marshal.Codec expression for a cross-package element
+// type, emitting paired decode and encode helpers.
+func (g *gen) crossElemCodec(sel *ast.SelectorExpr) (string, error) {
 	named, ok := g.namedOf(sel)
 	if !ok {
 		return "", fmt.Errorf("unsupported element type %s", typeString(g.fset, sel))
 	}
-	return g.crossElemDecoder(named)
+	dec, err := g.crossElemDecoder(named)
+	if err != nil {
+		return "", err
+	}
+	enc, err := g.crossElemEncoder(named)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("marshal.NewCodec(%s, %s)", dec, enc), nil
 }
 
 // crossElemDecoder emits, once, a function that decodes a cross-package named
@@ -204,6 +242,62 @@ func (g *gen) crossElemBody(hn, goType string, basic *types.Basic) (string, erro
 		fmt.Fprintf(&b, "\tif int64(%s(n)) != n {\n\t\treturn 0, qiRangeError(r, %q)\n\t}\n", goType, goType)
 	}
 	fmt.Fprintf(&b, "\treturn %s(n), nil\n}\n", goType)
+	return b.String(), nil
+}
+
+// crossElemEncoder emits, once, a function that encodes a cross-package named
+// scalar and returns its name.
+func (g *gen) crossElemEncoder(named *types.Named) (string, error) {
+	obj := named.Obj()
+	pkg := obj.Pkg()
+	if pkg == nil {
+		return "", fmt.Errorf("unsupported element type %s", obj.Name())
+	}
+	goType := pkg.Name() + "." + obj.Name()
+	basic, ok := named.Underlying().(*types.Basic)
+	if !ok {
+		return "", fmt.Errorf("unsupported cross-package element type %s (only basic scalar underlying types are supported)", goType)
+	}
+	g.addImport(pkg.Path(), pkg.Name())
+
+	hn := "qiEncode" + crossHelperSuffix(goType)
+	if _, ok := g.helpers[hn]; ok {
+		return hn, nil
+	}
+	body, err := g.crossElemEncodeBody(hn, goType, basic)
+	if err != nil {
+		return "", err
+	}
+	g.helpers[hn] = body
+	g.helperOrder = append(g.helperOrder, hn)
+	return hn, nil
+}
+
+// crossElemEncodeBody builds the body of a cross-package element encode helper.
+func (g *gen) crossElemEncodeBody(hn, goType string, basic *types.Basic) (string, error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "func %s(w *marshal.Writer, v %s) error {\n", hn, goType)
+	switch basic.Kind() {
+	case types.String:
+		b.WriteString("\treturn w.WriteString(string(v))\n}\n")
+		return b.String(), nil
+	case types.Bool:
+		b.WriteString("\treturn w.WriteBool(bool(v))\n}\n")
+		return b.String(), nil
+	}
+
+	basicName, ok := basicKindName(basic.Kind())
+	if !ok {
+		return "", fmt.Errorf("unsupported cross-package type %s (underlying %s)", goType, basic.Name())
+	}
+	switch {
+	case basicName == "float32" || basicName == "float64":
+		b.WriteString("\treturn w.WriteFloat(float64(v))\n}\n")
+	case isUnsigned(basicName):
+		b.WriteString("\treturn w.WriteUint(uint64(v))\n}\n")
+	default:
+		b.WriteString("\treturn w.WriteInt(int64(v))\n}\n")
+	}
 	return b.String(), nil
 }
 

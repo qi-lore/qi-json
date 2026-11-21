@@ -110,20 +110,52 @@ type Config struct {
 	}
 	src := string(got)
 	want := []string{
-		`marshal.Slice[Config, string]("Tags", func(v *Config) *[]string { return &v.Tags }, (*marshal.Reader).ReadString)`,
+		`marshal.Slice[Config, string]("Tags", func(v *Config) *[]string { return &v.Tags }, marshal.NewCodec((*marshal.Reader).ReadString, (*marshal.Writer).WriteString))`,
 		"qiDecodeInt8",
-		`marshal.Array[Config, int]("Matrix", func(v *Config) []int { return v.Matrix[:] }, qiDecodeInt)`,
-		`marshal.Map[Config, int32]("Scores", func(v *Config) *map[string]int32 { return &v.Scores }, qiDecodeInt32)`,
+		"qiEncodeInt8",
+		`marshal.Array[Config, int]("Matrix", func(v *Config) []int { return v.Matrix[:] }, marshal.NewCodec(qiDecodeInt, qiEncodeInt))`,
+		`marshal.Map[Config, int32]("Scores", func(v *Config) *map[string]int32 { return &v.Scores }, marshal.NewCodec(qiDecodeInt32, qiEncodeInt32))`,
 		`marshal.Raw[Config]("Blob", func(v *Config) *[]byte { return &v.Blob })`,
 		`marshal.Any[Config]("Meta", func(v *Config) *any { return &v.Meta })`,
 		`marshal.Object[Config, Point]("Origin", func(v *Config) *Point { return &v.Origin }, pointSchema)`,
-		`marshal.Slice[Config, Point]("Points", func(v *Config) *[]Point { return &v.Points }, qiDecodePoint)`,
+		`marshal.Slice[Config, Point]("Points", func(v *Config) *[]Point { return &v.Points }, marshal.NewCodec(qiDecodePoint, qiEncodePoint))`,
 		"func qiDecodePoint(r *marshal.Reader) (Point, error) {",
+		"func qiEncodePoint(w *marshal.Writer, v Point) error {",
+		"func (v *Config) EncodeJSON(w *marshal.Writer) error {",
 	}
 	for _, w := range want {
 		if !strings.Contains(src, w) {
 			t.Errorf("generated source missing %q\n---\n%s", w, src)
 		}
+	}
+}
+
+func TestGenerateOmitEmpty(t *testing.T) {
+	dir := writePkg(t, `package example
+
+type Config struct {
+	Keep   string
+	Empty  int64  `+"`json:\"empty,omitempty\"`"+`
+	Dash   string `+"`json:\"-,omitempty\"`"+`
+	Plain  string `+"`json:\"plain\"`"+`
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		`marshal.Int[Config]("empty", func(v *Config) *int64 { return &v.Empty }).OmitEmpty()`,
+		`marshal.String[Config]("-", func(v *Config) *string { return &v.Dash }).OmitEmpty()`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+	if strings.Contains(src, `marshal.String[Config]("plain", func(v *Config) *string { return &v.Plain }).OmitEmpty()`) {
+		t.Errorf("plain field must not be omitempty:\n%s", src)
 	}
 }
 
@@ -343,6 +375,12 @@ func TestGenerateErrors(t *testing.T) {
 			src:  "package example\n\nimport \"qi-json/marshal\"\n\ntype A struct{ N int }\n\nfunc (a *A) DecodeJSON(r *marshal.Reader) error { return nil }\n",
 			typ:  "A",
 			want: "already declares DecodeJSON",
+		},
+		{
+			name: "already has EncodeJSON",
+			src:  "package example\n\nimport \"qi-json/marshal\"\n\ntype A struct{ N int }\n\nfunc (a *A) EncodeJSON(w *marshal.Writer) error { return nil }\n",
+			typ:  "A",
+			want: "already declares EncodeJSON",
 		},
 	}
 	for _, tc := range cases {

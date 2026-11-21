@@ -54,6 +54,9 @@ type gen struct {
 	// hasDecodeJSON is the set of type names that already declare DecodeJSON.
 	hasDecodeJSON map[string]bool
 
+	// hasEncodeJSON is the set of type names that already declare EncodeJSON.
+	hasEncodeJSON map[string]bool
+
 	// targets is the ordered list of struct names to emit, and known is the set
 	// of names that will have a schema var (targets, for nested lookups).
 	targets []string
@@ -94,6 +97,7 @@ func generateWith(dir string, types []string, strict bool) ([]byte, error) {
 		structs:       map[string]*ast.StructType{},
 		marked:        map[string]bool{},
 		hasDecodeJSON: map[string]bool{},
+		hasEncodeJSON: map[string]bool{},
 		known:         map[string]bool{},
 		helpers:       map[string]string{},
 		extraImports:  map[string]string{},
@@ -170,10 +174,18 @@ func (g *gen) collect(f *ast.File) {
 				}
 			}
 		case *ast.FuncDecl:
-			if d.Name.Name == "DecodeJSON" && d.Recv != nil && len(d.Recv.List) == 1 {
-				if recv := recvTypeName(d.Recv.List[0].Type); recv != "" {
-					g.hasDecodeJSON[recv] = true
-				}
+			if d.Recv == nil || len(d.Recv.List) != 1 {
+				continue
+			}
+			recv := recvTypeName(d.Recv.List[0].Type)
+			if recv == "" {
+				continue
+			}
+			switch d.Name.Name {
+			case "DecodeJSON":
+				g.hasDecodeJSON[recv] = true
+			case "EncodeJSON":
+				g.hasEncodeJSON[recv] = true
 			}
 		}
 	}
@@ -204,6 +216,9 @@ func (g *gen) selectTargets(types []string) error {
 		}
 		if g.hasDecodeJSON[name] {
 			return fmt.Errorf("type %s already declares DecodeJSON", name)
+		}
+		if g.hasEncodeJSON[name] {
+			return fmt.Errorf("type %s already declares EncodeJSON", name)
 		}
 		g.targets = append(g.targets, name)
 		g.known[name] = true
@@ -298,6 +313,7 @@ func (g *gen) renderType(buf *bytes.Buffer, name string) error {
 		buf.WriteString(")\n\n")
 	}
 	fmt.Fprintf(buf, "func (v *%s) DecodeJSON(r *marshal.Reader) error {\n\treturn %s.Decode(r, v)\n}\n", name, schemaVar)
+	fmt.Fprintf(buf, "\nfunc (v *%s) EncodeJSON(w *marshal.Writer) error {\n\treturn %s.Encode(w, v)\n}\n", name, schemaVar)
 	return nil
 }
 
@@ -314,7 +330,7 @@ func (g *gen) fieldCodecs(owner string, field *ast.Field) ([]codec, error) {
 		return nil, fmt.Errorf("%s: embedded field %s is not supported", owner, typeString(g.fset, field.Type))
 	}
 
-	jname, skip, err := jsonTag(field.Tag)
+	jname, skip, omitEmpty, err := jsonTag(field.Tag)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", owner, err)
 	}
@@ -334,6 +350,9 @@ func (g *gen) fieldCodecs(owner string, field *ast.Field) ([]codec, error) {
 		code, err := g.fieldCodec(owner, ident.Name, name, field.Type)
 		if err != nil {
 			return nil, err
+		}
+		if omitEmpty {
+			code += ".OmitEmpty()"
 		}
 		out = append(out, codec{json: name, code: code})
 	}
@@ -416,19 +435,19 @@ func (g *gen) arrayCodec(owner, fname, jname string, t *ast.ArrayType) (string, 
 		if elem == "byte" || elem == "uint8" {
 			return ctor("Raw", owner, jname, fname, "*[]byte"), nil
 		}
-		dec, err := g.elemDecoder(t.Elt)
+		el, err := g.elemCodec(t.Elt)
 		if err != nil {
 			return "", fmt.Errorf("%s.%s: %w", owner, fname, err)
 		}
 		return fmt.Sprintf("marshal.Slice[%s, %s](%q, func(v *%s) *[]%s { return &v.%s }, %s)",
-			owner, elem, jname, owner, elem, fname, dec), nil
+			owner, elem, jname, owner, elem, fname, el), nil
 	}
-	dec, err := g.elemDecoder(t.Elt)
+	el, err := g.elemCodec(t.Elt)
 	if err != nil {
 		return "", fmt.Errorf("%s.%s: %w", owner, fname, err)
 	}
 	return fmt.Sprintf("marshal.Array[%s, %s](%q, func(v *%s) []%s { return v.%s[:] }, %s)",
-		owner, elem, jname, owner, elem, fname, dec), nil
+		owner, elem, jname, owner, elem, fname, el), nil
 }
 
 // mapCodec builds a codec for a map field with string keys.
@@ -437,12 +456,12 @@ func (g *gen) mapCodec(owner, fname, jname string, t *ast.MapType) (string, erro
 		return "", fmt.Errorf("%s.%s: map key %s is not supported; only string keys are", owner, fname, key)
 	}
 	val := typeString(g.fset, t.Value)
-	dec, err := g.elemDecoder(t.Value)
+	el, err := g.elemCodec(t.Value)
 	if err != nil {
 		return "", fmt.Errorf("%s.%s: %w", owner, fname, err)
 	}
 	return fmt.Sprintf("marshal.Map[%s, %s](%q, func(v *%s) *map[string]%s { return &v.%s }, %s)",
-		owner, val, jname, owner, val, fname, dec), nil
+		owner, val, jname, owner, val, fname, el), nil
 }
 
 // anyCodec builds a codec for an any field.
@@ -509,14 +528,48 @@ func (g *gen) numericCodec(owner, fname, jname, goType, basic string, ptr bool) 
 			fmt.Fprintf(&b, "\tv.%s = %s(n)\n", fname, goType)
 		}
 	}
-	b.WriteString("\treturn nil\n}}")
+	b.WriteString("\treturn nil\n\t},\n")
+	g.writeNumericEncode(&b, owner, fname, basic, ptr)
+	g.writeEmpty(&b, owner, fname, ptr)
+	b.WriteString("}")
 	return b.String()
 }
 
-// elemDecoder returns the decoder expression for a container element type.
-func (g *gen) elemDecoder(expr ast.Expr) (string, error) {
+// writeNumericEncode writes the Encode field of a numeric Field literal. access
+// is the field selector; a pointer field writes null when nil.
+func (g *gen) writeNumericEncode(b *strings.Builder, owner, fname, basic string, ptr bool) {
+	access := "v." + fname
+	fmt.Fprintf(b, "\tEncode: func(w *marshal.Writer, v *%s) error {\n", owner)
+	if ptr {
+		fmt.Fprintf(b, "\t\tif %s == nil {\n\t\t\treturn w.WriteNull()\n\t\t}\n", access)
+		access = "*" + access
+	}
+	switch {
+	case basic == "float32" || basic == "float64":
+		fmt.Fprintf(b, "\t\treturn w.WriteFloat(float64(%s))\n", access)
+	case isUnsigned(basic):
+		fmt.Fprintf(b, "\t\treturn w.WriteUint(uint64(%s))\n", access)
+	default:
+		fmt.Fprintf(b, "\t\treturn w.WriteInt(int64(%s))\n", access)
+	}
+	b.WriteString("\t},\n")
+}
+
+// writeEmpty writes the Empty field of a Field literal: a nil pointer or a zero
+// value is empty for omitempty.
+func (g *gen) writeEmpty(b *strings.Builder, owner, fname string, ptr bool) {
+	if ptr {
+		fmt.Fprintf(b, "\tEmpty: func(v *%s) bool { return v.%s == nil },\n", owner, fname)
+	} else {
+		fmt.Fprintf(b, "\tEmpty: func(v *%s) bool { return v.%s == 0 },\n", owner, fname)
+	}
+}
+
+// elemCodec returns a marshal.Codec expression for a container element type,
+// pairing the element's decoder and encoder.
+func (g *gen) elemCodec(expr ast.Expr) (string, error) {
 	if sel, ok := expr.(*ast.SelectorExpr); ok {
-		return g.crossElemDecoderExpr(sel)
+		return g.crossElemCodec(sel)
 	}
 	id, ok := expr.(*ast.Ident)
 	if !ok {
@@ -524,19 +577,27 @@ func (g *gen) elemDecoder(expr ast.Expr) (string, error) {
 	}
 	switch id.Name {
 	case "string":
-		return "(*marshal.Reader).ReadString", nil
+		return "marshal.NewCodec((*marshal.Reader).ReadString, (*marshal.Writer).WriteString)", nil
 	case "bool":
-		return "(*marshal.Reader).ReadBool", nil
+		return "marshal.NewCodec((*marshal.Reader).ReadBool, (*marshal.Writer).WriteBool)", nil
 	case "int64":
-		return "(*marshal.Reader).ReadInt", nil
+		return "marshal.NewCodec((*marshal.Reader).ReadInt, (*marshal.Writer).WriteInt)", nil
 	case "float64":
-		return "(*marshal.Reader).ReadFloat", nil
+		return "marshal.NewCodec((*marshal.Reader).ReadFloat, (*marshal.Writer).WriteFloat)", nil
 	}
 	if basic, ok := g.basicUnderlying(id.Name); ok {
-		return g.numericHelper(id.Name, basic), nil
+		return fmt.Sprintf("marshal.NewCodec(%s, %s)", g.numericHelper(id.Name, basic), g.numericEncodeHelper(id.Name, basic)), nil
 	}
 	if _, ok := g.structs[id.Name]; ok {
-		return g.structHelper(id.Name)
+		dec, err := g.structHelper(id.Name)
+		if err != nil {
+			return "", err
+		}
+		enc, err := g.structEncodeHelper(id.Name)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("marshal.NewCodec(%s, %s)", dec, enc), nil
 	}
 	return "", fmt.Errorf("unsupported element type %s", id.Name)
 }
@@ -593,6 +654,45 @@ func (g *gen) structHelper(name string) (string, error) {
 	return hn, nil
 }
 
+// numericEncodeHelper emits, once, a function that encodes goType to a Writer and
+// returns its name.
+func (g *gen) numericEncodeHelper(goType, basic string) string {
+	hn := "qiEncode" + upperFirst(goType)
+	if _, ok := g.helpers[hn]; ok {
+		return hn
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "func %s(w *marshal.Writer, v %s) error {\n", hn, goType)
+	switch {
+	case basic == "float32" || basic == "float64":
+		b.WriteString("\treturn w.WriteFloat(float64(v))\n}\n")
+	case isUnsigned(basic):
+		b.WriteString("\treturn w.WriteUint(uint64(v))\n}\n")
+	default:
+		b.WriteString("\treturn w.WriteInt(int64(v))\n}\n")
+	}
+	g.helpers[hn] = b.String()
+	g.helperOrder = append(g.helperOrder, hn)
+	return hn
+}
+
+// structEncodeHelper emits, once, a function that encodes a nested struct and
+// returns its name.
+func (g *gen) structEncodeHelper(name string) (string, error) {
+	if !g.known[name] {
+		return "", fmt.Errorf("nested struct %s is not generated; add -type=%s", name, name)
+	}
+	hn := "qiEncode" + upperFirst(name)
+	if _, ok := g.helpers[hn]; ok {
+		return hn, nil
+	}
+	g.helpers[hn] = fmt.Sprintf(
+		"func %s(w *marshal.Writer, v %s) error {\n\treturn %s.Encode(w, &v)\n}\n",
+		hn, name, schemaVarName(name))
+	g.helperOrder = append(g.helperOrder, hn)
+	return hn, nil
+}
+
 // basicUnderlying returns the predeclared basic type a name resolves to in this
 // package, following named types, or false when it resolves to something else.
 func (g *gen) basicUnderlying(name string) (string, bool) {
@@ -622,26 +722,48 @@ func (g *gen) resolveBasic(name string, seen map[string]bool) (string, bool) {
 	return g.resolveBasic(id.Name, seen)
 }
 
-// jsonTag returns the json member name (empty when absent) and whether the field
-// is skipped. It mirrors encoding/json's tag rules: `json:"-"` skips, `json:"-,"`
-// names the member "-", and a bare `json:"name,omitempty"` names it "name".
-func jsonTag(tag *ast.BasicLit) (name string, skip bool, err error) {
+// jsonTag returns the json member name (empty when absent), whether the field is
+// skipped, and whether it is tagged omitempty. It mirrors encoding/json's tag
+// rules: `json:"-"` skips, `json:"-,"` names the member "-", and a bare
+// `json:"name,omitempty"` names it "name" and marks it omitempty.
+func jsonTag(tag *ast.BasicLit) (name string, skip, omitEmpty bool, err error) {
 	if tag == nil {
-		return "", false, nil
+		return "", false, false, nil
 	}
 	raw, err := strconv.Unquote(tag.Value)
 	if err != nil {
-		return "", false, fmt.Errorf("bad struct tag %s", tag.Value)
+		return "", false, false, fmt.Errorf("bad struct tag %s", tag.Value)
 	}
 	val := parseTag(raw, "json")
 	switch {
 	case val == "-":
-		return "", true, nil
+		return "", true, false, nil
 	case strings.HasPrefix(val, "-,"):
-		return "-", false, nil
+		return "-", false, hasTagOption(val[2:], "omitempty"), nil
 	default:
-		return strings.SplitN(val, ",", 2)[0], false, nil
+		parts := strings.SplitN(val, ",", 2)
+		if len(parts) == 2 && hasTagOption(parts[1], "omitempty") {
+			omitEmpty = true
+		}
+		return parts[0], false, omitEmpty, nil
 	}
+}
+
+// hasTagOption reports whether a json tag's comma-separated option list holds
+// want.
+func hasTagOption(opts, want string) bool {
+	for opts != "" {
+		var opt string
+		if i := strings.IndexByte(opts, ','); i >= 0 {
+			opt, opts = opts[:i], opts[i+1:]
+		} else {
+			opt, opts = opts, ""
+		}
+		if opt == want {
+			return true
+		}
+	}
+	return false
 }
 
 // parseTag returns the value of the key in a struct tag, or "". It is a

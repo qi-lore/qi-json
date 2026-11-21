@@ -32,6 +32,7 @@ type Config struct {
 	Origin  Point            `json:"origin"`
 	Points  []Point          `json:"points"`
 	Ports   map[string]Point `json:"ports"`
+	Note    string           `json:"note,omitempty"`
 	Skipped string           `json:"-"`
 	//lint:ignore U1000 unexported fields must be ignored by the generator
 	hidden string

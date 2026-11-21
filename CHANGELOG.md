@@ -18,6 +18,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fields, pointer fields, and slice or map elements.
 - `cmd/qi-json-gen`: a `-strict` flag that makes every generated schema reject
   unknown and duplicate object members.
+- `marshal`: a reflection-free **encoder**, the mirror of the decoder:
+  - `Writer`, an append-only JSON buffer with a sticky error, `Write*` methods,
+    and `Begin*`/`End*` object and array framing.
+  - The `Encoder` interface (`EncodeJSON(*Writer) error`) and two entry points:
+    generic `Marshal[T](v)` and non-generic `Encode(w, v)`.
+  - `Schema.Encode`/`Schema.Marshal` and `Field.Encode`, writing object members
+    in declaration order and honouring `json:",omitempty"`.
+  - The element `Codec[E]` (`NewCodec`), so `Slice`, `Map`, and `Array` carry
+    both directions; map keys are written sorted, a nil slice or map as `null`,
+    and invalid UTF-8 in a string as `U+FFFD`.
+- `cmd/qi-json-gen`: generated types now get an `EncodeJSON` method alongside
+  `DecodeJSON`, and `json:",omitempty"` is honoured on encode.
+
+### Changed
+
+- `marshal` container field constructors (`Slice`, `Map`, `Array`) now take a
+  `Codec[E]` instead of a bare element decode function, so one value carries both
+  the decoder and the encoder. This is a breaking change to those three
+  constructors (the module is pre-1.0 and deliberately not `encoding/json`-compatible).
 
 ## [0.1.0] - 2026-11-21
 

@@ -2,6 +2,7 @@ package gentest
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -169,5 +170,54 @@ func TestGeneratedStrict(t *testing.T) {
 	err = marshal.UnmarshalInto[Strict]([]byte(`{"a":1,"a":2}`), &s)
 	if !errors.As(err, &e) || e.Kind != marshal.KindDuplicateField {
 		t.Errorf("duplicate member: err = %v, want KindDuplicateField", err)
+	}
+}
+
+// TestGeneratedEncodeConfig proves the generated EncodeJSON works end to end,
+// writes members in declaration order, and honours omitempty.
+func TestGeneratedEncodeConfig(t *testing.T) {
+	data, err := marshal.Marshal[Config](Config{})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	want := `{"name":"","port":0,"rate":0,"debug":false,"level":0,"count":0,` +
+		`"ratio":0,"size":0,"limit":null,"tags":null,"matrix":[0,0],"scores":null,` +
+		`"blob":null,"meta":null,"origin":{"x":0,"y":0},"points":null,"ports":null,` +
+		`"timeout":0,"deadline":null,"durations":null,"label":"","labels":null,"flag":false}`
+	if string(data) != want {
+		t.Errorf("Marshal:\n got %s\nwant %s", data, want)
+	}
+
+	limit := int32(7)
+	populated := Config{
+		Name:    "qi-json",
+		Port:    8080,
+		Rate:    1.5,
+		Debug:   true,
+		Limit:   &limit,
+		Tags:    []string{"a", "b"},
+		Matrix:  [2]int{3, 4},
+		Scores:  map[string]int32{"x": 1},
+		Origin:  Point{X: 1, Y: 2},
+		Note:    "hi",
+		Timeout: 5 * time.Second,
+	}
+	data, err = marshal.Marshal[Config](populated)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"note":"hi"`) {
+		t.Errorf("omitempty field with a value must be written: %s", data)
+	}
+	var back Config
+	if err := marshal.UnmarshalInto[Config](data, &back); err != nil {
+		t.Fatalf("UnmarshalInto: %v", err)
+	}
+	data2, err := marshal.Marshal[Config](back)
+	if err != nil {
+		t.Fatalf("re-Marshal: %v", err)
+	}
+	if string(data2) != string(data) {
+		t.Errorf("round trip not stable:\n got %s\nwant %s", data2, data)
 	}
 }

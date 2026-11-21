@@ -22,6 +22,10 @@ func (a *fuzzAny) DecodeJSON(r *Reader) error {
 	return nil
 }
 
+// EncodeJSON lets the round-trip fuzz target drive the encoder through the same
+// dynamic value the decoder produced.
+func (a *fuzzAny) EncodeJSON(w *Writer) error { return encodeAny(w, a.V) }
+
 // fuzzSeeds reach every branch: one value of each kind, composites, escapes, a
 // surrogate pair, an overflowing number, and a spread of malformed documents.
 var fuzzSeeds = []string{
@@ -108,6 +112,37 @@ func FuzzUnmarshalMatchesValid(f *testing.F) {
 		// decoder's stricter UTF-8 rejection.
 		if e.Kind == KindSyntax && valid && !errors.Is(err, errInvalidUTF8) {
 			t.Fatalf("Unmarshal(%q) reported a syntax error at offset %d but Valid(%q) = true", data, e.Offset, data)
+		}
+	})
+}
+
+// FuzzMarshalRoundTrip decodes arbitrary input into a dynamic value, encodes it
+// back, and decodes the result: the encoder must never panic, its output must be
+// valid JSON, and the round trip must preserve the value (the decoder produced
+// only types the encoder can write).
+func FuzzMarshalRoundTrip(f *testing.F) {
+	for _, seed := range fuzzSeeds {
+		f.Add([]byte(seed))
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		v, err := Unmarshal[fuzzAny](data)
+		if err != nil {
+			return // not decodable, nothing to round-trip
+		}
+		enc, err := Marshal[fuzzAny](v)
+		if err != nil {
+			t.Fatalf("Marshal after decoding %q: %v", data, err)
+		}
+		if !scanner.Valid(enc) {
+			t.Fatalf("Marshal(%q) produced invalid JSON %q", data, enc)
+		}
+		back, err := Unmarshal[fuzzAny](enc)
+		if err != nil {
+			t.Fatalf("re-decoding %q (encoded as %q): %v", data, enc, err)
+		}
+		if !anyEqual(v.V, back.V) {
+			t.Fatalf("round trip changed the value for %q: %v then %v", data, v.V, back.V)
 		}
 	})
 }

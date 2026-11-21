@@ -413,3 +413,26 @@ func BenchmarkStructDecode(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkStructEncode(b *testing.B) {
+	type config struct {
+		Name  string
+		Port  int64
+		Ratio float64
+		Debug bool
+	}
+	schema := Struct(
+		String[config]("name", func(c *config) *string { return &c.Name }),
+		Int[config]("port", func(c *config) *int64 { return &c.Port }),
+		Float[config]("ratio", func(c *config) *float64 { return &c.Ratio }),
+		Bool[config]("debug", func(c *config) *bool { return &c.Debug }),
+	)
+	v := config{Name: "qi-json", Port: 8080, Ratio: 0.5, Debug: true}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := schema.Marshal(v); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

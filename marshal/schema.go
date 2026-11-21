@@ -2,6 +2,7 @@ package marshal
 
 import (
 	"bytes"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -14,14 +15,22 @@ type Schema[T any] struct {
 	// fields holds the fields sorted by Name for binary-search lookup.
 	fields []Field[T]
 
+	// decl holds the fields in declaration order, used by Encode so member
+	// order is stable and natural.
+	decl []Field[T]
+
 	rejectUnknown   bool
 	rejectDuplicate bool
 }
 
-// Struct returns a Schema that decodes a JSON object using fields. Field names
-// must be unique; the order of the arguments does not matter.
+// Struct returns a Schema that decodes and encodes a JSON object using fields.
+// Field names must be unique; the order of the arguments does not matter, and
+// Encode writes members in that argument (declaration) order.
 func Struct[T any](fields ...Field[T]) *Schema[T] {
-	s := &Schema[T]{fields: slices.Clone(fields)}
+	s := &Schema[T]{
+		fields: slices.Clone(fields),
+		decl:   slices.Clone(fields),
+	}
 	slices.SortFunc(s.fields, func(a, b Field[T]) int {
 		return strings.Compare(a.Name, b.Name)
 	})
@@ -72,6 +81,45 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 		r.comps = r.comps[:before]
 		return err
 	})
+}
+
+// Encode writes v as a JSON object to w, emitting members in declaration order.
+// A field whose OmitEmpty is set and whose Empty reports true is skipped.
+func (s *Schema[T]) Encode(w *Writer, v *T) error {
+	if err := w.BeginObject(); err != nil {
+		return err
+	}
+	for i := range s.decl {
+		f := &s.decl[i]
+		if f.omitEmpty && f.Empty != nil && f.Empty(v) {
+			continue
+		}
+		if f.Encode == nil {
+			return fmt.Errorf("marshal: field %q has no encoder", f.Name)
+		}
+		if err := w.Key(f.Name); err != nil {
+			return err
+		}
+		if err := f.Encode(w, v); err != nil {
+			return err
+		}
+	}
+	return w.EndObject()
+}
+
+// Marshal encodes v as a JSON object. It is the counterpart to Unmarshal.
+func (s *Schema[T]) Marshal(v T) ([]byte, error) {
+	var w Writer
+	if err := s.Encode(&w, &v); err != nil {
+		return nil, err
+	}
+	if w.err != nil {
+		return nil, w.err
+	}
+	if !w.complete() {
+		return nil, errIncomplete
+	}
+	return w.buf, nil
 }
 
 // Unmarshal decodes data into a new T.

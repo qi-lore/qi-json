@@ -1,7 +1,8 @@
 # qi-json — post-decoder backlog (T11+)
 
 **Date**: 2026-11-21
-**Status**: plan agreed; tasks 4, 2 and 1 done; task 3 (encoder) remains.
+**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done. This backlog is
+complete.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -210,11 +211,13 @@ duplicate members; `make verify`, `-race` green.
 
 ## 6. Task 3 — encoder (`Marshal`)
 
-Out of scope until T4/T2/T1 are done. Requires its own plan
-(`.opencode/plan/…-json-encoder.md`) and a constitution amendment, because a
-reflection-free encoder needs either codegen (`EncodeJSON` methods, mirroring
-the decoder) or reflection — a design decision the plan must settle first. Not
-detailed here.
+**Done (2026-11-21).** Plan and results:
+`.opencode/plan/2026-11-21-json-encoder.md`. The reflection-free,
+codegen-symmetric encoder shipped (`Encoder`/`Writer`/`Marshal`/`Encode`,
+`Schema`/`Field` encode with declaration order and `omitempty`, the element
+`Codec[E]`, and generated `EncodeJSON`), with the Article VI amendment and the
+3.2.0 version bump in the same change. `make verify`, `-race` and a round-trip
+fuzz target are green.
 
 ---
 

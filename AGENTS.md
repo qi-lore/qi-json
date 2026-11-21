@@ -5,15 +5,17 @@ A from-scratch JSON library with three Go packages:
 - `scanner/` (import `qi-json/scanner`) — the single-pass syntax layer; exports
   `Valid` and the tokenizer (`Kind` plus a tokenizing type).
 - `marshal/` (import `qi-json/marshal`) — the reflection-free semantic layer (the
-  decoder). Not `encoding/json`-compatible; no `reflect`, no `unsafe`.
+  decoder and encoder). Not `encoding/json`-compatible; no `reflect`, no
+  `unsafe`.
 - `cmd/qi-json-gen` — the optional, stdlib-only code generator that emits
-  `marshal` `Schema` values and `DecodeJSON` methods from struct tags. No
-  `reflect`/`unsafe`; it targets only the exported `marshal` surface.
+  `marshal` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
+  tags. No `reflect`/`unsafe`; it targets only the exported `marshal` surface.
 
 The module root has no Go package. No third-party dependencies. `make` wraps the
-common tasks. `docs/task.md` is the syntax specification and
-`.opencode/plan/2026-11-21-json-decoder.md` is the decoder plan and task list;
-`docs/constitution.md` governs changes.
+common tasks. `docs/task.md` is the syntax specification;
+`.opencode/plan/2026-11-21-json-decoder.md` is the decoder plan and task list and
+`.opencode/plan/2026-11-21-json-encoder.md` is the encoder plan; `docs/constitution.md`
+governs changes.
 
 ## Required verification (in this order)
 
@@ -40,8 +42,9 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 
 - `scanner.Valid(data []byte) bool` is the scanner's headline export — the same
   name and signature as `encoding/json.Valid`. The sanctioned public surface is
-  exactly the scanner tokenizer and the `marshal` decoder (constitution
-  Article VI); do not export anything else without a new amendment.
+  exactly the scanner tokenizer and the `marshal` decoder and encoder
+  (constitution Article VI); do not export anything else without a new
+  amendment.
 - `scanner.validate(data []byte) (parseError, bool)` is unexported and returns
   the first failure plus whether the input is invalid. Tests assert messages and
   1-based positions through it; `Valid` is `!failed`. The error is a value type so
@@ -57,19 +60,27 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   delimiter after a completed value (see `docs/task.md` §6.1). The object-member
   scan is deliberately written twice so it stays inline; extracting it into a
   helper costs about 8% on object-heavy documents.
-- `marshal` is the decoder: a reflection-free semantic layer over `scanner`. It
-  MUST NOT import `encoding/json` and MUST NOT use `reflect` or `unsafe`; struct
-  binding is by compile-time accessor closures. Its API is deliberately not
-  `encoding/json`-compatible. The non-generic `Decode(data, v Decoder) error`
-  mirrors `UnmarshalInto` for a caller that does not want to name a type
-  argument. Plan and tasks:
-  `.opencode/plan/2026-11-21-json-decoder.md`.
+- `marshal` is the semantic layer: a reflection-free decoder and encoder over
+  `scanner`. It MUST NOT import `encoding/json` and MUST NOT use `reflect` or
+  `unsafe`; struct binding is by compile-time accessor closures. Its API is
+  deliberately not `encoding/json`-compatible. The non-generic `Decode(data, v
+  Decoder) error` mirrors `UnmarshalInto` for a caller that does not want to name
+  a type argument; the encoder mirrors it with `Marshal[T, PT](v T) ([]byte,
+  error)` and the non-generic `Encode(w *Writer, v Encoder) error`, built on a
+  `Writer` and an element `Codec[E]`. A container field constructor
+  (`Slice`/`Map`/`Array`) takes a `Codec[E]` carrying both directions; the
+  encoder honours `json:",omitempty"` and replaces invalid UTF-8 with `U+FFFD`
+  (the decoder rejects invalid UTF-8). Plans and tasks:
+  `.opencode/plan/2026-11-21-json-decoder.md` and
+  `.opencode/plan/2026-11-21-json-encoder.md`.
 - `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
-  `go/parser`, `go/format`). It emits code against the exported `marshal` surface
-  only; the runtime is unchanged by it. It MUST NOT import `encoding/json` and
-  MUST NOT use `reflect` or `unsafe`. Generation must be deterministic (sort all
-  emitted collections) so the drift guard passes. Plan:
-  `.opencode/plan/2026-11-21-json-codegen.md`.
+  `go/parser`, `go/format`, and `go/types` via the source importer for
+  cross-package named types). It emits code against the exported `marshal`
+  surface only; the runtime is unchanged by it. It emits a `Schema` var plus both
+  `DecodeJSON` and `EncodeJSON` for each target type. It MUST NOT import
+  `encoding/json` and MUST NOT use `reflect` or `unsafe`.
+  Generation must be deterministic (sort all emitted collections) so the drift
+  guard passes. Plan: `.opencode/plan/2026-11-21-json-codegen.md`.
 - Never use `encoding/json`, including in tests or benchmarks (hard requirement
   in `docs/task.md`); tests are hand-built tables.
 

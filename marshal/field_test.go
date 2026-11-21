@@ -24,12 +24,18 @@ func decodeFPPoint(r *Reader) (fpPoint, error) {
 	return p, err
 }
 
+// dec wraps a decode function in a Codec with no encoder, for the decode-only
+// tests below. Encode-side coverage lives in encode_test.go.
+func dec[E any](fn func(*Reader) (E, error)) Codec[E] {
+	return NewCodec(fn, nil)
+}
+
 func TestSliceOfPrimitives(t *testing.T) {
 	type cfg struct {
 		Tags []string
 	}
 	schema := Struct(
-		Slice[cfg, string]("tags", func(c *cfg) *[]string { return &c.Tags }, (*Reader).ReadString),
+		Slice[cfg, string]("tags", func(c *cfg) *[]string { return &c.Tags }, dec((*Reader).ReadString)),
 	)
 
 	got, err := schema.Unmarshal([]byte(`{"tags":["a","b","c"]}`))
@@ -52,7 +58,7 @@ func TestSliceOfStructs(t *testing.T) {
 		Points []fpPoint
 	}
 	schema := Struct(
-		Slice[cfg, fpPoint]("points", func(c *cfg) *[]fpPoint { return &c.Points }, decodeFPPoint),
+		Slice[cfg, fpPoint]("points", func(c *cfg) *[]fpPoint { return &c.Points }, dec(decodeFPPoint)),
 	)
 
 	got, err := schema.Unmarshal([]byte(`{"points":[{"x":1,"y":2},{"x":3,"y":4}]}`))
@@ -75,7 +81,7 @@ func TestEmptySlice(t *testing.T) {
 		Nums []int64
 	}
 	schema := Struct(
-		Slice[cfg, int64]("nums", func(c *cfg) *[]int64 { return &c.Nums }, (*Reader).ReadInt),
+		Slice[cfg, int64]("nums", func(c *cfg) *[]int64 { return &c.Nums }, dec((*Reader).ReadInt)),
 	)
 
 	got, err := schema.Unmarshal([]byte(`{"nums":[]}`))
@@ -95,7 +101,7 @@ func TestSliceNullLeavesFieldUnchanged(t *testing.T) {
 		Tags []string
 	}
 	schema := Struct(
-		Slice[cfg, string]("tags", func(c *cfg) *[]string { return &c.Tags }, (*Reader).ReadString),
+		Slice[cfg, string]("tags", func(c *cfg) *[]string { return &c.Tags }, dec((*Reader).ReadString)),
 	)
 
 	v := cfg{Tags: []string{"keep"}}
@@ -112,7 +118,7 @@ func TestSliceTypeError(t *testing.T) {
 		Tags []string
 	}
 	schema := Struct(
-		Slice[cfg, string]("tags", func(c *cfg) *[]string { return &c.Tags }, (*Reader).ReadString),
+		Slice[cfg, string]("tags", func(c *cfg) *[]string { return &c.Tags }, dec((*Reader).ReadString)),
 	)
 
 	_, err := schema.Unmarshal([]byte(`{"tags":{}}`))
@@ -136,7 +142,7 @@ func TestMapOfStrings(t *testing.T) {
 		Labels map[string]string
 	}
 	schema := Struct(
-		Map[cfg, string]("labels", func(c *cfg) *map[string]string { return &c.Labels }, (*Reader).ReadString),
+		Map[cfg, string]("labels", func(c *cfg) *map[string]string { return &c.Labels }, dec((*Reader).ReadString)),
 	)
 
 	got, err := schema.Unmarshal([]byte(`{"labels":{"a":"x","b":"y"}}`))
@@ -159,7 +165,7 @@ func TestMapOfStructs(t *testing.T) {
 		Points map[string]fpPoint
 	}
 	schema := Struct(
-		Map[cfg, fpPoint]("points", func(c *cfg) *map[string]fpPoint { return &c.Points }, decodeFPPoint),
+		Map[cfg, fpPoint]("points", func(c *cfg) *map[string]fpPoint { return &c.Points }, dec(decodeFPPoint)),
 	)
 
 	got, err := schema.Unmarshal([]byte(`{"points":{"a":{"x":1,"y":2},"b":{"x":3,"y":4}}}`))
@@ -182,7 +188,7 @@ func TestEmptyMap(t *testing.T) {
 		Labels map[string]string
 	}
 	schema := Struct(
-		Map[cfg, string]("labels", func(c *cfg) *map[string]string { return &c.Labels }, (*Reader).ReadString),
+		Map[cfg, string]("labels", func(c *cfg) *map[string]string { return &c.Labels }, dec((*Reader).ReadString)),
 	)
 
 	got, err := schema.Unmarshal([]byte(`{"labels":{}}`))
@@ -202,7 +208,7 @@ func TestMapTypeError(t *testing.T) {
 		Labels map[string]string
 	}
 	schema := Struct(
-		Map[cfg, string]("labels", func(c *cfg) *map[string]string { return &c.Labels }, (*Reader).ReadString),
+		Map[cfg, string]("labels", func(c *cfg) *map[string]string { return &c.Labels }, dec((*Reader).ReadString)),
 	)
 
 	_, err := schema.Unmarshal([]byte(`{"labels":[]}`))
@@ -224,7 +230,7 @@ func TestArrayFixedSize(t *testing.T) {
 	}
 	// The view returns a slice aliasing the array, so decoding writes through.
 	schema := Struct(
-		Array[cfg, int64]("v", func(c *cfg) []int64 { return c.V[:] }, (*Reader).ReadInt),
+		Array[cfg, int64]("v", func(c *cfg) []int64 { return c.V[:] }, dec((*Reader).ReadInt)),
 	)
 
 	t.Run("exact", func(t *testing.T) {

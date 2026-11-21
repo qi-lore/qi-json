@@ -32,7 +32,12 @@ var configSchema = marshal.Struct[Config](
 		}
 		v.Level = int8(n)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteInt(int64(v.Level))
+		},
+		Empty: func(v *Config) bool { return v.Level == 0 },
+	},
 	marshal.Field[Config]{Name: "count", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -50,7 +55,12 @@ var configSchema = marshal.Struct[Config](
 		}
 		v.Count = uint16(n)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteUint(uint64(v.Count))
+		},
+		Empty: func(v *Config) bool { return v.Count == 0 },
+	},
 	marshal.Field[Config]{Name: "ratio", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -68,7 +78,12 @@ var configSchema = marshal.Struct[Config](
 		}
 		v.Ratio = float32(f)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteFloat(float64(v.Ratio))
+		},
+		Empty: func(v *Config) bool { return v.Ratio == 0 },
+	},
 	marshal.Field[Config]{Name: "size", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -86,7 +101,12 @@ var configSchema = marshal.Struct[Config](
 		}
 		v.Size = int(n)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteInt(int64(v.Size))
+		},
+		Empty: func(v *Config) bool { return v.Size == 0 },
+	},
 	marshal.Field[Config]{Name: "limit", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -109,15 +129,24 @@ var configSchema = marshal.Struct[Config](
 		e := int32(n)
 		v.Limit = &e
 		return nil
-	}},
-	marshal.Slice[Config, string]("tags", func(v *Config) *[]string { return &v.Tags }, (*marshal.Reader).ReadString),
-	marshal.Array[Config, int]("matrix", func(v *Config) []int { return v.Matrix[:] }, qiDecodeInt),
-	marshal.Map[Config, int32]("scores", func(v *Config) *map[string]int32 { return &v.Scores }, qiDecodeInt32),
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			if v.Limit == nil {
+				return w.WriteNull()
+			}
+			return w.WriteInt(int64(*v.Limit))
+		},
+		Empty: func(v *Config) bool { return v.Limit == nil },
+	},
+	marshal.Slice[Config, string]("tags", func(v *Config) *[]string { return &v.Tags }, marshal.NewCodec((*marshal.Reader).ReadString, (*marshal.Writer).WriteString)),
+	marshal.Array[Config, int]("matrix", func(v *Config) []int { return v.Matrix[:] }, marshal.NewCodec(qiDecodeInt, qiEncodeInt)),
+	marshal.Map[Config, int32]("scores", func(v *Config) *map[string]int32 { return &v.Scores }, marshal.NewCodec(qiDecodeInt32, qiEncodeInt32)),
 	marshal.Raw[Config]("blob", func(v *Config) *[]byte { return &v.Blob }),
 	marshal.Any[Config]("meta", func(v *Config) *any { return &v.Meta }),
 	marshal.Object[Config, Point]("origin", func(v *Config) *Point { return &v.Origin }, pointSchema),
-	marshal.Slice[Config, Point]("points", func(v *Config) *[]Point { return &v.Points }, qiDecodePoint),
-	marshal.Map[Config, Point]("ports", func(v *Config) *map[string]Point { return &v.Ports }, qiDecodePoint),
+	marshal.Slice[Config, Point]("points", func(v *Config) *[]Point { return &v.Points }, marshal.NewCodec(qiDecodePoint, qiEncodePoint)),
+	marshal.Map[Config, Point]("ports", func(v *Config) *map[string]Point { return &v.Ports }, marshal.NewCodec(qiDecodePoint, qiEncodePoint)),
+	marshal.String[Config]("note", func(v *Config) *string { return &v.Note }).OmitEmpty(),
 	marshal.Field[Config]{Name: "timeout", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -135,7 +164,12 @@ var configSchema = marshal.Struct[Config](
 		}
 		v.Timeout = time.Duration(n)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteInt(int64(v.Timeout))
+		},
+		Empty: func(v *Config) bool { return v.Timeout == 0 },
+	},
 	marshal.Field[Config]{Name: "deadline", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -158,8 +192,16 @@ var configSchema = marshal.Struct[Config](
 		e := time.Duration(n)
 		v.Deadline = &e
 		return nil
-	}},
-	marshal.Slice[Config, time.Duration]("durations", func(v *Config) *[]time.Duration { return &v.Durations }, qiDecodeTimeDuration),
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			if v.Deadline == nil {
+				return w.WriteNull()
+			}
+			return w.WriteInt(int64(*v.Deadline))
+		},
+		Empty: func(v *Config) bool { return v.Deadline == nil },
+	},
+	marshal.Slice[Config, time.Duration]("durations", func(v *Config) *[]time.Duration { return &v.Durations }, marshal.NewCodec(qiDecodeTimeDuration, qiEncodeTimeDuration)),
 	marshal.Field[Config]{Name: "label", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -174,8 +216,13 @@ var configSchema = marshal.Struct[Config](
 		}
 		v.Label = xtypes.Label(s)
 		return nil
-	}},
-	marshal.Map[Config, xtypes.Label]("labels", func(v *Config) *map[string]xtypes.Label { return &v.Labels }, qiDecodeXtypesLabel),
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteString(string(v.Label))
+		},
+		Empty: func(v *Config) bool { return v.Label == "" },
+	},
+	marshal.Map[Config, xtypes.Label]("labels", func(v *Config) *map[string]xtypes.Label { return &v.Labels }, marshal.NewCodec(qiDecodeXtypesLabel, qiEncodeXtypesLabel)),
 	marshal.Field[Config]{Name: "flag", Decode: func(r *marshal.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -190,11 +237,20 @@ var configSchema = marshal.Struct[Config](
 		}
 		v.Flag = xtypes.Flag(b)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteBool(bool(v.Flag))
+		},
+		Empty: func(v *Config) bool { return v.Flag == false },
+	},
 )
 
 func (v *Config) DecodeJSON(r *marshal.Reader) error {
 	return configSchema.Decode(r, v)
+}
+
+func (v *Config) EncodeJSON(w *marshal.Writer) error {
+	return configSchema.Encode(w, v)
 }
 
 var pointSchema = marshal.Struct[Point](
@@ -215,7 +271,12 @@ var pointSchema = marshal.Struct[Point](
 		}
 		v.X = int(n)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Point) error {
+			return w.WriteInt(int64(v.X))
+		},
+		Empty: func(v *Point) bool { return v.X == 0 },
+	},
 	marshal.Field[Point]{Name: "y", Decode: func(r *marshal.Reader, v *Point) error {
 		k, err := r.Peek()
 		if err != nil {
@@ -233,21 +294,34 @@ var pointSchema = marshal.Struct[Point](
 		}
 		v.Y = int(n)
 		return nil
-	}},
+	},
+		Encode: func(w *marshal.Writer, v *Point) error {
+			return w.WriteInt(int64(v.Y))
+		},
+		Empty: func(v *Point) bool { return v.Y == 0 },
+	},
 )
 
 func (v *Point) DecodeJSON(r *marshal.Reader) error {
 	return pointSchema.Decode(r, v)
 }
 
+func (v *Point) EncodeJSON(w *marshal.Writer) error {
+	return pointSchema.Encode(w, v)
+}
+
 var numsSchema = marshal.Struct[Nums](
-	marshal.Slice[Nums, int8]("ints", func(v *Nums) *[]int8 { return &v.Ints }, qiDecodeInt8),
-	marshal.Slice[Nums, uint32]("uints", func(v *Nums) *[]uint32 { return &v.Uints }, qiDecodeUint32),
-	marshal.Slice[Nums, float32]("float", func(v *Nums) *[]float32 { return &v.Float }, qiDecodeFloat32),
+	marshal.Slice[Nums, int8]("ints", func(v *Nums) *[]int8 { return &v.Ints }, marshal.NewCodec(qiDecodeInt8, qiEncodeInt8)),
+	marshal.Slice[Nums, uint32]("uints", func(v *Nums) *[]uint32 { return &v.Uints }, marshal.NewCodec(qiDecodeUint32, qiEncodeUint32)),
+	marshal.Slice[Nums, float32]("float", func(v *Nums) *[]float32 { return &v.Float }, marshal.NewCodec(qiDecodeFloat32, qiEncodeFloat32)),
 )
 
 func (v *Nums) DecodeJSON(r *marshal.Reader) error {
 	return numsSchema.Decode(r, v)
+}
+
+func (v *Nums) EncodeJSON(w *marshal.Writer) error {
+	return numsSchema.Encode(w, v)
 }
 
 func qiDecodeInt(r *marshal.Reader) (int, error) {
@@ -261,6 +335,10 @@ func qiDecodeInt(r *marshal.Reader) (int, error) {
 	return int(n), nil
 }
 
+func qiEncodeInt(w *marshal.Writer, v int) error {
+	return w.WriteInt(int64(v))
+}
+
 func qiDecodeInt32(r *marshal.Reader) (int32, error) {
 	n, err := r.ReadInt()
 	if err != nil {
@@ -272,12 +350,20 @@ func qiDecodeInt32(r *marshal.Reader) (int32, error) {
 	return int32(n), nil
 }
 
+func qiEncodeInt32(w *marshal.Writer, v int32) error {
+	return w.WriteInt(int64(v))
+}
+
 func qiDecodePoint(r *marshal.Reader) (Point, error) {
 	var v Point
 	if err := pointSchema.Decode(r, &v); err != nil {
 		return v, err
 	}
 	return v, nil
+}
+
+func qiEncodePoint(w *marshal.Writer, v Point) error {
+	return pointSchema.Encode(w, &v)
 }
 
 func qiDecodeTimeDuration(r *marshal.Reader) (time.Duration, error) {
@@ -291,12 +377,20 @@ func qiDecodeTimeDuration(r *marshal.Reader) (time.Duration, error) {
 	return time.Duration(n), nil
 }
 
+func qiEncodeTimeDuration(w *marshal.Writer, v time.Duration) error {
+	return w.WriteInt(int64(v))
+}
+
 func qiDecodeXtypesLabel(r *marshal.Reader) (xtypes.Label, error) {
 	s, err := r.ReadString()
 	if err != nil {
 		return "", err
 	}
 	return xtypes.Label(s), nil
+}
+
+func qiEncodeXtypesLabel(w *marshal.Writer, v xtypes.Label) error {
+	return w.WriteString(string(v))
 }
 
 func qiDecodeInt8(r *marshal.Reader) (int8, error) {
@@ -310,6 +404,10 @@ func qiDecodeInt8(r *marshal.Reader) (int8, error) {
 	return int8(n), nil
 }
 
+func qiEncodeInt8(w *marshal.Writer, v int8) error {
+	return w.WriteInt(int64(v))
+}
+
 func qiDecodeUint32(r *marshal.Reader) (uint32, error) {
 	n, err := r.ReadInt()
 	if err != nil {
@@ -321,6 +419,10 @@ func qiDecodeUint32(r *marshal.Reader) (uint32, error) {
 	return uint32(n), nil
 }
 
+func qiEncodeUint32(w *marshal.Writer, v uint32) error {
+	return w.WriteUint(uint64(v))
+}
+
 func qiDecodeFloat32(r *marshal.Reader) (float32, error) {
 	f, err := r.ReadFloat()
 	if err != nil {
@@ -330,6 +432,10 @@ func qiDecodeFloat32(r *marshal.Reader) (float32, error) {
 		return 0, qiRangeError(r, "float32")
 	}
 	return float32(f), nil
+}
+
+func qiEncodeFloat32(w *marshal.Writer, v float32) error {
+	return w.WriteFloat(float64(v))
 }
 
 func qiRangeError(r *marshal.Reader, want string) error {

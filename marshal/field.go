@@ -1,16 +1,21 @@
 package marshal
 
 import (
+	"errors"
+	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 
 	"qi-json/scanner"
 )
 
-// Field describes how to decode one JSON object member into a field of T. Name
-// is the JSON member name the field matches; Decode reads the member value from
-// the Reader and stores it into v. Build fields with the type-specific
-// constructors (String, Int, Float, Bool and their Ptr variants, Object) or
-// supply a custom Decode.
+// Field describes how to decode and encode one JSON object member into a field
+// of T. Name is the JSON member name the field matches; Decode reads the member
+// value from the Reader and stores it into v, and Encode writes it back to a
+// Writer. Build fields with the type-specific constructors (String, Int, Float,
+// Bool and their Ptr variants, Object, Slice, Map, Array, Any, Raw) or supply a
+// custom Decode.
 type Field[T any] struct {
 	// Name is the JSON member name this field matches. Names must be unique
 	// within a Schema.
@@ -18,11 +23,30 @@ type Field[T any] struct {
 
 	// Decode reads exactly one JSON value from r and stores it into v.
 	Decode func(*Reader, *T) error
+
+	// Encode writes v's field as exactly one JSON value to w.
+	Encode func(*Writer, *T) error
+
+	// Empty reports whether the field is empty for `omitempty`. A nil Empty
+	// means the field is never empty, which is how a nested struct and a
+	// fixed-size array behave.
+	Empty func(*T) bool
+
+	// omitEmpty marks the field to be skipped by Schema.Encode when Empty
+	// reports true. Set it with OmitEmpty.
+	omitEmpty bool
+}
+
+// OmitEmpty returns a copy of f that Schema.Encode skips when f.Empty reports
+// the field is empty. It implements `json:",omitempty"`.
+func (f Field[T]) OmitEmpty() Field[T] {
+	f.omitEmpty = true
+	return f
 }
 
 // scalar builds a Field for a value field of type E. A JSON null leaves the
 // field unchanged, which is zero for a freshly decoded value.
-func scalar[T, E any](name string, set func(*T) *E, read func(*Reader) (E, error)) Field[T] {
+func scalar[T, E any](name string, set func(*T) *E, read func(*Reader) (E, error), write func(*Writer, E) error, empty func(*T) bool) Field[T] {
 	return Field[T]{
 		Name: name,
 		Decode: func(r *Reader, v *T) error {
@@ -40,12 +64,16 @@ func scalar[T, E any](name string, set func(*T) *E, read func(*Reader) (E, error
 			*set(v) = e
 			return nil
 		},
+		Encode: func(w *Writer, v *T) error {
+			return write(w, *set(v))
+		},
+		Empty: empty,
 	}
 }
 
 // scalarPtr builds a Field for a pointer field of type *E. A JSON null sets the
 // field to nil; otherwise the value is decoded into a fresh allocation.
-func scalarPtr[T, E any](name string, set func(*T) **E, read func(*Reader) (E, error)) Field[T] {
+func scalarPtr[T, E any](name string, set func(*T) **E, read func(*Reader) (E, error), write func(*Writer, E) error, empty func(*T) bool) Field[T] {
 	return Field[T]{
 		Name: name,
 		Decode: func(r *Reader, v *T) error {
@@ -67,53 +95,61 @@ func scalarPtr[T, E any](name string, set func(*T) **E, read func(*Reader) (E, e
 			*set(v) = &e
 			return nil
 		},
+		Encode: func(w *Writer, v *T) error {
+			if p := *set(v); p != nil {
+				return write(w, *p)
+			}
+			return w.WriteNull()
+		},
+		Empty: empty,
 	}
 }
 
 // String decodes a JSON string into a string field.
 func String[T any](name string, field func(*T) *string) Field[T] {
-	return scalar(name, field, (*Reader).ReadString)
+	return scalar(name, field, (*Reader).ReadString, (*Writer).WriteString, func(v *T) bool { return *field(v) == "" })
 }
 
 // StringPtr decodes a JSON string into a *string field; a JSON null sets it to
 // nil.
 func StringPtr[T any](name string, field func(*T) **string) Field[T] {
-	return scalarPtr(name, field, (*Reader).ReadString)
+	return scalarPtr(name, field, (*Reader).ReadString, (*Writer).WriteString, func(v *T) bool { return *field(v) == nil })
 }
 
 // Int decodes a JSON number into an int64 field.
 func Int[T any](name string, field func(*T) *int64) Field[T] {
-	return scalar(name, field, (*Reader).ReadInt)
+	return scalar(name, field, (*Reader).ReadInt, (*Writer).WriteInt, func(v *T) bool { return *field(v) == 0 })
 }
 
 // IntPtr decodes a JSON number into an *int64 field; a JSON null sets it to nil.
 func IntPtr[T any](name string, field func(*T) **int64) Field[T] {
-	return scalarPtr(name, field, (*Reader).ReadInt)
+	return scalarPtr(name, field, (*Reader).ReadInt, (*Writer).WriteInt, func(v *T) bool { return *field(v) == nil })
 }
 
 // Float decodes a JSON number into a float64 field.
 func Float[T any](name string, field func(*T) *float64) Field[T] {
-	return scalar(name, field, (*Reader).ReadFloat)
+	return scalar(name, field, (*Reader).ReadFloat, (*Writer).WriteFloat, func(v *T) bool { return *field(v) == 0 })
 }
 
 // FloatPtr decodes a JSON number into a *float64 field; a JSON null sets it to
 // nil.
 func FloatPtr[T any](name string, field func(*T) **float64) Field[T] {
-	return scalarPtr(name, field, (*Reader).ReadFloat)
+	return scalarPtr(name, field, (*Reader).ReadFloat, (*Writer).WriteFloat, func(v *T) bool { return *field(v) == nil })
 }
 
 // Bool decodes a JSON boolean into a bool field.
 func Bool[T any](name string, field func(*T) *bool) Field[T] {
-	return scalar(name, field, (*Reader).ReadBool)
+	return scalar(name, field, (*Reader).ReadBool, (*Writer).WriteBool, func(v *T) bool { return !*field(v) })
 }
 
 // BoolPtr decodes a JSON boolean into a *bool field; a JSON null sets it to nil.
 func BoolPtr[T any](name string, field func(*T) **bool) Field[T] {
-	return scalarPtr(name, field, (*Reader).ReadBool)
+	return scalarPtr(name, field, (*Reader).ReadBool, (*Writer).WriteBool, func(v *T) bool { return *field(v) == nil })
 }
 
 // Object decodes a JSON object into a nested struct field using schema. A JSON
-// null leaves the field unchanged.
+// null leaves the field unchanged. Because a struct is never empty, an Object
+// field is never omitted by omitempty.
 func Object[T, S any](name string, field func(*T) *S, schema *Schema[S]) Field[T] {
 	return Field[T]{
 		Name: name,
@@ -127,13 +163,18 @@ func Object[T, S any](name string, field func(*T) *S, schema *Schema[S]) Field[T
 			}
 			return schema.Decode(r, field(v))
 		},
+		Encode: func(w *Writer, v *T) error {
+			return schema.Encode(w, field(v))
+		},
 	}
 }
 
-// Slice decodes a JSON array into a slice field, decoding each element with
-// elem. A JSON null leaves the field unchanged; an empty JSON array produces a
-// non-nil empty slice.
-func Slice[T, E any](name string, field func(*T) *[]E, elem func(*Reader) (E, error)) Field[T] {
+// Slice decodes a JSON array into a slice field, decoding each element with the
+// elem codec's Decode. A JSON null leaves the field unchanged; an empty JSON
+// array produces a non-nil empty slice. On encode, a nil slice is written as
+// null and a non-nil slice as an array, and an empty slice is "empty" for
+// omitempty.
+func Slice[T, E any](name string, field func(*T) *[]E, elem Codec[E]) Field[T] {
 	return Field[T]{
 		Name: name,
 		Decode: func(r *Reader, v *T) error {
@@ -144,10 +185,13 @@ func Slice[T, E any](name string, field func(*T) *[]E, elem func(*Reader) (E, er
 			if k == scanner.KindNull {
 				return r.ReadNull()
 			}
+			if elem.Decode == nil {
+				return errors.New("marshal: nil element decoder")
+			}
 
 			out := make([]E, 0)
 			err = r.Array(func(int) error {
-				e, err := elem(r)
+				e, err := elem.Decode(r)
 				if err != nil {
 					return err
 				}
@@ -160,13 +204,34 @@ func Slice[T, E any](name string, field func(*T) *[]E, elem func(*Reader) (E, er
 			*field(v) = out
 			return nil
 		},
+		Encode: func(w *Writer, v *T) error {
+			s := *field(v)
+			if s == nil {
+				return w.WriteNull()
+			}
+			if elem.Encode == nil {
+				return errors.New("marshal: nil element encoder")
+			}
+			if err := w.BeginArray(); err != nil {
+				return err
+			}
+			for _, e := range s {
+				if err := elem.Encode(w, e); err != nil {
+					return err
+				}
+			}
+			return w.EndArray()
+		},
+		Empty: func(v *T) bool { return len(*field(v)) == 0 },
 	}
 }
 
 // Map decodes a JSON object into a map field with string keys, decoding each
-// member value with elem. A JSON null leaves the field unchanged; an empty JSON
-// object produces a non-nil empty map.
-func Map[T, V any](name string, field func(*T) *map[string]V, elem func(*Reader) (V, error)) Field[T] {
+// member value with the elem codec's Decode. A JSON null leaves the field
+// unchanged; an empty JSON object produces a non-nil empty map. On encode, keys
+// are written in sorted order for a stable result, a nil map becomes null, and
+// an empty map is "empty" for omitempty.
+func Map[T, V any](name string, field func(*T) *map[string]V, elem Codec[V]) Field[T] {
 	return Field[T]{
 		Name: name,
 		Decode: func(r *Reader, v *T) error {
@@ -177,10 +242,13 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem func(*Reader)
 			if k == scanner.KindNull {
 				return r.ReadNull()
 			}
+			if elem.Decode == nil {
+				return errors.New("marshal: nil element decoder")
+			}
 
 			m := make(map[string]V)
 			err = r.Object(func(key string) error {
-				e, err := elem(r)
+				e, err := elem.Decode(r)
 				if err != nil {
 					return err
 				}
@@ -193,6 +261,28 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem func(*Reader)
 			*field(v) = m
 			return nil
 		},
+		Encode: func(w *Writer, v *T) error {
+			m := *field(v)
+			if m == nil {
+				return w.WriteNull()
+			}
+			if elem.Encode == nil {
+				return errors.New("marshal: nil element encoder")
+			}
+			if err := w.BeginObject(); err != nil {
+				return err
+			}
+			for _, key := range slices.Sorted(maps.Keys(m)) {
+				if err := w.Key(key); err != nil {
+					return err
+				}
+				if err := elem.Encode(w, m[key]); err != nil {
+					return err
+				}
+			}
+			return w.EndObject()
+		},
+		Empty: func(v *T) bool { return len(*field(v)) == 0 },
 	}
 }
 
@@ -200,8 +290,9 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem func(*Reader)
 // slice view of the array (such as arr[:] for an array arr), so the decoder
 // writes through to the array. The JSON array must hold exactly len(field(v))
 // elements: fewer is an underflow error and more is an overflow error, both
-// reported as type errors. A JSON null leaves the field unchanged.
-func Array[T, E any](name string, field func(*T) []E, elem func(*Reader) (E, error)) Field[T] {
+// reported as type errors. A JSON null leaves the field unchanged. On encode a
+// fixed-size array is always written and is never omitted by omitempty.
+func Array[T, E any](name string, field func(*T) []E, elem Codec[E]) Field[T] {
 	return Field[T]{
 		Name: name,
 		Decode: func(r *Reader, v *T) error {
@@ -212,6 +303,9 @@ func Array[T, E any](name string, field func(*T) []E, elem func(*Reader) (E, err
 			if k == scanner.KindNull {
 				return r.ReadNull()
 			}
+			if elem.Decode == nil {
+				return errors.New("marshal: nil element decoder")
+			}
 
 			view := field(v)
 			n := len(view)
@@ -219,7 +313,7 @@ func Array[T, E any](name string, field func(*T) []E, elem func(*Reader) (E, err
 
 			out := make([]E, 0, n)
 			err = r.Array(func(int) error {
-				e, err := elem(r)
+				e, err := elem.Decode(r)
 				if err != nil {
 					return err
 				}
@@ -234,6 +328,21 @@ func Array[T, E any](name string, field func(*T) []E, elem func(*Reader) (E, err
 			}
 			copy(view, out)
 			return nil
+		},
+		Encode: func(w *Writer, v *T) error {
+			if elem.Encode == nil {
+				return errors.New("marshal: nil element encoder")
+			}
+			view := field(v)
+			if err := w.BeginArray(); err != nil {
+				return err
+			}
+			for _, e := range view {
+				if err := elem.Encode(w, e); err != nil {
+					return err
+				}
+			}
+			return w.EndArray()
 		},
 	}
 }
@@ -252,11 +361,17 @@ func Any[T any](name string, field func(*T) *any) Field[T] {
 			*field(v) = a
 			return nil
 		},
+		Encode: func(w *Writer, v *T) error {
+			return encodeAny(w, *field(v))
+		},
+		Empty: func(v *T) bool { return *field(v) == nil },
 	}
 }
 
 // Raw decodes any JSON value into a []byte field holding the value's exact
-// literal bytes. The bytes are copied, so they do not alias the input.
+// literal bytes. The bytes are copied, so they do not alias the input. On encode
+// a nil or empty slice is written as null; otherwise the bytes are written back
+// verbatim, without validation.
 func Raw[T any](name string, field func(*T) *[]byte) Field[T] {
 	return Field[T]{
 		Name: name,
@@ -270,6 +385,14 @@ func Raw[T any](name string, field func(*T) *[]byte) Field[T] {
 			*field(v) = out
 			return nil
 		},
+		Encode: func(w *Writer, v *T) error {
+			b := *field(v)
+			if len(b) == 0 {
+				return w.WriteNull()
+			}
+			return w.WriteRaw(b)
+		},
+		Empty: func(v *T) bool { return len(*field(v)) == 0 },
 	}
 }
 
@@ -323,6 +446,73 @@ func decodeAny(r *Reader) (any, error) {
 		return out, nil
 	default:
 		return nil, r.mismatch("value", k)
+	}
+}
+
+// encodeAny writes a value decoded into an any field, or a value a caller put
+// there, back as JSON: nil to null, bool, string, float and integer kinds at
+// their natural width, []any to an array, map[string]any to an object with
+// sorted keys, and an Encoder through its EncodeJSON. Any other dynamic type is
+// an error, since marshal may not use reflection to discover one.
+func encodeAny(w *Writer, v any) error {
+	switch x := v.(type) {
+	case nil:
+		return w.WriteNull()
+	case bool:
+		return w.WriteBool(x)
+	case string:
+		return w.WriteString(x)
+	case float64:
+		return w.WriteFloat(x)
+	case float32:
+		return w.WriteFloat(float64(x))
+	case int:
+		return w.WriteInt(int64(x))
+	case int8:
+		return w.WriteInt(int64(x))
+	case int16:
+		return w.WriteInt(int64(x))
+	case int32:
+		return w.WriteInt(int64(x))
+	case int64:
+		return w.WriteInt(x)
+	case uint:
+		return w.WriteUint(uint64(x))
+	case uint8:
+		return w.WriteUint(uint64(x))
+	case uint16:
+		return w.WriteUint(uint64(x))
+	case uint32:
+		return w.WriteUint(uint64(x))
+	case uint64:
+		return w.WriteUint(x)
+	case []any:
+		if err := w.BeginArray(); err != nil {
+			return err
+		}
+		for _, e := range x {
+			if err := encodeAny(w, e); err != nil {
+				return err
+			}
+		}
+		return w.EndArray()
+	case map[string]any:
+		if err := w.BeginObject(); err != nil {
+			return err
+		}
+		for _, key := range slices.Sorted(maps.Keys(x)) {
+			if err := w.Key(key); err != nil {
+				return err
+			}
+			if err := encodeAny(w, x[key]); err != nil {
+				return err
+			}
+		}
+		return w.EndObject()
+	case Encoder:
+		return x.EncodeJSON(w)
+	default:
+		return w.fail(fmt.Errorf("marshal: cannot encode %T as JSON", v))
 	}
 }
 
