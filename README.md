@@ -248,12 +248,13 @@ unchanged.
 
 The generator supports `string`, `bool`, `float32`/`float64`, every signed and
 unsigned integer width (plus pointers), same-package named types whose underlying
-type is a numeric scalar, `[]E`, `map[string]V`, `[N]E`, `[]byte`, `any`, and
-nested same-package structs that are generated too. It also resolves **cross-package
-named types whose underlying type is a basic scalar** (`time.Duration`,
-`net/http.Dir`, or any named string, bool, integer or float from another
-package), both as a field and as a slice or map element type, using the standard
-library's type checker. It honours `json:"name"`, `json:"-"`, `json:"-,"`, and
+type is a basic scalar (string, bool, or a numeric scalar), `[]E`,
+`map[string]V`, `[N]E`, `[]byte`, `any`, and nested same-package structs that are
+generated too. It also resolves **cross-package named types whose underlying type
+is a basic scalar** (`time.Duration`, `net/http.Dir`, or any named string, bool,
+integer or float from another package), both as a field and as a slice or map
+element type, using the standard library's type checker. It honours
+`json:"name"`, `json:"-"`, `json:"-,"`, and
 `json:",omitempty"` (which makes the encoder skip an empty field); an untagged
 field uses the field name. Still reported as errors: a cross-package type whose
 underlying type is not a basic scalar (such as a cross-package struct),

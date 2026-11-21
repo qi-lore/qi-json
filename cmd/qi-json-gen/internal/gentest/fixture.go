@@ -44,7 +44,20 @@ type Config struct {
 	Label     xtypes.Label            `json:"label"`
 	Labels    map[string]xtypes.Label `json:"labels"`
 	Flag      xtypes.Flag             `json:"flag"`
+
+	// Same-package named string/bool types: resolved from the AST.
+	Status   Status          `json:"status"`
+	Prev     *Status         `json:"prev"`
+	Statuses []Status        `json:"statuses"`
+	Mode     Mode            `json:"mode"`
+	Modes    map[string]Mode `json:"modes"`
 }
+
+// Status is a same-package named string, decoded through the AST path.
+type Status string
+
+// Mode is a same-package named bool, decoded through the AST path.
+type Mode bool
 
 // Point is a nested struct used by Config, so it must be generated too.
 type Point struct {

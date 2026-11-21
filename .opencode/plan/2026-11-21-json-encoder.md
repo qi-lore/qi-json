@@ -373,10 +373,13 @@ following were fixed in the same change:
   detected (needs reflection), and the encoder bullet in Article VI names
   `NewWriter`/`NewCodec`.
 
-Not changed (documented instead): the README's pre-existing over-claim that
+Not changed then (documented instead): the README's pre-existing over-claim that
 same-package named `string`/`bool` types are generated was narrowed to *named
 types whose underlying type is a numeric scalar*, which is what `resolveBasic`
-supports (recorded as a candidate in the codegen plan §8).
+supports (recorded as a candidate in the codegen plan §8). **Reversed
+(2026-11-21)**: same-package named `string`/`bool` types are now generated, so
+the README claim holds again — see
+`.opencode/plan/2026-11-21-codegen-named-string-bool.md`.
 
 New tests: `marshal/encode_guard_test.go`
 (`TestEncodeNilElementEncoder`, `TestEncodeEmptyRaw`, `TestMarshalIncomplete`,

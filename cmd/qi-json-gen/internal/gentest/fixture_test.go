@@ -37,6 +37,11 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 		"label": "prod",
 		"labels": {"a": "x", "b": "y"},
 		"flag": true,
+		"status": "active",
+		"prev": "idle",
+		"statuses": ["a", "b"],
+		"mode": true,
+		"modes": {"x": true, "y": false},
 		"skipped": "ignored"
 	}`)
 
@@ -95,6 +100,21 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 	}
 	if !c.Flag {
 		t.Errorf("Flag = false, want true")
+	}
+	if c.Status != "active" {
+		t.Errorf("Status = %q, want active", c.Status)
+	}
+	if c.Prev == nil || *c.Prev != "idle" {
+		t.Errorf("Prev = %v, want idle", c.Prev)
+	}
+	if len(c.Statuses) != 2 || c.Statuses[0] != "a" || c.Statuses[1] != "b" {
+		t.Errorf("Statuses = %v", c.Statuses)
+	}
+	if !c.Mode {
+		t.Errorf("Mode = false, want true")
+	}
+	if !c.Modes["x"] || c.Modes["y"] {
+		t.Errorf("Modes = %v", c.Modes)
 	}
 	if c.Skipped != "" || c.hidden != "" {
 		t.Errorf("skipped/unexported fields must stay zero: %q %q", c.Skipped, c.hidden)
@@ -183,7 +203,8 @@ func TestGeneratedEncodeConfig(t *testing.T) {
 	want := `{"name":"","port":0,"rate":0,"debug":false,"level":0,"count":0,` +
 		`"ratio":0,"size":0,"limit":null,"tags":null,"matrix":[0,0],"scores":null,` +
 		`"blob":null,"meta":null,"origin":{"x":0,"y":0},"points":null,"ports":null,` +
-		`"timeout":0,"deadline":null,"durations":null,"label":"","labels":null,"flag":false}`
+		`"timeout":0,"deadline":null,"durations":null,"label":"","labels":null,"flag":false,` +
+		`"status":"","prev":null,"statuses":null,"mode":false,"modes":null}`
 	if string(data) != want {
 		t.Errorf("Marshal:\n got %s\nwant %s", data, want)
 	}
@@ -201,6 +222,8 @@ func TestGeneratedEncodeConfig(t *testing.T) {
 		Origin:  Point{X: 1, Y: 2},
 		Note:    "hi",
 		Timeout: 5 * time.Second,
+		Status:  "active",
+		Mode:    true,
 	}
 	data, err = marshal.Marshal[Config](populated)
 	if err != nil {
@@ -208,6 +231,9 @@ func TestGeneratedEncodeConfig(t *testing.T) {
 	}
 	if !strings.Contains(string(data), `"note":"hi"`) {
 		t.Errorf("omitempty field with a value must be written: %s", data)
+	}
+	if !strings.Contains(string(data), `"status":"active"`) || !strings.Contains(string(data), `"mode":true`) {
+		t.Errorf("named string/bool fields must be written: %s", data)
 	}
 	var back Config
 	if err := marshal.UnmarshalInto[Config](data, &back); err != nil {

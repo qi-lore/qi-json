@@ -397,6 +397,9 @@ func (g *gen) identCodec(owner, fname, jname, tname string) (string, error) {
 	if basic, ok := g.basicUnderlying(tname); ok {
 		return g.numericCodec(owner, fname, jname, tname, basic, false), nil
 	}
+	if kind, ok := g.stringOrBoolUnderlying(tname); ok {
+		return g.scalarClosure(owner, fname, jname, tname, kind, false), nil
+	}
 	if _, ok := g.structs[tname]; ok {
 		return g.objectCodec(owner, fname, jname, tname)
 	}
@@ -424,6 +427,9 @@ func (g *gen) starCodec(owner, fname, jname string, x ast.Expr) (string, error) 
 	}
 	if basic, ok := g.basicUnderlying(id.Name); ok {
 		return g.numericCodec(owner, fname, jname, id.Name, basic, true), nil
+	}
+	if kind, ok := g.stringOrBoolUnderlying(id.Name); ok {
+		return g.scalarClosure(owner, fname, jname, id.Name, kind, true), nil
 	}
 	return "", fmt.Errorf("%s.%s: unsupported pointer type *%s", owner, fname, id.Name)
 }
@@ -482,6 +488,60 @@ func (g *gen) objectCodec(owner, fname, jname, sn string) (string, error) {
 // accessor's return type, such as "*string" or "**string".
 func ctor(fn, owner, jname, fname, retType string) string {
 	return fmt.Sprintf("marshal.%s[%s](%q, func(v *%s) %s { return &v.%s })", fn, owner, jname, owner, retType, fname)
+}
+
+// scalarClosure builds a Field literal for a named string or bool type, whether
+// same-package (goType "Status") or cross-package (goType "time.Duration"). kind
+// is "string" or "bool"; a pointer field writes null when nil. It is the string
+// and bool analogue of numericCodec.
+func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) string {
+	g.needScanner = true
+	read, name := "\ts, err := r.ReadString()\n\tif err != nil {\n\t\treturn err\n\t}\n", "s"
+	if kind == "bool" {
+		read, name = "\tb, err := r.ReadBool()\n\tif err != nil {\n\t\treturn err\n\t}\n", "b"
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "marshal.Field[%s]{Name: %q, Decode: func(r *marshal.Reader, v *%s) error {\n", owner, jname, owner)
+	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
+	if ptr {
+		b.WriteString("\tif k == scanner.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
+		fmt.Fprintf(&b, "\t\tv.%s = nil\n\t\treturn nil\n\t}\n", fname)
+	} else {
+		b.WriteString("\tif k == scanner.KindNull {\n\t\treturn r.ReadNull()\n\t}\n")
+	}
+	b.WriteString(read)
+	if ptr {
+		fmt.Fprintf(&b, "\te := %s(%s)\n\tv.%s = &e\n", goType, name, fname)
+	} else {
+		fmt.Fprintf(&b, "\tv.%s = %s(%s)\n", fname, goType, name)
+	}
+	b.WriteString("\treturn nil\n\t},\n")
+
+	access := "v." + fname
+	fmt.Fprintf(&b, "\tEncode: func(w *marshal.Writer, v *%s) error {\n", owner)
+	if ptr {
+		fmt.Fprintf(&b, "\t\tif %s == nil {\n\t\t\treturn w.WriteNull()\n\t\t}\n", access)
+		access = "*" + access
+	}
+	if kind == "string" {
+		fmt.Fprintf(&b, "\t\treturn w.WriteString(string(%s))\n", access)
+	} else {
+		fmt.Fprintf(&b, "\t\treturn w.WriteBool(bool(%s))\n", access)
+	}
+	b.WriteString("\t},\n")
+
+	switch {
+	case ptr:
+		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == nil },\n", owner, fname)
+	case kind == "string":
+		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == \"\" },\n", owner, fname)
+	default:
+		// Unary ! keeps the named boolean type, so compare instead.
+		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == false },\n", owner, fname)
+	}
+	b.WriteString("}")
+	return b.String()
 }
 
 // numericCodec builds an inline closure for a numeric field whose Go type is
@@ -588,6 +648,9 @@ func (g *gen) elemCodec(expr ast.Expr) (string, error) {
 	if basic, ok := g.basicUnderlying(id.Name); ok {
 		return fmt.Sprintf("marshal.NewCodec(%s, %s)", g.numericHelper(id.Name, basic), g.numericEncodeHelper(id.Name, basic)), nil
 	}
+	if kind, ok := g.stringOrBoolUnderlying(id.Name); ok {
+		return fmt.Sprintf("marshal.NewCodec(%s, %s)", g.scalarHelper(id.Name, kind), g.scalarEncodeHelper(id.Name, kind)), nil
+	}
 	if _, ok := g.structs[id.Name]; ok {
 		dec, err := g.structHelper(id.Name)
 		if err != nil {
@@ -635,6 +698,58 @@ func (g *gen) numericHelper(goType, basic string) string {
 	g.helpers[hn] = b.String()
 	g.helperOrder = append(g.helperOrder, hn)
 	return hn
+}
+
+// scalarHelper emits, once, a function that decodes a same-package named string
+// or bool type and returns its name.
+func (g *gen) scalarHelper(goType, kind string) string {
+	hn := "qiDecode" + upperFirst(goType)
+	if _, ok := g.helpers[hn]; ok {
+		return hn
+	}
+	g.helpers[hn] = namedScalarDecodeBody(hn, goType, kind)
+	g.helperOrder = append(g.helperOrder, hn)
+	return hn
+}
+
+// scalarEncodeHelper emits, once, a function that encodes a same-package named
+// string or bool type and returns its name.
+func (g *gen) scalarEncodeHelper(goType, kind string) string {
+	hn := "qiEncode" + upperFirst(goType)
+	if _, ok := g.helpers[hn]; ok {
+		return hn
+	}
+	g.helpers[hn] = namedScalarEncodeBody(hn, goType, kind)
+	g.helperOrder = append(g.helperOrder, hn)
+	return hn
+}
+
+// namedScalarDecodeBody builds the body of an element decode helper for a named
+// string or bool type goType, where kind is "string" or "bool".
+func namedScalarDecodeBody(hn, goType, kind string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "func %s(r *marshal.Reader) (%s, error) {\n", hn, goType)
+	if kind == "string" {
+		b.WriteString("\ts, err := r.ReadString()\n\tif err != nil {\n\t\treturn \"\", err\n\t}\n")
+		fmt.Fprintf(&b, "\treturn %s(s), nil\n}\n", goType)
+	} else {
+		b.WriteString("\tb, err := r.ReadBool()\n\tif err != nil {\n\t\treturn false, err\n\t}\n")
+		fmt.Fprintf(&b, "\treturn %s(b), nil\n}\n", goType)
+	}
+	return b.String()
+}
+
+// namedScalarEncodeBody builds the body of an element encode helper for a named
+// string or bool type goType, where kind is "string" or "bool".
+func namedScalarEncodeBody(hn, goType, kind string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "func %s(w *marshal.Writer, v %s) error {\n", hn, goType)
+	if kind == "string" {
+		b.WriteString("\treturn w.WriteString(string(v))\n}\n")
+	} else {
+		b.WriteString("\treturn w.WriteBool(bool(v))\n}\n")
+	}
+	return b.String()
 }
 
 // structHelper emits, once, a function that decodes a nested struct and returns
@@ -720,6 +835,33 @@ func (g *gen) resolveBasic(name string, seen map[string]bool) (string, bool) {
 		return "", false
 	}
 	return g.resolveBasic(id.Name, seen)
+}
+
+// stringOrBoolUnderlying returns "string" or "bool" when name resolves to a
+// same-package named type whose underlying basic type is string or bool,
+// following named types, or false. It complements basicUnderlying, which covers
+// the numeric underlyings only.
+func (g *gen) stringOrBoolUnderlying(name string) (string, bool) {
+	return g.resolveStringOrBool(name, map[string]bool{})
+}
+
+func (g *gen) resolveStringOrBool(name string, seen map[string]bool) (string, bool) {
+	switch name {
+	case "string":
+		return "string", true
+	case "bool":
+		return "bool", true
+	}
+	ts, ok := g.decls[name]
+	if !ok || seen[name] {
+		return "", false
+	}
+	seen[name] = true
+	id, ok := ts.Type.(*ast.Ident)
+	if !ok {
+		return "", false
+	}
+	return g.resolveStringOrBool(id.Name, seen)
 }
 
 // jsonTag returns the json member name (empty when absent), whether the field is

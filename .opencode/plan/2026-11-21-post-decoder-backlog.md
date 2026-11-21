@@ -1,8 +1,9 @@
 # qi-json — post-decoder backlog (T11+)
 
 **Date**: 2026-11-21
-**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done. Two open
-follow-ups remain, tracked in §9.
+**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done, and the codegen
+named `string`/`bool` follow-up is done. One open follow-up remains (the package
+rename), tracked in §9.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -246,6 +247,8 @@ Not started; recorded so a later session can pick them up.
   decodes *and* encodes (recommended: `codec`). Needs a name decision and a
   constitution amendment (Article VI names the package). Plan:
   `.opencode/plan/2026-11-21-package-rename.md`.
-- **Codegen named `string`/`bool` types** — generate for a same-package named
-  type whose underlying type is `string` or `bool` (D8.2 covers numeric
-  underlyings only). Recorded in `.opencode/plan/2026-11-21-json-codegen.md` §8.
+- **Codegen named `string`/`bool` types** — **done (2026-11-21)**: a
+  same-package named type whose underlying type is `string` or `bool` is now
+  generated (field, pointer, slice/map element), matching the cross-package path.
+  See `.opencode/plan/2026-11-21-codegen-named-string-bool.md`; the codegen plan
+  §8 is updated.

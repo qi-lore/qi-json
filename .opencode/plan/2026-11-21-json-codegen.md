@@ -33,6 +33,10 @@ It is **optional**: `marshal` is fully usable without it. T8 is an accelerator.
   Because `marshal` has no width-aware integer constructor (width needs
   reflection), the generator emits an inline conversion with a round-trip range
   check.
+  *Extended later (2026-11-21):* a same-package named type whose underlying type
+  is `string` or `bool` is also generated, as a converting closure with an
+  `Encode`/`Empty` pair (and a `qiDecode*`/`qiEncode*` element pair for
+  containers) — see `.opencode/plan/2026-11-21-codegen-named-string-bool.md`.
 - **D8.3 — Output shape.** One file per package, default
   `<pkgdir>/zz_qi_json_gen.go`: per type an unexported `var <t>Schema` and
   `func (v *<T>) DecodeJSON(r *marshal.Reader) error`. The user's exported API is
@@ -98,6 +102,7 @@ per file.
 | `int64` / `*int64` | `marshal.Int` / `marshal.IntPtr` |
 | `float64` / `*float64` | `marshal.Float` / `marshal.FloatPtr` |
 | `int`,`int8/16/32`,`uint`,`uint8/16/32/64`,`float32` (+ ptr), same-package named with that underlying | inline closure + range check |
+| same-package named with `string`/`bool` underlying (+ ptr) | inline converting closure |
 | `[]byte` (element `byte`/`uint8`) | `marshal.Raw` |
 | `[]E` | `marshal.Slice` + element decoder |
 | `map[string]V` | `marshal.Map` + element decoder |
@@ -173,7 +178,7 @@ amendment. Amend together, before code:
 | `go/ast` cannot resolve cross-package named types | v1 errors precisely; documented; `go/types` is a later, isolated upgrade. |
 | Helper name collision in the user's package | Fixed `qi`-prefixed names, documented; the generator errors if a name is taken. |
 | Generation is non-deterministic (map iteration) | Sort all emitted collections; the drift guard enforces it. |
-| A same-package named `string`/`bool` type is not generated (D8.2 covers numeric underlyings only) | A precise unsupported-type error, not silent misbehaviour; README narrowed to match; tracked as a candidate in §8. |
+| A same-package named `string`/`bool` type was not generated (D8.2 covers numeric underlyings only) | Resolved (2026-11-21): now generated as a converting closure; see `.opencode/plan/2026-11-21-codegen-named-string-bool.md`. |
 
 ## 8. Verification (handoff)
 
@@ -213,11 +218,7 @@ amendment. Amend together, before code:
 - **Not done / next**:
   - The encoder is a separate effort (backlog §6) — now done
     (`.opencode/plan/2026-11-21-json-encoder.md`).
-  - **Candidate (unstarted)** — generate for a same-package named type whose
-    underlying type is `string` or `bool` (e.g. `type Label string`). D8.2 covers
-    only the numeric underlyings, so such a field is currently a precise
-    unsupported-type error and the README was narrowed to match (encoder plan
-    §10). To add it: teach `resolveBasic`/`identCodec` (and `starCodec`) to
-    recognise `string`/`bool` underlyings and emit a converting codec with an
-    `Encode`/`Empty` pair, add a `qiDecode*`/`qiEncode*` element pair for
-    container elements, and regenerate the fixtures.
+  - **Done (2026-11-21)** — same-package named types whose underlying type is
+    `string` or `bool` (e.g. `type Label string`) are now generated, as a field,
+    pointer field, and slice or map element, matching the cross-package path. See
+    `.opencode/plan/2026-11-21-codegen-named-string-bool.md`.

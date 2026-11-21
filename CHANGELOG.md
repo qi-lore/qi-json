@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scalar (`time.Duration`, or any named `string`/`bool`/integer/float from
   another package) are now resolved with the standard library's type checker, as
   fields, pointer fields, and slice or map elements.
+- `cmd/qi-json-gen`: same-package named types whose underlying type is `string`
+  or `bool` (for example `type Status string`) are now generated, as a field,
+  pointer field, and slice or map element, matching the cross-package path.
 - `cmd/qi-json-gen`: a `-strict` flag that makes every generated schema reject
   unknown and duplicate object members.
 - `marshal`: a reflection-free **encoder**, the mirror of the decoder:

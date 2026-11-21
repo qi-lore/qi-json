@@ -243,6 +243,76 @@ var configSchema = marshal.Struct[Config](
 		},
 		Empty: func(v *Config) bool { return v.Flag == false },
 	},
+	marshal.Field[Config]{Name: "status", Decode: func(r *marshal.Reader, v *Config) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == scanner.KindNull {
+			return r.ReadNull()
+		}
+		s, err := r.ReadString()
+		if err != nil {
+			return err
+		}
+		v.Status = Status(s)
+		return nil
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteString(string(v.Status))
+		},
+		Empty: func(v *Config) bool { return v.Status == "" },
+	},
+	marshal.Field[Config]{Name: "prev", Decode: func(r *marshal.Reader, v *Config) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == scanner.KindNull {
+			if err := r.ReadNull(); err != nil {
+				return err
+			}
+			v.Prev = nil
+			return nil
+		}
+		s, err := r.ReadString()
+		if err != nil {
+			return err
+		}
+		e := Status(s)
+		v.Prev = &e
+		return nil
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			if v.Prev == nil {
+				return w.WriteNull()
+			}
+			return w.WriteString(string(*v.Prev))
+		},
+		Empty: func(v *Config) bool { return v.Prev == nil },
+	},
+	marshal.Slice[Config, Status]("statuses", func(v *Config) *[]Status { return &v.Statuses }, marshal.NewCodec(qiDecodeStatus, qiEncodeStatus)),
+	marshal.Field[Config]{Name: "mode", Decode: func(r *marshal.Reader, v *Config) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == scanner.KindNull {
+			return r.ReadNull()
+		}
+		b, err := r.ReadBool()
+		if err != nil {
+			return err
+		}
+		v.Mode = Mode(b)
+		return nil
+	},
+		Encode: func(w *marshal.Writer, v *Config) error {
+			return w.WriteBool(bool(v.Mode))
+		},
+		Empty: func(v *Config) bool { return v.Mode == false },
+	},
+	marshal.Map[Config, Mode]("modes", func(v *Config) *map[string]Mode { return &v.Modes }, marshal.NewCodec(qiDecodeMode, qiEncodeMode)),
 )
 
 func (v *Config) DecodeJSON(r *marshal.Reader) error {
@@ -391,6 +461,30 @@ func qiDecodeXtypesLabel(r *marshal.Reader) (xtypes.Label, error) {
 
 func qiEncodeXtypesLabel(w *marshal.Writer, v xtypes.Label) error {
 	return w.WriteString(string(v))
+}
+
+func qiDecodeStatus(r *marshal.Reader) (Status, error) {
+	s, err := r.ReadString()
+	if err != nil {
+		return "", err
+	}
+	return Status(s), nil
+}
+
+func qiEncodeStatus(w *marshal.Writer, v Status) error {
+	return w.WriteString(string(v))
+}
+
+func qiDecodeMode(r *marshal.Reader) (Mode, error) {
+	b, err := r.ReadBool()
+	if err != nil {
+		return false, err
+	}
+	return Mode(b), nil
+}
+
+func qiEncodeMode(w *marshal.Writer, v Mode) error {
+	return w.WriteBool(bool(v))
 }
 
 func qiDecodeInt8(r *marshal.Reader) (int8, error) {

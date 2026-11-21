@@ -75,7 +75,8 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   `.opencode/plan/2026-11-21-json-encoder.md`.
 - `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
   `go/parser`, `go/format`, and `go/types` via the source importer for
-  cross-package named types). It emits code against the exported `marshal`
+  cross-package named types; same-package named scalar types are resolved from
+  the AST). It emits code against the exported `marshal`
   surface only; the runtime is unchanged by it. It emits a `Schema` var plus both
   `DecodeJSON` and `EncodeJSON` for each target type. It MUST NOT import
   `encoding/json` and MUST NOT use `reflect` or `unsafe`.

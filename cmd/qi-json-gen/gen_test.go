@@ -264,6 +264,54 @@ type Config struct {
 	}
 }
 
+func TestGenerateNamedStringBool(t *testing.T) {
+	dir := writePkg(t, `package example
+
+type Status string
+type Mode bool
+type Alias Status
+
+type Config struct {
+	Status   Status          `+"`json:\"status\"`"+`
+	Prev     *Status         `+"`json:\"prev\"`"+`
+	Statuses []Status        `+"`json:\"statuses\"`"+`
+	Mode     Mode            `+"`json:\"mode\"`"+`
+	Modes    map[string]Mode `+"`json:\"modes\"`"+`
+	Alias    Alias           `+"`json:\"alias\"`"+`
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		`marshal.Field[Config]{Name: "status"`,
+		`v.Status = Status(s)`,
+		`return w.WriteString(string(v.Status))`,
+		`Empty: func(v *Config) bool { return v.Status == "" }`,
+		`marshal.Field[Config]{Name: "prev"`,
+		`v.Prev = &e`,
+		`marshal.Slice[Config, Status]("statuses", func(v *Config) *[]Status { return &v.Statuses }, marshal.NewCodec(qiDecodeStatus, qiEncodeStatus))`,
+		`marshal.Field[Config]{Name: "mode"`,
+		`v.Mode = Mode(b)`,
+		`Empty: func(v *Config) bool { return v.Mode == false }`,
+		`marshal.Map[Config, Mode]("modes", func(v *Config) *map[string]Mode { return &v.Modes }, marshal.NewCodec(qiDecodeMode, qiEncodeMode))`,
+		`v.Alias = Alias(s)`,
+		`func qiDecodeStatus(r *marshal.Reader) (Status, error) {`,
+		`return Status(s), nil`,
+		`func qiEncodeStatus(w *marshal.Writer, v Status) error {`,
+		`func qiDecodeMode(r *marshal.Reader) (Mode, error) {`,
+		`func qiEncodeMode(w *marshal.Writer, v Mode) error {`,
+		`"qi-json/scanner"`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+}
+
 func TestGenerateCrossPackageUnsupported(t *testing.T) {
 	dir := writePkg(t, `package example
 
@@ -351,6 +399,12 @@ func TestGenerateErrors(t *testing.T) {
 			src:  "package example\n\ntype P struct{ N int }\n\ntype A struct{ P *P }\n",
 			typ:  "A",
 			want: "unsupported pointer type",
+		},
+		{
+			name: "named unsupported underlying",
+			src:  "package example\n\ntype S []int\n\ntype A struct{ S S }\n",
+			typ:  "A",
+			want: "unsupported type S",
 		},
 		{
 			name: "map key",
