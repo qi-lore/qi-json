@@ -376,7 +376,7 @@ following were fixed in the same change:
 Not changed (documented instead): the README's pre-existing over-claim that
 same-package named `string`/`bool` types are generated was narrowed to *named
 types whose underlying type is a numeric scalar*, which is what `resolveBasic`
-supports (adding `string`/`bool` is a separate follow-up).
+supports (recorded as a candidate in the codegen plan §8).
 
 New tests: `marshal/encode_guard_test.go`
 (`TestEncodeNilElementEncoder`, `TestEncodeEmptyRaw`, `TestMarshalIncomplete`,

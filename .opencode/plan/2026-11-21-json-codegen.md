@@ -173,6 +173,7 @@ amendment. Amend together, before code:
 | `go/ast` cannot resolve cross-package named types | v1 errors precisely; documented; `go/types` is a later, isolated upgrade. |
 | Helper name collision in the user's package | Fixed `qi`-prefixed names, documented; the generator errors if a name is taken. |
 | Generation is non-deterministic (map iteration) | Sort all emitted collections; the drift guard enforces it. |
+| A same-package named `string`/`bool` type is not generated (D8.2 covers numeric underlyings only) | A precise unsupported-type error, not silent misbehaviour; README narrowed to match; tracked as a candidate in §8. |
 
 ## 8. Verification (handoff)
 
@@ -209,5 +210,14 @@ amendment. Amend together, before code:
   underlying type are now supported via the standard library's type checker (see
   `.opencode/plan/2026-11-21-post-decoder-backlog.md` §4). T10 is done as
   `marshal.Decode`. The `-strict` flag is done (backlog §5).
-- **Not done / next**: none on this plan; the encoder is a separate effort
-  (backlog §6).
+- **Not done / next**:
+  - The encoder is a separate effort (backlog §6) — now done
+    (`.opencode/plan/2026-11-21-json-encoder.md`).
+  - **Candidate (unstarted)** — generate for a same-package named type whose
+    underlying type is `string` or `bool` (e.g. `type Label string`). D8.2 covers
+    only the numeric underlyings, so such a field is currently a precise
+    unsupported-type error and the README was narrowed to match (encoder plan
+    §10). To add it: teach `resolveBasic`/`identCodec` (and `starCodec`) to
+    recognise `string`/`bool` underlyings and emit a converting codec with an
+    `Encode`/`Empty` pair, add a `qiDecode*`/`qiEncode*` element pair for
+    container elements, and regenerate the fixtures.
