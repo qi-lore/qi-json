@@ -10,17 +10,19 @@ accessor closures, optionally generated from struct tags.
 | `qijson` | `qi-json` | Semantic layer: the reflection-free decoder and encoder |
 | `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.1.0** (2026-11-21). The decoder is complete and benchmarked; as
-a pre-1.0 release the API may still change.
+Released as **v0.1.1** (2026-11-22). The decoder and encoder are complete and
+benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.1.0** (2026-11-21).
+Current release: **v0.1.1** (2026-11-22).
 
-This is the first release that includes the `qijson` decoder and the optional
-`cmd/qi-json-gen` code generator. Being pre-1.0, the exported API may still
-change in a minor release. See [CHANGELOG.md](CHANGELOG.md) for the change
-history; the git tags record the release series.
+v0.1.1 adds the reflection-free encoder, resolves cross-package named scalar
+types in the generator, and relocates the semantic layer to the module root as
+package `qijson` (import path `qi-json`) — a breaking import-path change. Being
+pre-1.0, the exported API may still change in a minor release. See
+[CHANGELOG.md](CHANGELOG.md) for the change history; the git tags record the
+release series.
 
 ## Why another JSON library
 
