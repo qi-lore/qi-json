@@ -56,9 +56,32 @@ func UnmarshalInto[T any, PT interface {
 	if v == nil {
 		return errNilTarget
 	}
+	return Decode(data, PT(v))
+}
+
+// Decode decodes the single JSON value in data into v. It is the non-generic
+// counterpart to UnmarshalInto for a caller who does not want to name the type
+// argument:
+//
+//	var cfg Config
+//	if err := marshal.Decode(data, &cfg); err != nil { /* ... */ }
+//
+// v must implement Decoder, which a type does by defining DecodeJSON (usually by
+// delegating to a Schema). Decode works in place, merging into whatever v already
+// holds, and reports the same errors as UnmarshalInto: a syntax error, a JSON
+// type that does not match v, or trailing input after the single value.
+//
+// A nil interface is reported as errNilTarget. Because marshal may not use
+// reflection, a typed-nil target (an interface holding a nil pointer) is not
+// detected here: its DecodeJSON is called with a nil receiver and must behave as
+// any method does when its receiver is nil.
+func Decode(data []byte, v Decoder) error {
+	if v == nil {
+		return errNilTarget
+	}
 
 	r := newReader(scanner.NewTokenizer(data))
-	if err := PT(v).DecodeJSON(r); err != nil {
+	if err := v.DecodeJSON(r); err != nil {
 		return err
 	}
 	// The document must hold exactly one value; Peek reports trailing content.

@@ -33,4 +33,5 @@
 //
 //	cfg, err := marshal.Unmarshal[Config](data)        // fresh value
 //	err = marshal.UnmarshalInto[Config](data, &cfg)    // merge into an existing value
+//	err = marshal.Decode(data, &cfg)                   // merge, with no type argument
 package marshal

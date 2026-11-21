@@ -60,7 +60,9 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - `marshal` is the decoder: a reflection-free semantic layer over `scanner`. It
   MUST NOT import `encoding/json` and MUST NOT use `reflect` or `unsafe`; struct
   binding is by compile-time accessor closures. Its API is deliberately not
-  `encoding/json`-compatible. Plan and tasks:
+  `encoding/json`-compatible. The non-generic `Decode(data, v Decoder) error`
+  mirrors `UnmarshalInto` for a caller that does not want to name a type
+  argument. Plan and tasks:
   `.opencode/plan/2026-11-21-json-decoder.md`.
 - `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
   `go/parser`, `go/format`). It emits code against the exported `marshal` surface

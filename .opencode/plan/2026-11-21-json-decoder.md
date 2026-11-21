@@ -154,7 +154,11 @@ Designed and implemented; see `.opencode/plan/2026-11-21-json-codegen.md` for th
 decisions, tasks and verification log. Adds a third package
 (`cmd/qi-json-gen`, constitution v3.1.0).
 ### [ ] T9 — Documentation — **deferred**.
-### [ ] T10 — Non-generic entry point (API ergonomics) — **deferred**
+### [X] T10 — Non-generic entry point (API ergonomics) — **done**
+Shipped as `marshal.Decode(data []byte, v Decoder) error`: a thin wrapper over
+`newReader` + `DecodeJSON` + the trailing-value check, with `UnmarshalInto`
+refactored to delegate to it. Article VI and `AGENTS.md` amended together
+(constitution v3.1.1).
 
 Today every decoder entry point is generic, so a caller must name an
 instantiation: `marshal.Unmarshal[Config](data)`,
@@ -453,16 +457,11 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
     `ValidObject` ~831 MB/s, `ValidArrayOfObjects` ~821, `ValidNumbers` ~1039,
     `ValidString` ~2530–2575 MB/s — all `0 B/op`, `0 allocs/op`.
   - `make verify`, `-race`, and 12s fuzz on all three targets are green.
-- **Not started**: **T8** is now **done** (see
-  `.opencode/plan/2026-11-21-json-codegen.md`; a third package, constitution
-  v3.1.0). **T9** (documentation) is optional and unstarted. **T10** (a
-  non-generic entry point such as `marshal.Decode(data, &cfg)`) is a small,
-  high-value ergonomics task but is **blocked on a constitution amendment**,
-  because it adds an exported identifier; the design is in §5 T10. A WIP draft of
-  T10 is parked in a git stash.
-- **Next action**: none required for the decoder. If resumed, T9 (package docs,
-  README, and folding §8's results into `doc.go`) and then T10 (amendment
-  first).
+- **Not started**: **T8** (codegen) and **T10** (non-generic `Decode`) are now
+  **done** — T8 in `cmd/qi-json-gen` (constitution v3.1.0), T10 as
+  `marshal.Decode` (constitution v3.1.1). **T9** (documentation) is optional and
+  the only remaining task.
+- **Next action**: none required. T9 (package docs, README) remains optional.
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add

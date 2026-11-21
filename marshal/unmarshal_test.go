@@ -126,6 +126,114 @@ func TestUnmarshalInvalidTarget(t *testing.T) {
 	})
 }
 
+func TestDecodeNonGeneric(t *testing.T) {
+	var v uhConfig
+	if err := Decode([]byte(`{"name":"qi-json","port":8080}`), &v); err != nil {
+		t.Fatalf("Decode() error = %v, want nil", err)
+	}
+	if v.Name != "qi-json" || v.Port != 8080 {
+		t.Fatalf("Decode() = %+v, want {Name:qi-json Port:8080}", v)
+	}
+}
+
+func TestDecodeMerge(t *testing.T) {
+	v := uhConfig{Name: "keep", Port: 1}
+	if err := Decode([]byte(`{"port":9}`), &v); err != nil {
+		t.Fatalf("Decode() error = %v, want nil", err)
+	}
+	if v.Name != "keep" || v.Port != 9 {
+		t.Fatalf("Decode() = %+v, want {Name:keep Port:9}", v)
+	}
+}
+
+// TestDecodeMatchesUnmarshalInto asserts that the non-generic Decode behaves
+// exactly like the generic UnmarshalInto: the same success, the same target and
+// the same error for every input.
+func TestDecodeMatchesUnmarshalInto(t *testing.T) {
+	inputs := []struct {
+		name string
+		data string
+	}{
+		{"ok", `{"name":"qi-json","port":8080}`},
+		{"merge", `{"port":9}`},
+		{"empty object", `{}`},
+		{"wrong type", `[1,2]`},
+		{"invalid json", `{`},
+		{"trailing data", `{"name":"a"} 1`},
+		{"field type error", `{"port":"nope"}`},
+	}
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotV, wantV uhConfig
+			gotErr := Decode([]byte(tc.data), &gotV)
+			wantErr := UnmarshalInto[uhConfig]([]byte(tc.data), &wantV)
+			if (gotErr == nil) != (wantErr == nil) {
+				t.Fatalf("Decode() error = %v, UnmarshalInto() error = %v", gotErr, wantErr)
+			}
+			if gotErr != nil && gotErr.Error() != wantErr.Error() {
+				t.Fatalf("Decode() error = %q, UnmarshalInto() error = %q", gotErr, wantErr)
+			}
+			// A failed decode leaves the target unchanged in both paths.
+			if gotV != wantV {
+				t.Fatalf("Decode() = %+v, UnmarshalInto() = %+v", gotV, wantV)
+			}
+		})
+	}
+}
+
+func TestDecodeErrorKinds(t *testing.T) {
+	t.Run("nil decoder", func(t *testing.T) {
+		if err := Decode([]byte(`{}`), nil); !errors.Is(err, errNilTarget) {
+			t.Fatalf("Decode(nil) error = %v, want %v", err, errNilTarget)
+		}
+	})
+
+	t.Run("type error", func(t *testing.T) {
+		var v uhConfig
+		err := Decode([]byte(`[1,2]`), &v)
+		var e *Error
+		if !errors.As(err, &e) {
+			t.Fatalf("error type = %T, want *Error", err)
+		}
+		if e.Kind != KindType {
+			t.Errorf("Kind = %v, want %v", e.Kind, KindType)
+		}
+	})
+
+	t.Run("syntax error", func(t *testing.T) {
+		var v uhConfig
+		err := Decode([]byte(`{"name":"a"} 1`), &v)
+		var e *Error
+		if !errors.As(err, &e) {
+			t.Fatalf("error type = %T, want *Error", err)
+		}
+		if e.Kind != KindSyntax {
+			t.Errorf("Kind = %v, want %v", e.Kind, KindSyntax)
+		}
+	})
+}
+
+func TestDecodeDispatchesToDecoder(t *testing.T) {
+	var d uhCounter
+	if err := Decode([]byte(`[1,2,3]`), &d); err != nil {
+		t.Fatalf("Decode() error = %v, want nil", err)
+	}
+	if d.calls != 1 || d.kind != "array" {
+		t.Fatalf("Decode() calls = %d, kind = %q; want 1, array", d.calls, d.kind)
+	}
+}
+
+func BenchmarkDecodeNonGeneric(b *testing.B) {
+	data := []byte(`{"name":"qi-json","port":8080}`)
+	var v uhConfig
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if err := Decode(data, &v); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkUnmarshalGeneric(b *testing.B) {
 	data := []byte(`{"name":"qi-json","port":8080}`)
 	b.ReportAllocs()

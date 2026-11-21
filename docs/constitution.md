@@ -60,9 +60,9 @@ Three further surfaces are sanctioned (amended 2026-11-21; rationale:
   `Peek`/`Read*`/`Begin*`/`End*`/`Skip`/`Offset`/`Err`, so the semantic layer
   consumes the same engine.
 - **`marshal` decoder** — the reflection-free semantic layer: a generic
-  `Unmarshal`/`UnmarshalInto`, the `Decoder` interface (`DecodeJSON(*Reader)
-  error`), `Schema[T]`/`Struct`, the `Field[T]` constructors, `Reader`, and the
-  error types.
+  `Unmarshal`/`UnmarshalInto` and the non-generic `Decode`, the `Decoder`
+  interface (`DecodeJSON(*Reader) error`), `Schema[T]`/`Struct`, the `Field[T]`
+  constructors, `Reader`, and the error types.
 - **`cmd/qi-json-gen`** — an optional, stdlib-only code generator that emits
   `marshal` `Schema` values and `DecodeJSON` methods from struct tags, so callers
   need not hand-write the accessor closures. It is a `main` package, targets only
@@ -107,4 +107,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.1.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
+**Version**: 3.1.1 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
