@@ -124,8 +124,13 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
     follow-up tasks (resume here for post-decoder work).
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the
     gaps they expose (the foreign-struct-field gap is a release blocker).
-  - `.opencode/plan/2026-11-22-third-party-struct-fields.md` — **next task**:
-    research a fix for struct fields whose type is a struct from another package.
+  - `.opencode/plan/2026-11-22-third-party-struct-fields.md` — research for
+    struct fields whose type is a struct from another package (**done
+    2026-11-22**; decision is **F**: A + B + C, with D as the escape hatch; E
+    rejected).
+  - `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md` — **next task**:
+    implement that decision (TDD tasks T-F1…T-F6; a small Article VI amendment
+    for the delegation constructor C).
   - `.opencode/plan/2026-11-21-package-rename.md` — relocated the semantic layer
     to the module root and renamed it `qijson` (done 2026-11-21).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
