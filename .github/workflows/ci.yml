@@ -32,8 +32,8 @@ jobs:
     name: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           check-latest: true
@@ -50,9 +50,12 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        # v9 of the action runs golangci-lint v2 (v6 pulled v1, which is built
+        # with an older Go and rejects a go 1.27 module). Pin the same version
+        # the local tool reports so the gate is reproducible.
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.15.0
 
   branch-name:
     name: branch name
@@ -94,7 +97,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Conventional Commits
