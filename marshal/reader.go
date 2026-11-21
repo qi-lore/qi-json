@@ -9,50 +9,114 @@ import (
 	"qi-json/scanner"
 )
 
-// pathInline is the number of bytes of JSON path held inline in a Reader before
-// the path grows onto the heap.
-const pathInline = 64
+// compsInline is the number of JSON path components held inline in a Reader
+// before the component stack grows onto the heap. It bounds nesting depth, not
+// the number of members or elements, so decoding a flat array or object never
+// grows it.
+const compsInline = 8
 
 // Reader decodes typed values from a JSON document, tracking the JSON path of
 // the value being decoded so that errors point at the offending member. It reads
 // from the pull tokenizer in qi-json/scanner: whitespace, separators and object
 // keys are handled by the tokenizer and the Object and Array iterators.
 //
+// The JSON path is built lazily: descending into a container records a component
+// and the path string is only rendered when Path (or an error that carries it)
+// needs it, so a successful decode never formats the path.
+//
 // A Reader is created by the decoder entry points and passed to Decoder
 // implementations. It is not safe for concurrent use and must not be copied
-// after first use (its path buffer points into itself).
+// after first use (its component stack points into itself).
 type Reader struct {
 	tok *scanner.Tokenizer
 
-	// path holds the JSON path of the value about to be read, in the form
-	// ".a.b[2]", relative to the document root. buf backs path so the common
-	// case does not allocate.
-	path []byte
-	buf  [pathInline]byte
+	// comps is the stack of path components from the document root to the value
+	// being decoded. inline backs the common case so descending does not
+	// allocate.
+	comps  []pathComp
+	inline [compsInline]pathComp
+
+	// peekKind, peekOff and peekTok memoize the kind of the token at the
+	// tokenizer's current offset. A Peek followed by a read would otherwise
+	// peek twice; the cache makes the read reuse the Peek. It stays valid only
+	// while the same tokenizer has neither advanced nor failed since the kind
+	// was recorded.
+	peekKind scanner.Kind
+	peekOff  int64
+	peekTok  *scanner.Tokenizer
+}
+
+// pathComp is one step in the JSON path: a member name or an array index.
+type pathComp struct {
+	// name is the member name; it is meaningful when index is negative.
+	name string
+
+	// index is the array index, or -1 for a member.
+	index int
 }
 
 // newReader returns a Reader that decodes from tok.
 func newReader(tok *scanner.Tokenizer) *Reader {
 	r := &Reader{tok: tok}
-	r.path = r.buf[:0]
+	r.comps = r.inline[:0]
 	return r
+}
+
+// pushKey records that the value about to be read is the member name of the
+// current object.
+func (r *Reader) pushKey(name string) {
+	r.comps = append(r.comps, pathComp{name: name, index: -1})
+}
+
+// pushIndex records that the value about to be read is element i of the current
+// array.
+func (r *Reader) pushIndex(i int) {
+	r.comps = append(r.comps, pathComp{index: i})
+}
+
+// popComp discards the innermost path component.
+func (r *Reader) popComp() {
+	r.comps = r.comps[:len(r.comps)-1]
 }
 
 // Peek returns the kind of the next value without consuming it, so a Decoder can
 // dispatch on it.
 func (r *Reader) Peek() (scanner.Kind, error) {
+	if k, ok := r.cachedKind(); ok {
+		return k, nil
+	}
 	k, err := r.tok.Peek()
 	if err != nil {
 		return k, r.syntaxError(err)
 	}
+	r.peekKind, r.peekOff, r.peekTok = k, r.tok.Offset(), r.tok
 	return k, nil
+}
+
+// cachedKind returns the memorized kind of the token at the tokenizer's current
+// offset, or false when there is none. The entry is used only while the same
+// tokenizer has neither advanced nor failed since it was recorded, so it never
+// hides a consumed token or a sticky error.
+func (r *Reader) cachedKind() (scanner.Kind, bool) {
+	if r.peekTok == r.tok && r.peekTok != nil && r.tok.Offset() == r.peekOff && r.tok.Err() == nil {
+		return r.peekKind, true
+	}
+	return 0, false
+}
+
+// nextKind returns the kind of the next value, reusing a just-made Peek.
+func (r *Reader) nextKind() (scanner.Kind, error) {
+	if k, ok := r.cachedKind(); ok {
+		return k, nil
+	}
+	return r.Peek()
 }
 
 // ReadNull consumes a null value.
 func (r *Reader) ReadNull() error {
-	k, err := r.tok.Peek()
+	k, err := r.nextKind()
 	if err != nil {
-		return r.syntaxError(err)
+		return err
 	}
 	if k != scanner.KindNull {
 		return r.mismatch("null", k)
@@ -65,9 +129,9 @@ func (r *Reader) ReadNull() error {
 
 // ReadBool consumes a true or false value.
 func (r *Reader) ReadBool() (bool, error) {
-	k, err := r.tok.Peek()
+	k, err := r.nextKind()
 	if err != nil {
-		return false, r.syntaxError(err)
+		return false, err
 	}
 	if k != scanner.KindBool {
 		return false, r.mismatch("boolean", k)
@@ -82,9 +146,9 @@ func (r *Reader) ReadBool() (bool, error) {
 // ReadString consumes a string value and returns it decoded: escape sequences
 // are resolved and a lone surrogate becomes U+FFFD.
 func (r *Reader) ReadString() (string, error) {
-	k, err := r.tok.Peek()
+	k, err := r.nextKind()
 	if err != nil {
-		return "", r.syntaxError(err)
+		return "", err
 	}
 	if k != scanner.KindString {
 		return "", r.mismatch("string", k)
@@ -132,9 +196,9 @@ func (r *Reader) ReadFloat() (float64, error) {
 // readNumber peeks at a number token and returns its raw bytes, describing the
 // expected JSON type as want for a type error.
 func (r *Reader) readNumber(want string) ([]byte, error) {
-	k, err := r.tok.Peek()
+	k, err := r.nextKind()
 	if err != nil {
-		return nil, r.syntaxError(err)
+		return nil, err
 	}
 	if k != scanner.KindNumber {
 		return nil, r.mismatch(want, k)
@@ -201,9 +265,9 @@ func (r *Reader) Object(fn func(key string) error) error {
 		return err
 	}
 	for {
-		k, err := r.tok.Peek()
+		k, err := r.Peek()
 		if err != nil {
-			return r.syntaxError(err)
+			return err
 		}
 		if k == scanner.KindEnd {
 			break
@@ -217,10 +281,10 @@ func (r *Reader) Object(fn func(key string) error) error {
 			return r.syntaxError(err)
 		}
 
-		before := len(r.path)
-		r.appendKey(key)
+		before := len(r.comps)
+		r.pushKey(key)
 		err = fn(key)
-		r.path = r.path[:before]
+		r.comps = r.comps[:before]
 		if err != nil {
 			return err
 		}
@@ -241,9 +305,9 @@ func (r *Reader) objectRaw(fn func(raw []byte) error) error {
 		return err
 	}
 	for {
-		k, err := r.tok.Peek()
+		k, err := r.Peek()
 		if err != nil {
-			return r.syntaxError(err)
+			return err
 		}
 		if k == scanner.KindEnd {
 			break
@@ -270,18 +334,18 @@ func (r *Reader) Array(fn func(index int) error) error {
 		return err
 	}
 	for i := 0; ; i++ {
-		k, err := r.tok.Peek()
+		k, err := r.Peek()
 		if err != nil {
-			return r.syntaxError(err)
+			return err
 		}
 		if k == scanner.KindEnd {
 			break
 		}
 
-		before := len(r.path)
-		r.appendIndex(i)
+		before := len(r.comps)
+		r.pushIndex(i)
 		err = fn(i)
-		r.path = r.path[:before]
+		r.comps = r.comps[:before]
 		if err != nil {
 			return err
 		}
@@ -312,12 +376,21 @@ func (r *Reader) raw() ([]byte, error) {
 }
 
 // Path returns the JSON path of the value being decoded, such as "$.a.b[2].c".
-// At the document root it is "$".
+// At the document root it is "$". The path is rendered on demand from the
+// recorded path components, so it is only built when an error needs it.
 func (r *Reader) Path() string {
-	if len(r.path) == 0 {
+	if len(r.comps) == 0 {
 		return "$"
 	}
-	return "$" + string(r.path)
+	var dst []byte
+	for i := range r.comps {
+		if c := &r.comps[i]; c.index >= 0 {
+			dst = appendIndexTo(dst, c.index)
+		} else {
+			dst = appendKeyTo(dst, c.name)
+		}
+	}
+	return "$" + string(dst)
 }
 
 // Offset returns the number of bytes of the input consumed so far.
@@ -377,30 +450,29 @@ func (r *Reader) duplicateField(name string) error {
 // pathWithKey returns the current JSON path extended with a member name, leaving
 // the reader's path unchanged.
 func (r *Reader) pathWithKey(key string) string {
-	before := len(r.path)
-	r.appendKey(key)
+	r.pushKey(key)
 	p := r.Path()
-	r.path = r.path[:before]
+	r.popComp()
 	return p
 }
 
-// appendKey extends the current path with a member name.
-func (r *Reader) appendKey(key string) {
+// appendKeyTo appends key to dst as a JSON path step, quoting it when it is not a
+// plain identifier.
+func appendKeyTo(dst []byte, key string) []byte {
 	if isPlainKey(key) {
-		r.path = append(r.path, '.')
-		r.path = append(r.path, key...)
-		return
+		dst = append(dst, '.')
+		return append(dst, key...)
 	}
-	r.path = append(r.path, '[')
-	r.appendQuoted(key)
-	r.path = append(r.path, ']')
+	dst = append(dst, '[')
+	dst = appendQuotedTo(dst, key)
+	return append(dst, ']')
 }
 
-// appendIndex extends the current path with an array index.
-func (r *Reader) appendIndex(i int) {
-	r.path = append(r.path, '[')
-	r.path = strconv.AppendInt(r.path, int64(i), 10)
-	r.path = append(r.path, ']')
+// appendIndexTo appends an array index to dst as "[i]".
+func appendIndexTo(dst []byte, i int) []byte {
+	dst = append(dst, '[')
+	dst = strconv.AppendInt(dst, int64(i), 10)
+	return append(dst, ']')
 }
 
 // isPlainKey reports whether key can follow a '.' in a JSON path without
@@ -423,17 +495,17 @@ func isPlainKey(key string) bool {
 	return true
 }
 
-// appendQuoted appends key to the path as a double-quoted JSON string.
-func (r *Reader) appendQuoted(key string) {
-	r.path = append(r.path, '"')
+// appendQuotedTo appends key to dst as a double-quoted JSON string.
+func appendQuotedTo(dst []byte, key string) []byte {
+	dst = append(dst, '"')
 	for i := 0; i < len(key); i++ {
 		c := key[i]
 		if c == '"' || c == '\\' {
-			r.path = append(r.path, '\\')
+			dst = append(dst, '\\')
 		}
-		r.path = append(r.path, c)
+		dst = append(dst, c)
 	}
-	r.path = append(r.path, '"')
+	return append(dst, '"')
 }
 
 // unescape decodes the JSON escape sequences in raw and returns the decoded

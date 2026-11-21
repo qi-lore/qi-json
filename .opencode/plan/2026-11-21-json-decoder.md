@@ -1,7 +1,8 @@
 # qi-json Decoder — decisions, tasks, and handoff
 
 **Date**: 2026-11-21
-**Status**: decisions agreed; T0–T6 done; fuzz and differential testing green.
+**Status**: decisions agreed; T0–T7 done; fuzz, differential testing and the bulk
+fast paths are green.
 **Supersedes (in part)**: `.opencode/plan/2026-11-21-json-unmarshal-research.md`.
 **Related**: `docs/task.md`, `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-scanner-rewrite.md`.
@@ -140,10 +141,13 @@ and an in-range offset; a successful decode is deterministic);
 **Acceptance**: 10s fuzz clean on both targets. See §8 for the edge case the
 fuzzer surfaced.
 
-### [ ] T7 — Bulk fast paths (performance) — **next**
+### [X] T7 — Bulk fast paths (performance) — **done**
 String/number/whitespace fast paths with a differential test against the
 reference path.
 **Acceptance**: ≥ 1 GB/s on string-heavy documents; 0 allocs; verify green.
+Result: the decoder won the throughput; the scanner's existing SWAR string path
+already meets the target, and the number/whitespace word paths were measured to
+regress and are not shipped (see §8).
 
 ### [ ] T8 — Optional codegen (`cmd/qi-json-gen`) — **deferred**.
 ### [ ] T9 — Documentation — **deferred**.
@@ -369,10 +373,59 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
     seeds. This matches `encoding/json`, which likewise converts the number
     before checking for trailing data.
   - `make verify`, `-race`, and 10s fuzz on both targets are green.
-- **Not started**: the remaining tasks (T7–T9).
-- **Next action**: start **T7**: bulk fast paths (string/number/whitespace)
-  behind a differential test against the reference path; ≥ 1 GB/s on
-  string-heavy documents, 0 allocs, verify green.
+- **T7** (`scanner/fastpath_test.go`, `marshal/reader.go`, `marshal/schema.go`,
+  `marshal/bench_test.go`): bulk fast paths and their differential tests.
+  - **Differential tests** (`scanner/fastpath_test.go`): plain byte-at-a-time
+    reference scanners (`skipSpaceRef`, `scanStringRef`, `scanEscapeRef`,
+    `scanNumberRef`) are compared against the production `skipSpace`,
+    `scanString`/`scanEscape`, and `scanNumber` over the fixed corpora plus
+    seeded random fragments, asserting the same return index and the same (or
+    no) failure down to the 1-based position and the message. This pins the
+    scanner's SWAR string path (and the scalar scanners generally) so a future
+    fast path cannot silently change an index or an error.
+  - **Scanner fast paths — measured, not shipped.** The string fast path
+    (`stringStopWord` SWAR, warm-up gated) already exists and is what the
+    differential tests validate. Two further word-at-a-time paths were built and
+    benchmarked, both with the byte-at-a-time form as the reference:
+    - *Number* (SWAR digit-run skip, warm-up gated at eight digits): regressed
+      every benchmark — `BenchmarkValidNumbers` 1048 → 885 MB/s and the object
+      and array documents ~2%. The extra work on the common one-to-four-digit
+      number costs more than the rare eight-plus-digit run saves, even with the
+      helper inlined (the helper is too large to inline, so calling it per digit
+      run is what regressed at first).
+    - *Whitespace* (eight-byte skip of space runs): regressed pretty-printed
+      input at every indent tried — 4, 16 and 64 spaces and a document whose
+      only whitespace runs were newline plus sixteen spaces — by 9–22%. Inlined
+      at each `run` call site the word loop bloats `run`, and the byte loop is
+      already cheap enough that the per-call overhead outweighs the bytes
+      skipped. `skipSpace` is therefore unchanged save for a comment recording
+      this.
+  - **Decoder fast path — the throughput win.** Two changes to `Reader`:
+    - *Lazy JSON path*: instead of appending formatted path text (`.key`,
+      `[i]`) while descending, `Reader` keeps a stack of `pathComp` (member
+      name or index) in an inline `[8]pathComp` slice, and `Path` renders the
+      string only when an error needs it. A successful decode formats nothing;
+      removing the per-element `strconv.AppendInt` was worth ~16% on the
+      many-string document.
+    - *Memoized `Peek`*: a `Peek` followed by a read peeked twice. `Reader`
+      memoizes the kind keyed on the tokenizer pointer, its offset and a nil
+      sticky error, so a read reuses the just-made `Peek`; the entry can never
+      hide a consumed token or a sticky error. Worth ~4–5% alone.
+  - **Benchmarks recorded** (Apple M1, go1.27.3; `BenchmarkDecodeStrings*` in
+    `marshal/bench_test.go`), before → after: many medium strings (10 000 × 64 B)
+    981 → **~1120 MB/s** (acceptance met), long strings (2 000 × 512 B)
+    ~2 685 → ~2 780 MB/s, short strings (20 000 × 16 B) ~296 → ~350 MB/s (the
+    short case is allocation-bound, not scanner-bound), one 64 KiB string
+    ~4 162 → ~4 100 MB/s (within noise). `BenchmarkStructDecode` stayed
+    ~415 ns/op, 1208 B/op, 4 allocs; `BenchmarkUnmarshalGeneric` ~294 ns/op.
+  - **Scanner benchmarks** are unchanged from T6 within noise:
+    `ValidObject` ~831 MB/s, `ValidArrayOfObjects` ~821, `ValidNumbers` ~1039,
+    `ValidString` ~2530–2575 MB/s — all `0 B/op`, `0 allocs/op`.
+  - `make verify`, `-race`, and 12s fuzz on all three targets are green.
+- **Not started**: the remaining tasks (T8–T9), both deferred.
+- **Next action**: none required for the decoder; T8 (codegen) and T9
+  (documentation) are optional. If resumed, T9 first (package docs, README, and
+  folding §8's results into `doc.go`).
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add

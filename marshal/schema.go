@@ -66,10 +66,10 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 			seen[idx] = true
 		}
 
-		before := len(r.path)
-		r.appendKey(f.Name)
+		before := len(r.comps)
+		r.pushKey(f.Name)
 		err := f.Decode(r, v)
-		r.path = r.path[:before]
+		r.comps = r.comps[:before]
 		return err
 	})
 }
