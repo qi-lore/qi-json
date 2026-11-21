@@ -1,14 +1,19 @@
-// Package scanner validates JSON syntax.
+// Package scanner is the syntax layer of qi-json. It exports Valid, the syntax
+// validator, and the Tokenizer that the semantic layer in qi-json/marshal
+// consumes. Valid's name and signature match encoding/json.Valid.
 //
-// The package exposes a single function, Valid, whose name and signature match
-// encoding/json.Valid. The implementation is a from-scratch single-pass
-// validator: it walks the byte slice with an index, scans strings, numbers,
-// whitespace and literals in bulk, and keeps an explicit stack of open
-// containers. It does not use encoding/json, does not build values, and does not
-// validate UTF-8 or surrogate pairs.
+// The implementation is a from-scratch single-pass walk over the byte slice:
+// it walks with an index, scans strings, numbers, whitespace and literals in
+// bulk, and keeps an explicit stack of open containers. It does not use
+// encoding/json, does not build values, and does not validate UTF-8 or surrogate
+// pairs.
 //
 // Unlike encoding/json, Valid accepts any JSON value at the top level and
 // intentionally applies no nesting depth limit.
+//
+// The exported surface — Valid plus the tokenizer (Kind and Tokenizer, in
+// token.go) — is sanctioned by docs/constitution.md Article VI; the decoder in
+// qi-json/marshal consumes the tokenizer.
 package scanner
 
 // Valid reports whether data is a syntactically valid JSON text.

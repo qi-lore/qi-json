@@ -50,8 +50,8 @@ is recorded in `.opencode/plan/2026-11-21-scanner-rewrite.md`.
 
 ## 4. Public surface
 
-Exactly one exported identifier, with the same name and signature as
-`encoding/json.Valid`:
+The scanner validates through one headline export, with the same name and
+signature as `encoding/json.Valid`:
 
 ```go
 // Valid reports whether data is a syntactically valid JSON text.
@@ -73,6 +73,13 @@ func validate(data []byte) (parseError, bool)
 
 `validate` exists so that diagnostics — the error text and the 1-based position
 — remain a testable contract without widening the exported surface.
+
+`Valid` is the scanner's syntax validator. The package additionally exposes a
+pull tokenizer — `Kind` and `Tokenizer`, in `scanner/token.go` — so the semantic
+layer in `marshal` consumes the same engine instead of re-scanning. That export,
+and the `marshal` decoder, are sanctioned by `docs/constitution.md` Article VI
+and specified in `.opencode/plan/2026-11-21-json-decoder.md`; this document
+specifies the syntax validator only.
 
 ## 5. Grammar
 
@@ -457,6 +464,7 @@ unexpected end of JSON input
 scanner/
   valid.go   // package doc, Valid, validate
   scan.go    // validator, dispatch, scanners, tables, parseError
+  token.go   // Kind and the tokenizer used by marshal
   *_test.go  // tests and benchmarks
 marshal/
   doc.go     // placeholder for the encoding layer; exports nothing

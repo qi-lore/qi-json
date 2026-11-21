@@ -219,16 +219,26 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
   `perf(scanner): replace state machine with goto-free scanner`. Tree clean
   before this docs change.
 - **Done**: the scanner — `scanner/scan.go` + `valid.go`: single pass, no `goto`,
-  faster than `encoding/json.Valid`, 0 allocs.
-- **Not started**: everything under `marshal/`, and `scanner/token.go`.
-- **Next action**: T0 is landed by this doc (plus the constitution, `AGENTS.md`
-  and `marshal/doc.go`). Then start **T1**: write `scanner/token_test.go` (red)
-  for the tokenizer API in §7, then implement `scanner/token.go` (green).
+  faster than `encoding/json.Valid`, 0 allocs. **T0** (governance: constitution
+  Article VI + Additional Constraints, `AGENTS.md`, `marshal/doc.go`). **T1**
+  (`scanner/token.go` + `scanner/token_test.go`): the tokenizer — `Kind`,
+  `Tokenizer`, `NewTokenizer`; the T1a design (a separate `tokenizer` state that
+  reuses the validator's scalar scanners and error contract, leaving `Valid`
+  untouched). Tests cover `Peek` per value, raw `ReadString`/`ReadNumber`/
+  `ReadRaw`, `Begin`/`End` for objects and arrays, nested `Skip`, `Offset`,
+  sticky `Err`, misuse errors, and full agreement with `validate` over
+  `validDocuments` and `invalidDocuments`. `make verify`, `-race`, a 10s
+  `FuzzValid` and the benchmarks are green; `Valid` still allocates 0.
+- **Not started**: everything under `marshal/`.
+- **Next action**: start **T2**: write `marshal/reader_test.go` (red) for the
+  primitives and errors, then implement `marshal/reader.go` and
+  `marshal/errors.go` (green). The `Reader` sits on top of `scanner.Tokenizer`.
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add
   exports beyond the amended constitution without a new amendment; reintroduce
-  `goto`/labels or per-byte dispatch in the scanner.
+  `goto`/labels or per-byte dispatch in the scanner. The tokenizer must not be
+  copied after first use (its frame stack points into itself).
 - **Commands**:
   - `make verify` — test → gofmt → vet → golangci-lint.
   - `go test -race ./...`

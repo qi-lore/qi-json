@@ -34,117 +34,120 @@ func TestValidateAcceptsValidDocuments(t *testing.T) {
 }
 
 func TestInvalidDocuments(t *testing.T) {
-	tests := []struct {
-		in      string
-		at      int64
-		problem string
-	}{
-		// Empty input and truncated documents.
-		{``, 0, "unexpected end of JSON input"},
-		{` `, 1, "unexpected end of JSON input"},
-		{`{`, 1, "unexpected end of JSON input"},
-		{`[`, 1, "unexpected end of JSON input"},
-		{`{"a"`, 4, "unexpected end of JSON input"},
-		{`{"a":`, 5, "unexpected end of JSON input"},
-		{`[1`, 2, "unexpected end of JSON input"},
-		{`"`, 1, "unexpected end of JSON input"},
-		{`"abc`, 4, "unexpected end of JSON input"},
-
-		// Truncated or mistyped literals.
-		{`tru`, 3, "in literal true (expecting 'e')"},
-		{`trux`, 4, "in literal true (expecting 'e')"},
-		{`tx`, 2, "in literal true (expecting 'r')"},
-		{`trx`, 3, "in literal true (expecting 'u')"},
-		{`fals`, 4, "in literal false (expecting 'e')"},
-		{`falsy`, 5, "in literal false (expecting 'e')"},
-		{`fx`, 2, "in literal false (expecting 'a')"},
-		{`falx`, 4, "in literal false (expecting 's')"},
-		{`nul`, 3, "in literal null (expecting 'l')"},
-		{`nulx`, 4, "in literal null (expecting 'l')"},
-		{`nx`, 2, "in literal null (expecting 'u')"},
-		{`nuX`, 3, "in literal null (expecting 'l')"},
-
-		// Invalid numbers.
-		{`-`, 1, "in numeric literal"},
-		{`--1`, 2, "in numeric literal"},
-		{`01`, 2, "in numeric literal"},
-		{`-01`, 3, "in numeric literal"},
-		{`1.`, 2, "after decimal point in numeric literal"},
-		{`1.e1`, 3, "after decimal point in numeric literal"},
-		{`1e`, 2, "in exponent of numeric literal"},
-		{`1e+`, 3, "in exponent of numeric literal"},
-		{`1e++1`, 4, "in exponent of numeric literal"},
-		{`1e+-1`, 4, "in exponent of numeric literal"},
-
-		// Numbers may contain at most one fraction and one exponent.
-		{`1.2.3`, 4, "after top-level value"},
-		{`1e1e2`, 4, "after top-level value"},
-		{`1e1.5`, 4, "after top-level value"},
-		{`0e1e2`, 4, "after top-level value"},
-		{`1e+1e2`, 5, "after top-level value"},
-		{`-1.5E2.3`, 7, "after top-level value"},
-		{`[1.2.3]`, 5, "after array value"},
-		{`{"a":1.5.6}`, 9, "after object value"},
-
-		// Bytes that cannot begin a value.
-		{`+1`, 1, "looking for beginning of value"},
-		{`.5`, 1, "looking for beginning of value"},
-		{`NaN`, 1, "looking for beginning of value"},
-		{`'a'`, 1, "looking for beginning of value"},
-
-		// Object structure.
-		{`{a:1}`, 2, "looking for beginning of object key string"},
-		{`{,}`, 2, "looking for beginning of object key string"},
-		{`{]`, 2, "looking for beginning of object key string"},
-		{`{"a" 1}`, 6, "after object key"},
-		{`{"a":1 "b":2}`, 8, "after object value"},
-		{`{"a":1,}`, 8, "looking for beginning of object key string"},
-		{`{"a":1,,"b":2}`, 8, "looking for beginning of object key string"},
-		{`{"a":1]`, 7, "after object value"},
-		{`{"a":1;}`, 7, "after object value"},
-		{`{"a":}`, 6, "looking for beginning of value"},
-
-		// Array structure.
-		{`[1 2]`, 4, "after array value"},
-		{`[1,]`, 4, "looking for beginning of value"},
-		{`[1,,2]`, 4, "looking for beginning of value"},
-		{`[,]`, 2, "looking for beginning of value"},
-		{`[1}`, 3, "after array value"},
-		{`[}`, 2, "looking for beginning of value"},
-
-		// Bytes after a complete top-level value.
-		{`{}x`, 3, "after top-level value"},
-		{`{} {}`, 4, "after top-level value"},
-		{`1 2`, 3, "after top-level value"},
-		{`"a""b"`, 4, "after top-level value"},
-		{`[1]]`, 4, "after top-level value"},
-
-		// Strings and escapes.
-		{`"\q"`, 3, "in string escape code"},
-		{`"\u"`, 4, `in \u hexadecimal character escape`},
-		{`"\u00"`, 6, `in \u hexadecimal character escape`},
-		{`"\u12g"`, 6, `in \u hexadecimal character escape`},
-		{`"\u12`, 5, `in \u hexadecimal character escape`},
-		{`"\u0g00"`, 5, `in \u hexadecimal character escape`},
-		{`"\u000g"`, 7, `in \u hexadecimal character escape`},
-		{"\"a\nb\"", 3, "in string literal"},
-		{"\"a\tb\"", 3, "in string literal"},
-		{"\"a\x00b\"", 3, `invalid character '\x00' in string literal`},
-
-		// Terminators past the eight-byte warm-up exercise the word scan.
-		{"\"aaaaaaaaaaaa\x00b\"", 14, "in string literal"},
-		{"\"aaaaaaaaaaaa\x1fb\"", 14, "in string literal"},
-		{`"aaaaaaaaaaaaaaaaaaaa`, 21, "unexpected end of JSON input"},
-
-		// Incomplete key position after a comma.
-		{"{\"a\":1, ", 8, "unexpected end of JSON input"},
-	}
-
-	for _, tt := range tests {
+	for _, tt := range invalidDocuments {
 		t.Run(strconv.Quote(tt.in), func(t *testing.T) {
 			requireParseError(t, tt.in, tt.at, tt.problem)
 		})
 	}
+}
+
+// invalidDocuments is the shared table of inputs validate rejects, with the
+// exact 1-based position and message of the first failure. The tokenizer is
+// also driven over it and must report the same error.
+var invalidDocuments = []struct {
+	in      string
+	at      int64
+	problem string
+}{
+	// Empty input and truncated documents.
+	{``, 0, "unexpected end of JSON input"},
+	{` `, 1, "unexpected end of JSON input"},
+	{`{`, 1, "unexpected end of JSON input"},
+	{`[`, 1, "unexpected end of JSON input"},
+	{`{"a"`, 4, "unexpected end of JSON input"},
+	{`{"a":`, 5, "unexpected end of JSON input"},
+	{`[1`, 2, "unexpected end of JSON input"},
+	{`"`, 1, "unexpected end of JSON input"},
+	{`"abc`, 4, "unexpected end of JSON input"},
+
+	// Truncated or mistyped literals.
+	{`tru`, 3, "in literal true (expecting 'e')"},
+	{`trux`, 4, "in literal true (expecting 'e')"},
+	{`tx`, 2, "in literal true (expecting 'r')"},
+	{`trx`, 3, "in literal true (expecting 'u')"},
+	{`fals`, 4, "in literal false (expecting 'e')"},
+	{`falsy`, 5, "in literal false (expecting 'e')"},
+	{`fx`, 2, "in literal false (expecting 'a')"},
+	{`falx`, 4, "in literal false (expecting 's')"},
+	{`nul`, 3, "in literal null (expecting 'l')"},
+	{`nulx`, 4, "in literal null (expecting 'l')"},
+	{`nx`, 2, "in literal null (expecting 'u')"},
+	{`nuX`, 3, "in literal null (expecting 'l')"},
+
+	// Invalid numbers.
+	{`-`, 1, "in numeric literal"},
+	{`--1`, 2, "in numeric literal"},
+	{`01`, 2, "in numeric literal"},
+	{`-01`, 3, "in numeric literal"},
+	{`1.`, 2, "after decimal point in numeric literal"},
+	{`1.e1`, 3, "after decimal point in numeric literal"},
+	{`1e`, 2, "in exponent of numeric literal"},
+	{`1e+`, 3, "in exponent of numeric literal"},
+	{`1e++1`, 4, "in exponent of numeric literal"},
+	{`1e+-1`, 4, "in exponent of numeric literal"},
+
+	// Numbers may contain at most one fraction and one exponent.
+	{`1.2.3`, 4, "after top-level value"},
+	{`1e1e2`, 4, "after top-level value"},
+	{`1e1.5`, 4, "after top-level value"},
+	{`0e1e2`, 4, "after top-level value"},
+	{`1e+1e2`, 5, "after top-level value"},
+	{`-1.5E2.3`, 7, "after top-level value"},
+	{`[1.2.3]`, 5, "after array value"},
+	{`{"a":1.5.6}`, 9, "after object value"},
+
+	// Bytes that cannot begin a value.
+	{`+1`, 1, "looking for beginning of value"},
+	{`.5`, 1, "looking for beginning of value"},
+	{`NaN`, 1, "looking for beginning of value"},
+	{`'a'`, 1, "looking for beginning of value"},
+
+	// Object structure.
+	{`{a:1}`, 2, "looking for beginning of object key string"},
+	{`{,}`, 2, "looking for beginning of object key string"},
+	{`{]`, 2, "looking for beginning of object key string"},
+	{`{"a" 1}`, 6, "after object key"},
+	{`{"a":1 "b":2}`, 8, "after object value"},
+	{`{"a":1,}`, 8, "looking for beginning of object key string"},
+	{`{"a":1,,"b":2}`, 8, "looking for beginning of object key string"},
+	{`{"a":1]`, 7, "after object value"},
+	{`{"a":1;}`, 7, "after object value"},
+	{`{"a":}`, 6, "looking for beginning of value"},
+
+	// Array structure.
+	{`[1 2]`, 4, "after array value"},
+	{`[1,]`, 4, "looking for beginning of value"},
+	{`[1,,2]`, 4, "looking for beginning of value"},
+	{`[,]`, 2, "looking for beginning of value"},
+	{`[1}`, 3, "after array value"},
+	{`[}`, 2, "looking for beginning of value"},
+
+	// Bytes after a complete top-level value.
+	{`{}x`, 3, "after top-level value"},
+	{`{} {}`, 4, "after top-level value"},
+	{`1 2`, 3, "after top-level value"},
+	{`"a""b"`, 4, "after top-level value"},
+	{`[1]]`, 4, "after top-level value"},
+
+	// Strings and escapes.
+	{`"\q"`, 3, "in string escape code"},
+	{`"\u"`, 4, `in \u hexadecimal character escape`},
+	{`"\u00"`, 6, `in \u hexadecimal character escape`},
+	{`"\u12g"`, 6, `in \u hexadecimal character escape`},
+	{`"\u12`, 5, `in \u hexadecimal character escape`},
+	{`"\u0g00"`, 5, `in \u hexadecimal character escape`},
+	{`"\u000g"`, 7, `in \u hexadecimal character escape`},
+	{"\"a\nb\"", 3, "in string literal"},
+	{"\"a\tb\"", 3, "in string literal"},
+	{"\"a\x00b\"", 3, `invalid character '\x00' in string literal`},
+
+	// Terminators past the eight-byte warm-up exercise the word scan.
+	{"\"aaaaaaaaaaaa\x00b\"", 14, "in string literal"},
+	{"\"aaaaaaaaaaaa\x1fb\"", 14, "in string literal"},
+	{`"aaaaaaaaaaaaaaaaaaaa`, 21, "unexpected end of JSON input"},
+
+	// Incomplete key position after a comma.
+	{"{\"a\":1, ", 8, "unexpected end of JSON input"},
 }
 
 func TestErrorMessage(t *testing.T) {
