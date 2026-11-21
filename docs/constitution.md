@@ -22,9 +22,9 @@ exact error messages and 1-based positions; never weaken them to make code pass.
 
 ### III. Standard Library Only
 
-No third-party dependencies. `encoding/json` MUST NOT be used anywhere,
-including tests and benchmarks — writing our own validator is the point of the
-project.
+No third-party dependencies. `encoding/json` MUST NOT be used anywhere in the
+module, including tests and benchmarks — writing our own scanner and decoder is
+the point of the project.
 
 ### IV. Syntax Contract
 
@@ -45,17 +45,29 @@ stays inline, because a shared helper costs about 8% on object-heavy documents.
 Deeper documents may allocate the nesting stack once. Prefer the fastest correct
 implementation and support structural changes with benchmarks.
 
-### VI. Minimal Public Surface
+### VI. Public Surface
 
-Exactly one exported identifier module-wide: `scanner.Valid(data []byte) bool`,
-matching `encoding/json.Valid` in name and signature. `scanner.validate` is
-unexported and returns the first `parseError` plus whether the input is invalid,
-so diagnostics stay testable without widening the API. Package `marshal` may
-export `Marshal`/`Unmarshal`-style functions only after an amendment. Internal
-identifiers are repo-specific (`validator`, `container`/`containerObject`/
-`containerArray`, `parseError`, `skipSpace`, `scan*`); do not copy
-`encoding/json` identifiers such as `Scanner`, `SyntaxError`, `scanBegin*`, or
-`stateBegin*`.
+`scanner.Valid(data []byte) bool` is the scanner's headline export, matching
+`encoding/json.Valid` in name and signature. `scanner.validate` stays unexported:
+it returns the first `parseError` plus whether the input is invalid, so
+diagnostics stay testable without widening the API.
+
+Two further surfaces are sanctioned (amended 2026-11-21; rationale:
+`.opencode/plan/2026-11-21-json-decoder.md`):
+
+- **`scanner` tokenizer** — a `Kind` and a tokenizing type exposing
+  `Peek`/`Read*`/`Begin*`/`End*`/`Skip`/`Offset`/`Err`, so the semantic layer
+  consumes the same engine.
+- **`marshal` decoder** — the reflection-free semantic layer: a generic
+  `Unmarshal`/`UnmarshalInto`, `Schema[T]`/`Struct`, the `Field[T]` constructors,
+  `Reader`, and the error types.
+
+`marshal` is **not** API-compatible with `encoding/json`; that is deliberate. It
+MUST NOT import `encoding/json` and MUST NOT use `reflect` or `unsafe`; struct
+binding is by compile-time accessor closures. Internal identifiers stay
+repo-specific (`validator`, `container`/`containerObject`/`containerArray`,
+`parseError`, `skipSpace`, `scan*`); do not copy `encoding/json` identifiers such
+as `Scanner`, `SyntaxError`, `scanBegin*`, or `stateBegin*`.
 
 ## Verification Workflow (NON-NEGOTIABLE)
 
@@ -74,9 +86,9 @@ results in the final summary.
 
 - Go >= 1.23 (toolchain in `go.mod`: 1.27.3).
 - Two packages under module `qi-json`, no root Go package:
-  - `scanner/` — public `Valid` (`valid.go`) and the scanner (`scan.go`);
-  - `marshal/` — placeholder for the encoding/json-compatible layer, exports
-    nothing yet.
+  - `scanner/` — `Valid` and the tokenizer over the single-pass scanner
+    (`valid.go`, `scan.go`, `token.go`);
+  - `marshal/` — the reflection-free semantic layer (decode now; encode later).
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
 
@@ -86,4 +98,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 2.1.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
+**Version**: 3.0.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21

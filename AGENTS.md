@@ -2,15 +2,15 @@
 
 A from-scratch JSON library with two Go packages:
 
-- `scanner/` (import `qi-json/scanner`) — the single-pass syntax scanner;
-  exports only `Valid`.
-- `marshal/` (import `qi-json/marshal`) — reserved for the
-  encoding/json-compatible encoding layer; currently a documented placeholder
-  with no exports.
+- `scanner/` (import `qi-json/scanner`) — the single-pass syntax layer; exports
+  `Valid` and the tokenizer (`Kind` plus a tokenizing type).
+- `marshal/` (import `qi-json/marshal`) — the reflection-free semantic layer (the
+  decoder). Not `encoding/json`-compatible; no `reflect`, no `unsafe`.
 
-The module root has no Go package. No third-party dependencies. `make` wraps
-the common tasks. `docs/task.md` is the specification; `docs/constitution.md`
-governs changes.
+The module root has no Go package. No third-party dependencies. `make` wraps the
+common tasks. `docs/task.md` is the syntax specification and
+`.opencode/plan/2026-11-21-json-decoder.md` is the decoder plan and task list;
+`docs/constitution.md` governs changes.
 
 ## Required verification (in this order)
 
@@ -33,9 +33,10 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 
 ## API and naming
 
-- The only exported identifier is `scanner.Valid(data []byte) bool` — the same
-  name and signature as `encoding/json.Valid`. `marshal` deliberately exports
-  nothing yet. Do not export anything else without amending the constitution.
+- `scanner.Valid(data []byte) bool` is the scanner's headline export — the same
+  name and signature as `encoding/json.Valid`. The sanctioned public surface is
+  exactly the scanner tokenizer and the `marshal` decoder (constitution
+  Article VI); do not export anything else without a new amendment.
 - `scanner.validate(data []byte) (parseError, bool)` is unexported and returns
   the first failure plus whether the input is invalid. Tests assert messages and
   1-based positions through it; `Valid` is `!failed`. The error is a value type so
@@ -51,6 +52,11 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   delimiter after a completed value (see `docs/task.md` §6.1). The object-member
   scan is deliberately written twice so it stays inline; extracting it into a
   helper costs about 8% on object-heavy documents.
+- `marshal` is the decoder: a reflection-free semantic layer over `scanner`. It
+  MUST NOT import `encoding/json` and MUST NOT use `reflect` or `unsafe`; struct
+  binding is by compile-time accessor closures. Its API is deliberately not
+  `encoding/json`-compatible. Plan and tasks:
+  `.opencode/plan/2026-11-21-json-decoder.md`.
 - Never use `encoding/json`, including in tests or benchmarks (hard requirement
   in `docs/task.md`); tests are hand-built tables.
 
@@ -83,7 +89,12 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 ## Context
 
 - Governing rules: `docs/constitution.md`.
-- Spec: `docs/task.md`.
-- Design rationale and verification log:
-  `.opencode/plan/2026-11-21-scanner-rewrite.md` (rewrite) and
-  `.opencode/plan/2026-11-21-json-scanner.md` (superseded state machine).
+- Specs and plans:
+  - `docs/task.md` — scanner specification.
+  - `.opencode/plan/2026-11-21-json-decoder.md` — decoder decisions, tasks and
+    handoff (resume here for decoder work).
+  - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
+    and verification log.
+  - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research
+    (see the decoder plan for what is superseded).
+  - `.opencode/plan/2026-11-21-json-scanner.md` — superseded state machine.

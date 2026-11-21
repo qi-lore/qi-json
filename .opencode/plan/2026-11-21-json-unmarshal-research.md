@@ -1,10 +1,14 @@
 # Deep Research — Reflection-Free JSON Unmarshalling
 
 **Date**: 2026-11-21
-**Status**: Research + proposal. No production code written yet.
+**Status**: Research + proposal. Decisions taken 2026-11-21; the agreed API,
+task list and session handoff live in `.opencode/plan/2026-11-21-json-decoder.md`.
+**Superseded here**: §6.3, §6.4 and TL;DR caveat #4 (the scanner is now faster
+than the standard library) and §7.3 (the state machine was deleted). The rest
+still stands.
 **Scope**: How to implement `Unmarshal` in `qi-json/marshal` without `reflect`.
 **Related**: `docs/task.md`, `docs/constitution.md`, `AGENTS.md`,
-`.opencode/plan/2026-11-21-json-scanner.md`.
+`.opencode/plan/2026-11-21-json-decoder.md`.
 
 ---
 
