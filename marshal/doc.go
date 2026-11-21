@@ -9,8 +9,8 @@
 // A Reader decodes typed values from a document, tracking the JSON path so that
 // errors point at the offending member. A Schema[T] binds JSON object members to
 // struct fields: build one with Struct and the field constructors (String, Int,
-// Float, Bool, Object, and their Ptr variants), then decode with Schema.Unmarshal
-// or Schema.Decode.
+// Float, Bool, Object, Slice, Map, Array, Any, Raw and their Ptr variants), then
+// decode with Schema.Unmarshal or Schema.Decode.
 //
 //	var configSchema = marshal.Struct(
 //	    marshal.String[Config]("name", func(c *Config) *string { return &c.Name }),

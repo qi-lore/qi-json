@@ -58,10 +58,11 @@ semantic corner cases) still stands.
 scanner/                      syntax layer
   valid.go, scan.go           Valid + the single-pass scanner        (done)
   token.go         NEW        Kind + Tokenizer: Peek, Read*, Begin/End, Skip, Offset, Err
+  doc.go           NEW        Package documentation                  (done)
 marshal/                      semantic layer (reflection-free)
   reader.go        NEW        Reader: typed access over the tokenizer + JSON path
   schema.go        NEW        Schema[T], Struct(fields...)
-  field.go         NEW        String/Int/Float/Bool/Slice/Map/Object/Any/Raw
+  field.go         NEW        String/Int/Float/Bool/Slice/Map/Array/Object/Any/Raw
   unmarshal.go     NEW        Unmarshal[T], UnmarshalInto[T], Decoder interface
   errors.go        NEW        Error, TypeError, path formatting, errors.As
   doc.go                      updated package doc
@@ -127,7 +128,7 @@ Tests: `Unmarshal[Config]`; `UnmarshalInto` merge; `Decoder` dispatch; invalid
 target (nil pointer, wrong type).
 **Acceptance**: `go doc ./marshal` shows only the intended surface.
 
-### [ ] T5 — Containers (`field.go`) — **next**
+### [X] T5 — Containers (`field.go`) — **done**
 Tests: slice of primitives/structs, empty; map of strings/structs, empty; fixed
 arrays overflow/underflow; `any` to map/array/string/float64/bool/nil; `Raw`.
 **Acceptance**: `make verify` green.
@@ -221,11 +222,10 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
 
 ## 8. Session state (handoff) — resume here
 
-- **Repo**: git repository, branch `main`. Last commit `68eea65`
-  `feat(marshal): add decoder reader, errors, and schema binding` (T2 + T3). T4
-  (`marshal/unmarshal.go`, `marshal/unmarshal_test.go`), the `marshal/doc.go`
-  and `docs/constitution.md` (Article VI: name the `Decoder` interface) edits are
-  in the working tree, not yet committed.
+- **Repo**: git repository, branch `main`. T4 is commit `bccd46e`
+  `feat(marshal): add generic Unmarshal entry point and Decoder interface`; T5
+  (`marshal/field.go`, `marshal/field_test.go`, `marshal/reader.go`,
+  `marshal/doc.go`) is committed on top.
 - **Done**: the scanner — `scanner/scan.go` + `valid.go`: single pass, no `goto`,
   faster than `encoding/json.Valid`, 0 allocs. **T0** (governance: constitution
   Article VI + Additional Constraints, `AGENTS.md`, `marshal/doc.go`). **T1**
@@ -322,11 +322,36 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
   - **Benchmark recorded** (Apple M1, go1.27.3):
     `BenchmarkUnmarshalGeneric-8  285.2 ns/op  1024 B/op  4 allocs/op` (same four
     allocations as T3). `Valid` benchmarks unchanged.
-- **Not started**: the containers in `field.go` (T5) and the remaining tasks
-  (T6–T9).
-- **Next action**: start **T5**: the container fields in `marshal/field.go` —
-  `Slice`, `Map`, fixed-size arrays, `Any`, `Raw` — with the tests named in §5
-  (`TestSlice*`, `TestMap*`, `TestArrayFixedSize`, `TestAny`, `TestRaw`).
+- **T5** (`marshal/field.go` + `marshal/field_test.go`): the container fields.
+  - `Slice[T, E]` (JSON array → `[]E`) and `Map[T, V]` (JSON object →
+    `map[string]V`), each taking an element decoder `func(*Reader) (E, error)`;
+    a JSON `null` leaves the field unchanged and an empty array/object yields a
+    non-nil empty slice/map. Both build into a temporary and assign only on
+    success, so a failed decode leaves the target unchanged.
+  - `Array[T, E]` (fixed-size array): the accessor returns a slice view of the
+    array (`func(c *C) []E { return c.V[:] }`), so the decoder writes through;
+    the JSON array must hold exactly `len(field(v))` elements, with underflow and
+    overflow reported as `KindType` errors (`arrayLengthError`, offset at the
+    `[`). This is the only reflection-free way to support a real Go array without
+    `unsafe` (Go has no const type parameters); the view keeps the element type
+    known at compile time.
+  - `Any[T]` (JSON value → `any`): `decodeAny` recurses without reflection —
+    object → `map[string]any`, array → `[]any`, string → `string`, number →
+    `float64`, boolean → `bool`, null → `nil`.
+  - `Raw[T]` (JSON value → `[]byte`): reads the exact literal bytes via a new
+    unexported `Reader.raw()` over `Tokenizer.ReadRaw`, and copies them so the
+    field does not alias the input.
+  - No new amendment needed: these are `Field[T]` constructors, sanctioned by
+    Article VI.
+  - Tests: `TestSliceOfPrimitives`, `TestSliceOfStructs`, `TestEmptySlice`,
+    `TestSliceNullLeavesFieldUnchanged`, `TestSliceTypeError`, `TestMapOfStrings`,
+    `TestMapOfStructs`, `TestEmptyMap`, `TestMapTypeError`,
+    `TestArrayFixedSize` (exact/overflow/underflow), `TestAny`
+    (object/array/string/float64/bool/null), `TestRaw`, and
+    `TestRawDoesNotAliasInput`. `make verify`, `-race`, `go doc ./marshal` green.
+- **Not started**: the remaining tasks (T6–T9).
+- **Next action**: start **T6**: `FuzzUnmarshal` (never panics; error offset in
+  range) and `FuzzUnmarshalMatchesValid`; 10s fuzz clean.
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add

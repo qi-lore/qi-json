@@ -300,6 +300,17 @@ func (r *Reader) Skip() error {
 	return nil
 }
 
+// raw consumes the next value, composites included, and returns its raw bytes
+// exactly as they appear in the input. The returned slice aliases the input, so
+// callers that keep it must copy.
+func (r *Reader) raw() ([]byte, error) {
+	b, err := r.tok.ReadRaw()
+	if err != nil {
+		return nil, r.syntaxError(err)
+	}
+	return b, nil
+}
+
 // Path returns the JSON path of the value being decoded, such as "$.a.b[2].c".
 // At the document root it is "$".
 func (r *Reader) Path() string {
