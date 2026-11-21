@@ -24,6 +24,10 @@
 // RejectUnknown is set; a member that repeats is overwritten unless
 // RejectDuplicate is set.
 //
+// A decoded string value or object member name must be valid UTF-8; invalid
+// UTF-8 is a syntax error. The scanner is syntax-only and does not check UTF-8,
+// so the decoder is stricter than scanner.Valid on this one point.
+//
 // A type that implements Decoder can be decoded without naming its Schema. The
 // usual implementation delegates to a Schema:
 //

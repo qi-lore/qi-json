@@ -196,17 +196,19 @@ amendment. Amend Article VI and `AGENTS.md` together before shipping.
 and syntax/type errors exactly like `UnmarshalInto`; the generic API is
 unchanged; amendment recorded; `make verify`, `-race`, fuzz green.
 
-## 6. Open questions still to settle (from research §10)
+## 6. Open questions (from research §10)
 
-- **Semantic defaults** at T3/T5: unknown members (recommend *ignored*, strict
-  opt-in); duplicate members (recommend *last wins*, strict opt-in); `null` into
-  a non-pointer scalar (recommend *leave zero*); number overflow (error, not
-  truncation).
-- **UTF-8 policy** in the decoder: reject invalid UTF-8 in strings, or pass
-  through as the scanner does? Recommend reject in the decoder; the scanner stays
-  syntax-only.
+- **Semantic defaults** — **decided** (T3/T5; pinned by tests). Unknown members
+  are *ignored* (`RejectUnknown` opt-in); duplicate members are *last wins*
+  (`RejectDuplicate` opt-in); `null` leaves a value field unchanged and sets a
+  pointer field to `nil`; `int64`/`float64` overflow is a type error, never
+  truncation.
+- **UTF-8 policy** — **decided** (T4, 2026-11-21). The decoder rejects invalid
+  UTF-8 in a string value or member name as a syntax error; the scanner stays
+  syntax-only. See `.opencode/plan/2026-11-21-post-decoder-backlog.md` §3.
 - **Encoder** (`Marshal`): out of scope until the decoder is done. Encoding
   arbitrary Go types likely needs reflection or codegen — a separate amendment.
+  Tracked as task 3 in the backlog plan.
 
 ## 7. Target API (sketch)
 

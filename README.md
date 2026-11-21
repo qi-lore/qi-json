@@ -149,8 +149,9 @@ set is fixed at compile time. `Array` takes a slice view of the array
   as is a value outside `int64`. `ReadFloat`/`Float` reject overflow and turn
   underflow into `0`.
 - Strings are unescaped (`\" \\ \/ \b \f \n \r \t \uXXXX`, including surrogate
-  pairs); a lone surrogate becomes `U+FFFD`. The decoder does not validate
-  UTF-8, matching the syntax-only scanner.
+  pairs); a lone surrogate becomes `U+FFFD`. A decoded string value or member
+  name must be valid UTF-8 — invalid UTF-8 is a syntax error — so the decoder is
+  stricter here than `scanner.Valid`, which checks syntax only.
 - `Slice`, `Map`, and `Array` fields build into a temporary and assign only on
   success, so a failed decode leaves that field unchanged. An `Object` field
   decodes into the nested struct directly, so a failure partway through can
@@ -247,15 +248,22 @@ numbers, not guarantees.
 
 | Benchmark | Result |
 |---|---|
-| `BenchmarkValidObject` | 844 MB/s, 0 allocs |
-| `BenchmarkValidArrayOfObjects` | 833 MB/s, 0 allocs |
-| `BenchmarkValidNumbers` | 1062 MB/s, 0 allocs |
-| `BenchmarkValidString` | 2625 MB/s, 0 allocs |
-| `BenchmarkDecodeStringsMedium` (10k × 64 B) | 1119 MB/s |
-| `BenchmarkDecodeStringsLong` (2k × 512 B) | 2856 MB/s |
-| `BenchmarkDecodeBigString` (64 KiB) | 4157 MB/s |
-| `BenchmarkStructDecode` | 417 ns/op, 1208 B/op, 4 allocs/op |
-| `BenchmarkDecodeNonGeneric` | 285 ns/op, 1160 B/op, 3 allocs/op |
+| `BenchmarkValidObject` | 829 MB/s, 0 allocs |
+| `BenchmarkValidArrayOfObjects` | 820 MB/s, 0 allocs |
+| `BenchmarkValidNumbers` | 1044 MB/s, 0 allocs |
+| `BenchmarkValidString` | 2578 MB/s, 0 allocs |
+| `BenchmarkDecodeStringsShort` (20k × 16 B) | 338 MB/s |
+| `BenchmarkDecodeStringsMedium` (10k × 64 B) | 1033 MB/s |
+| `BenchmarkDecodeStringsLong` (2k × 512 B) | 2350 MB/s |
+| `BenchmarkDecodeBigString` (64 KiB) | 3172 MB/s |
+| `BenchmarkStructDecode` | 447 ns/op, 1208 B/op, 4 allocs/op |
+| `BenchmarkDecodeNonGeneric` | 301 ns/op, 1160 B/op, 3 allocs/op |
+
+The decoder validates UTF-8 while decoding each string value and member name
+(the syntax-only scanner does not), which adds a pass over the string bytes. On
+string-heavy documents that costs roughly 8–25% versus a build without the check;
+the medium-string case still exceeds 1 GB/s. The 16-byte case is allocation-bound,
+not scan-bound.
 
 During development `Valid` was 1.10×–1.77× faster than `encoding/json.Valid` on
 the four benchmark documents. That comparison is not part of the suite because

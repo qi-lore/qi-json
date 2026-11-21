@@ -117,3 +117,8 @@ func (e *TypeError) Error() string {
 // errBadEscape reports a malformed escape sequence in a JSON string. The scanner
 // rejects these before the decoder sees them, so this guards the invariant.
 var errBadEscape = errors.New("marshal: invalid string escape")
+
+// errInvalidUTF8 reports a JSON string that is not valid UTF-8. The scanner is
+// syntax-only and accepts it; the decoder is stricter and rejects it as a
+// syntax error, since RFC 8259 requires a JSON text to be UTF-8.
+var errInvalidUTF8 = errors.New("invalid UTF-8 in string")

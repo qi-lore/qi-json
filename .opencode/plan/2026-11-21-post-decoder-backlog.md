@@ -1,7 +1,7 @@
 # qi-json — post-decoder backlog (T11+)
 
 **Date**: 2026-11-21
-**Status**: plan agreed; task 4 in progress, then 2 → 1 → 3.
+**Status**: plan agreed; task 4 done, task 2 next.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -100,6 +100,27 @@ the decoded string**; validating the raw bytes is sufficient.
 
 **Acceptance**: decoder rejects invalid UTF-8 in values and keys; scanner
 unchanged; semantic defaults pinned; `make verify`, `-race`, fuzz green.
+
+### 3.5 Results (T4 done, 2026-11-21)
+
+- **Shipped**: `marshal/errors.go` (`errInvalidUTF8`), `marshal/reader.go`
+  (`checkString`, `hasHighBit`, `firstInvalidUTF8`; call sites in `ReadString`,
+  `Object`, `objectRaw`), `marshal/utf8_test.go`, and the fuzz target update.
+- **Offset anchor**: because the tokenizer consumes the `:` after an object key,
+  `Offset()` after `ReadString` is not the string end. The reader captures the
+  opening-quote offset right after `Peek` and derives the content start from it
+  (`start + 1`), so key and value offsets are exact.
+- **Semantic defaults** were already pinned by existing tests (unknown ignored /
+  rejected, duplicate last-wins / rejected, null into scalar/pointer, int and
+  float overflow as `KindType`); no new tests were needed, only documentation.
+- **Verification**: `make verify` green (0 lint issues); `go test -race ./...`
+  green; 10s `FuzzUnmarshal` and 10s `FuzzUnmarshalMatchesValid` green (the
+  latter now exempts the UTF-8 case and seeds invalid UTF-8).
+- **Performance** (Apple M1, go1.27.3; before → after): medium strings
+  1119 → 1033 MB/s, long strings 2856 → 2350 MB/s, one 64 KiB string
+  4157 → 3172 MB/s; `StructDecode` 417 → 447 ns/op; scanner benchmarks
+  unchanged within noise. The UTF-8 pass costs ~8–25% on string-heavy input;
+  the medium case still exceeds the 1 GB/s T7 target.
 
 ---
 

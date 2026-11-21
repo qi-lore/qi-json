@@ -2,6 +2,7 @@ package marshal
 
 import (
 	"bytes"
+	"encoding/binary"
 	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -153,9 +154,17 @@ func (r *Reader) ReadString() (string, error) {
 	if k != scanner.KindString {
 		return "", r.mismatch("string", k)
 	}
+	// After the kind check the tokenizer is positioned at the opening quote, so
+	// the content starts one byte later. ReadString consumes the closing quote,
+	// and for a key it also consumes the ':', which makes Offset() unreliable as
+	// a content anchor.
+	start := r.tok.Offset()
 	raw, err := r.tok.ReadString()
 	if err != nil {
 		return "", r.syntaxError(err)
+	}
+	if err := r.checkString(raw, start+1); err != nil {
+		return "", err
 	}
 	s, err := unescape(raw)
 	if err != nil {
@@ -272,9 +281,13 @@ func (r *Reader) Object(fn func(key string) error) error {
 		if k == scanner.KindEnd {
 			break
 		}
+		start := r.tok.Offset()
 		raw, err := r.tok.ReadString()
 		if err != nil {
 			return r.syntaxError(err)
+		}
+		if err := r.checkString(raw, start+1); err != nil {
+			return err
 		}
 		key, err := unescape(raw)
 		if err != nil {
@@ -312,9 +325,13 @@ func (r *Reader) objectRaw(fn func(raw []byte) error) error {
 		if k == scanner.KindEnd {
 			break
 		}
+		start := r.tok.Offset()
 		raw, err := r.tok.ReadString()
 		if err != nil {
 			return r.syntaxError(err)
+		}
+		if err := r.checkString(raw, start+1); err != nil {
+			return err
 		}
 		if err := fn(raw); err != nil {
 			return err
@@ -395,6 +412,61 @@ func (r *Reader) Path() string {
 
 // Offset returns the number of bytes of the input consumed so far.
 func (r *Reader) Offset() int64 { return r.tok.Offset() }
+
+// checkString rejects a JSON string whose bytes are not valid UTF-8. raw is the
+// content between the quotes with escape sequences intact and contentStart is the
+// byte offset of that content in the input. Escapes are ASCII and \u decoding
+// always yields valid UTF-8 (a lone surrogate becomes U+FFFD), so the decoded
+// string is valid exactly when raw is. Pure ASCII, the common case, pays only a
+// high-bit scan.
+func (r *Reader) checkString(raw []byte, contentStart int64) error {
+	if !hasHighBit(raw) {
+		return nil
+	}
+	i := firstInvalidUTF8(raw)
+	if i < 0 {
+		return nil
+	}
+	return &Error{
+		Path:   r.Path(),
+		Offset: contentStart + int64(i),
+		Kind:   KindSyntax,
+		Err:    errInvalidUTF8,
+	}
+}
+
+// hasHighBit reports whether b contains a byte with the high bit set. A sequence
+// of bytes all below 0x80 is always valid UTF-8, so the expensive validator only
+// runs when this returns true.
+func hasHighBit(b []byte) bool {
+	const high = 0x8080808080808080
+	for len(b) >= 8 {
+		if binary.LittleEndian.Uint64(b)&high != 0 {
+			return true
+		}
+		b = b[8:]
+	}
+	for _, c := range b {
+		if c&0x80 != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// firstInvalidUTF8 returns the index of the first byte of b that does not start a
+// valid UTF-8 sequence, or -1 when b is valid. b is assumed to contain a high
+// bit, so this runs only on the slow path.
+func firstInvalidUTF8(b []byte) int {
+	for i := 0; i < len(b); {
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError && size == 1 {
+			return i
+		}
+		i += size
+	}
+	return -1
+}
 
 // syntaxError wraps a tokenizer error as a syntax Error.
 func (r *Reader) syntaxError(err error) error {

@@ -34,6 +34,9 @@ var fuzzSeeds = []string{
 	// A number that overflows float64 fails as a type error before the trailing
 	// garbage is reached, so this is invalid JSON that is not a syntax error.
 	`1e700A`, `1e999x`,
+	// Invalid UTF-8: the decoder rejects it as a syntax error, but the
+	// syntax-only scanner accepts the same bytes.
+	"\"a\xff\"", "{\"k\xff\":1}", "\"\xc0\xaf\"", "\"\xed\xa0\x80\"",
 }
 
 // FuzzUnmarshal checks the entry point over arbitrary bytes: it must never
@@ -73,7 +76,8 @@ func FuzzUnmarshal(f *testing.F) {
 
 // FuzzUnmarshalMatchesValid ties the decoder's classification to the scanner in
 // the two directions that must hold: a successful decode proves the document is
-// valid, and a syntax error proves it is not.
+// valid, and a syntax error proves it is not — except for invalid UTF-8, which
+// the decoder rejects but the syntax-only scanner accepts.
 //
 // The converse does not hold and is deliberately not asserted: a document can be
 // invalid yet fail earlier as a type error. For example 1e700A is invalid JSON,
@@ -100,8 +104,9 @@ func FuzzUnmarshalMatchesValid(f *testing.F) {
 		if !errors.As(err, &e) {
 			t.Fatalf("Unmarshal(%q) error %v is not an *Error", data, err)
 		}
-		// A syntax error proves the document is invalid.
-		if e.Kind == KindSyntax && valid {
+		// A syntax error proves the document is invalid, unless it is the
+		// decoder's stricter UTF-8 rejection.
+		if e.Kind == KindSyntax && valid && !errors.Is(err, errInvalidUTF8) {
 			t.Fatalf("Unmarshal(%q) reported a syntax error at offset %d but Valid(%q) = true", data, e.Offset, data)
 		}
 	})
