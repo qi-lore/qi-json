@@ -1,4 +1,4 @@
-# Developer Makefile for qi-json (packages scanner and marshal).
+# Developer Makefile for qi-json (packages scanner, marshal and cmd/qi-json-gen).
 #
 # The required verification order is defined in docs/constitution.md:
 #   test -> gofmt check -> vet -> golangci-lint
@@ -13,7 +13,7 @@ BENCH_TIME    ?= 1s
 COVER_PROFILE ?= cover.out
 
 .DEFAULT_GOAL := help
-.PHONY: help verify test race fmt fmt-check vet lint fuzz bench cover clean
+.PHONY: help verify test race generate fmt fmt-check vet lint fuzz bench cover clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -29,6 +29,9 @@ test: ## Run the test suite (no cache)
 
 race: ## Run the test suite with the race detector
 	$(GO) test $(PKG) -race -count=1
+
+generate: ## Run go generate across the module (regenerates codegen fixtures)
+	$(GO) generate $(PKG)
 
 fmt: ## Format all Go files in place
 	gofmt -w .

@@ -52,8 +52,9 @@ implementation and support structural changes with benchmarks.
 it returns the first `parseError` plus whether the input is invalid, so
 diagnostics stay testable without widening the API.
 
-Two further surfaces are sanctioned (amended 2026-11-21; rationale:
-`.opencode/plan/2026-11-21-json-decoder.md`):
+Three further surfaces are sanctioned (amended 2026-11-21; rationale:
+`.opencode/plan/2026-11-21-json-decoder.md` and
+`.opencode/plan/2026-11-21-json-codegen.md`):
 
 - **`scanner` tokenizer** — a `Kind` and a tokenizing type exposing
   `Peek`/`Read*`/`Begin*`/`End*`/`Skip`/`Offset`/`Err`, so the semantic layer
@@ -62,6 +63,12 @@ Two further surfaces are sanctioned (amended 2026-11-21; rationale:
   `Unmarshal`/`UnmarshalInto`, the `Decoder` interface (`DecodeJSON(*Reader)
   error`), `Schema[T]`/`Struct`, the `Field[T]` constructors, `Reader`, and the
   error types.
+- **`cmd/qi-json-gen`** — an optional, stdlib-only code generator that emits
+  `marshal` `Schema` values and `DecodeJSON` methods from struct tags, so callers
+  need not hand-write the accessor closures. It is a `main` package, targets only
+  the exported `marshal` surface, and MUST NOT import `encoding/json` or use
+  `reflect`/`unsafe`. Generated code is ordinary source in the caller's package;
+  the `marshal` runtime is unchanged by it.
 
 `marshal` is **not** API-compatible with `encoding/json`; that is deliberate. It
 MUST NOT import `encoding/json` and MUST NOT use `reflect` or `unsafe`; struct
@@ -86,10 +93,11 @@ results in the final summary.
 ## Additional Constraints
 
 - Go >= 1.23 (toolchain in `go.mod`: 1.27.3).
-- Two packages under module `qi-json`, no root Go package:
+- Three packages under module `qi-json`, no root Go package:
   - `scanner/` — `Valid` and the tokenizer over the single-pass scanner
     (`valid.go`, `scan.go`, `token.go`, `doc.go`);
-  - `marshal/` — the reflection-free semantic layer (decode now; encode later).
+  - `marshal/` — the reflection-free semantic layer (decode now; encode later);
+  - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
 
@@ -99,4 +107,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.0.1 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
+**Version**: 3.1.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21

@@ -1,11 +1,14 @@
 # AGENTS.md — qi-json
 
-A from-scratch JSON library with two Go packages:
+A from-scratch JSON library with three Go packages:
 
 - `scanner/` (import `qi-json/scanner`) — the single-pass syntax layer; exports
   `Valid` and the tokenizer (`Kind` plus a tokenizing type).
 - `marshal/` (import `qi-json/marshal`) — the reflection-free semantic layer (the
   decoder). Not `encoding/json`-compatible; no `reflect`, no `unsafe`.
+- `cmd/qi-json-gen` — the optional, stdlib-only code generator that emits
+  `marshal` `Schema` values and `DecodeJSON` methods from struct tags. No
+  `reflect`/`unsafe`; it targets only the exported `marshal` surface.
 
 The module root has no Go package. No third-party dependencies. `make` wraps the
 common tasks. `docs/task.md` is the syntax specification and
@@ -30,6 +33,8 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - `go test ./scanner -run '^TestInvalidDocuments$'` — run one test/table
 - `go test -run=^$ -fuzz=FuzzValid -fuzztime=10s ./scanner` — fuzz (`-run=^$` is required)
 - `go test -run=^$ -bench=. -benchmem ./scanner` — benchmarks
+- `go generate ./...` — regenerate `cmd/qi-json-gen` fixtures — no other package
+  emits generated code
 
 ## API and naming
 
@@ -57,6 +62,12 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   binding is by compile-time accessor closures. Its API is deliberately not
   `encoding/json`-compatible. Plan and tasks:
   `.opencode/plan/2026-11-21-json-decoder.md`.
+- `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
+  `go/parser`, `go/format`). It emits code against the exported `marshal` surface
+  only; the runtime is unchanged by it. It MUST NOT import `encoding/json` and
+  MUST NOT use `reflect` or `unsafe`. Generation must be deterministic (sort all
+  emitted collections) so the drift guard passes. Plan:
+  `.opencode/plan/2026-11-21-json-codegen.md`.
 - Never use `encoding/json`, including in tests or benchmarks (hard requirement
   in `docs/task.md`); tests are hand-built tables.
 
@@ -93,6 +104,8 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   - `docs/task.md` — scanner specification.
   - `.opencode/plan/2026-11-21-json-decoder.md` — decoder decisions, tasks and
     handoff (resume here for decoder work).
+  - `.opencode/plan/2026-11-21-json-codegen.md` — the `cmd/qi-json-gen` codegen
+    design, tasks and handoff (resume here for codegen work).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
     and verification log.
   - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research

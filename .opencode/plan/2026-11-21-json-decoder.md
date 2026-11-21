@@ -149,7 +149,10 @@ Result: the decoder won the throughput; the scanner's existing SWAR string path
 already meets the target, and the number/whitespace word paths were measured to
 regress and are not shipped (see §8).
 
-### [ ] T8 — Optional codegen (`cmd/qi-json-gen`) — **deferred**.
+### [X] T8 — Optional codegen (`cmd/qi-json-gen`) — **done**
+Designed and implemented; see `.opencode/plan/2026-11-21-json-codegen.md` for the
+decisions, tasks and verification log. Adds a third package
+(`cmd/qi-json-gen`, constitution v3.1.0).
 ### [ ] T9 — Documentation — **deferred**.
 ### [ ] T10 — Non-generic entry point (API ergonomics) — **deferred**
 
@@ -450,11 +453,13 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
     `ValidObject` ~831 MB/s, `ValidArrayOfObjects` ~821, `ValidNumbers` ~1039,
     `ValidString` ~2530–2575 MB/s — all `0 B/op`, `0 allocs/op`.
   - `make verify`, `-race`, and 12s fuzz on all three targets are green.
-- **Not started**: the remaining tasks (T8–T10), all deferred. T8 (codegen) and
-  T9 (documentation) are optional. **T10** (a non-generic entry point such as
-  `marshal.Decode(data, &cfg)`) is a small, high-value ergonomics task but is
-  **blocked on a constitution amendment**, because it adds an exported
-  identifier; the design is in §5 T10.
+- **Not started**: **T8** is now **done** (see
+  `.opencode/plan/2026-11-21-json-codegen.md`; a third package, constitution
+  v3.1.0). **T9** (documentation) is optional and unstarted. **T10** (a
+  non-generic entry point such as `marshal.Decode(data, &cfg)`) is a small,
+  high-value ergonomics task but is **blocked on a constitution amendment**,
+  because it adds an exported identifier; the design is in §5 T10. A WIP draft of
+  T10 is parked in a git stash.
 - **Next action**: none required for the decoder. If resumed, T9 (package docs,
   README, and folding §8's results into `doc.go`) and then T10 (amendment
   first).
