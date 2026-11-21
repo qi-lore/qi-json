@@ -209,7 +209,8 @@ next task: **"Research ways to fix the gap"**
 
 - **D1 (blocker + next task).** Struct fields whose type is a struct from another
   package must be supported. Research task opened; see
-  `.opencode/plan/2026-11-22-third-party-struct-fields.md`.
+  `.opencode/plan/2026-11-22-third-party-struct-fields.md`. **Closed in v0.2.0**
+  (implementation `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`).
 - **D2 (research constraints).** Any fix must preserve: no `reflect`, no
   `unsafe`, no `encoding/json`; the code generator stays stdlib-only,
   deterministic and drift-guarded; the decoder and encoder stay symmetric; new

@@ -241,17 +241,14 @@ the decoder or scanner. Results are recorded in each task's handoff.
 
 ## 9. Open follow-ups (T12+)
 
-Recorded so a later session can pick them up. Two items are **open** (2026-11-22);
+Recorded so a later session can pick them up. One item is **open** (2026-11-22);
 the rest are done.
 
-- **Foreign struct fields — release blocker (research DONE 2026-11-22;
-  implementation OPEN, next task).** A struct field whose type is a struct from
-  another package cannot be bound: the generator refuses it (`unsupported
-  cross-package type …`) and the manual fallback is limited (exported fields only,
-  no one-liner for non-canonical widths, no `Decoder`-based constructor). Research
-  decided a layered fix — delegate to a qi-json-aware foreign type (B), synthesize
-  a schema for a plain foreign struct (A), a small new delegation constructor (C),
-  and a `-foreign` escape hatch (D). Research:
+- **Foreign struct fields — release blocker** — **done (2026-11-22), shipped in
+  v0.2.0.** A struct field whose type is a struct from another package is now
+  bound: the generator delegates to a qi-json-aware foreign type (B), synthesizes
+  a schema for a plain foreign struct (A), backed by the new delegation
+  constructors (C) and a `-foreign=pkg.T=ident` escape hatch (D). Research:
   `.opencode/plan/2026-11-22-third-party-struct-fields.md`; implementation plan:
   `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`; user evidence:
   `.opencode/plan/user-scenarios.md` §3.
