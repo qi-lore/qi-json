@@ -1,7 +1,7 @@
 # qi-json Decoder — decisions, tasks, and handoff
 
 **Date**: 2026-11-21
-**Status**: decisions agreed; decoder not started.
+**Status**: decisions agreed; T0–T3 done; decoder primitives and struct binding landed.
 **Supersedes (in part)**: `.opencode/plan/2026-11-21-json-unmarshal-research.md`.
 **Related**: `docs/task.md`, `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-scanner-rewrite.md`.
@@ -91,53 +91,59 @@ Each task is TDD (failing test first), ends with the mandated verification
 (`make verify`, plus `-race` and fuzz where relevant), and does not start until
 the previous task is green.
 
-### T0 — Governance (this change; no code)
+Status legend: `[X]` — completed and verified; `[ ]` — not completed. The word
+after each heading is the state: **done**, **next** (the task to start),
+**pending**, or **deferred**. Details and verification evidence for completed
+tasks are in §8.
+
+### [X] T0 — Governance (this change; no code) — **done**
 - Amend `docs/constitution.md`: Article VI + Additional Constraints, to allow the
   `scanner` tokenizer and the `marshal` surface, and to forbid `reflect`/`unsafe`
   in `marshal`.
 - Update `AGENTS.md`; rewrite `marshal/doc.go`.
 - **Acceptance**: docs landed; `make verify` still green.
 
-### T1 — Tokenizer in `scanner` (`scanner/token.go`, `scanner/token_test.go`)
+### [X] T1 — Tokenizer in `scanner` (`scanner/token.go`, `scanner/token_test.go`) — **done**
 Tests: `Peek` kind per value; `Read` raw string/number/raw bytes; `Begin`/`End`
 object/array; `Skip` nested; `Offset`; errors match `Valid`'s message and
 position; `Tokenizer` agrees with `Valid` over `TestValidDocuments` +
 `TestInvalidDocuments`.
 **Acceptance**: all pass; `Valid` benchmarks show no regression beyond noise.
 
-### T2 — `marshal` primitives and errors (`reader.go`, `errors.go`)
+### [X] T2 — `marshal` primitives and errors (`reader.go`, `errors.go`) — **done**
 Tests: `\n \t \" \\ \/ \uXXXX` unescaping; int/float parse, overflow, `-0`,
 exponents; bool/null; `$.a.b[2].c` path; `errors.As` unwrap.
 **Acceptance**: zero allocations on the primitive path (`testing.AllocsPerRun`).
 
-### T3 — `Schema[T]` and struct binding (`schema.go`, `field.go`)
+### [X] T3 — `Schema[T]` and struct binding (`schema.go`, `field.go`) — **done**
 Tests: flat struct, all field types; unknown field ignored/rejected; duplicate
 last-wins/strict; nested object; null into scalar and pointer;
 `TestStructNoAllocs`; field lookup with 1/2/7/64 fields.
-**Acceptance**: `make verify` green; decode benchmark recorded.
+**Acceptance**: `make verify` green; decode benchmark recorded
+(`BenchmarkStructDecode-8  412.0 ns/op  1048 B/op  4 allocs/op`).
 
-### T4 — Generic entry point and interface (`unmarshal.go`)
+### [ ] T4 — Generic entry point and interface (`unmarshal.go`) — **next**
 Tests: `Unmarshal[Config]`; `UnmarshalInto` merge; `Decoder` dispatch; invalid
 target (nil pointer, wrong type).
 **Acceptance**: `go doc ./marshal` shows only the intended surface.
 
-### T5 — Containers (`field.go`)
+### [ ] T5 — Containers (`field.go`) — **pending**
 Tests: slice of primitives/structs, empty; map of strings/structs, empty; fixed
 arrays overflow/underflow; `any` to map/array/string/float64/bool/nil; `Raw`.
 **Acceptance**: `make verify` green.
 
-### T6 — Fuzz and differential testing
+### [ ] T6 — Fuzz and differential testing — **pending**
 `FuzzUnmarshal` (never panics; error offset in range);
 `FuzzUnmarshalMatchesValid`.
 **Acceptance**: 10s fuzz clean.
 
-### T7 — Bulk fast paths (performance)
+### [ ] T7 — Bulk fast paths (performance) — **pending**
 String/number/whitespace fast paths with a differential test against the
 reference path.
 **Acceptance**: ≥ 1 GB/s on string-heavy documents; 0 allocs; verify green.
 
-### T8 — Optional codegen (`cmd/qi-json-gen`) — deferred.
-### T9 — Documentation — deferred.
+### [ ] T8 — Optional codegen (`cmd/qi-json-gen`) — **deferred**.
+### [ ] T9 — Documentation — **deferred**.
 
 ## 6. Open questions still to settle (from research §10)
 
@@ -215,9 +221,10 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
 
 ## 8. Session state (handoff) — resume here
 
-- **Repo**: git repository, branch `main`. Last commit `3d47c70`
-  `perf(scanner): replace state machine with goto-free scanner`. Tree clean
-  before this docs change.
+- **Repo**: git repository, branch `main`. Last commit `5e2c54a`
+  `feat(scanner): add pull tokenizer over the syntax engine`. T2 and T3
+  (`marshal/reader.go`, `errors.go`, `field.go`, `schema.go`, `doc.go` and their
+  tests) are in the working tree, not yet committed.
 - **Done**: the scanner — `scanner/scan.go` + `valid.go`: single pass, no `goto`,
   faster than `encoding/json.Valid`, 0 allocs. **T0** (governance: constitution
   Article VI + Additional Constraints, `AGENTS.md`, `marshal/doc.go`). **T1**
@@ -229,10 +236,70 @@ generic entry point, tokenizer in `scanner`) is fixed by D1–D3.
   sticky `Err`, misuse errors, and full agreement with `validate` over
   `validDocuments` and `invalidDocuments`. `make verify`, `-race`, a 10s
   `FuzzValid` and the benchmarks are green; `Valid` still allocates 0.
-- **Not started**: everything under `marshal/`.
-- **Next action**: start **T2**: write `marshal/reader_test.go` (red) for the
-  primitives and errors, then implement `marshal/reader.go` and
-  `marshal/errors.go` (green). The `Reader` sits on top of `scanner.Tokenizer`.
+- **T2** (`marshal/reader.go` + `marshal/errors.go` + `marshal/reader_test.go`):
+  the `Reader` over `scanner.Tokenizer` and the error types.
+  - `Reader`: `Peek`, `ReadNull`, `ReadBool`, `ReadString` (decoded: escapes
+    resolved, lone surrogate → U+FFFD), `ReadInt` (`int64`, integer literal only,
+    range-checked), `ReadFloat` (`float64`; overflow is an error, underflow → 0),
+    `Object`/`Array` iterators with callbacks, `Skip`, `Path`, `Offset`.
+  - Errors: `Error` (`Path`, `Offset`, `Kind`, `Err`; `Unwrap`), `ErrorKind`
+    (`KindSyntax`, `KindType`, `KindUnknownField`, `KindDuplicateField`,
+    `KindDepth`), and `TypeError` (`Want`, `Got`) reachable through
+    `errors.As`/`errors.Unwrap`. No scanner or constitution change was needed:
+    `Reader` and the error types are already sanctioned by Article VI.
+  - Path tracking uses an inline 64-byte buffer (mirroring the scanner's
+    `nestingInline` idea), so primitives do not allocate; `Path` renders keys
+    plainly (`$.a.b`) or quoted (`$["a b"]`) and indices as `[2]`.
+  - `ReadInt`/`ReadFloat` use `strconv.ParseInt`/`ParseFloat(string(raw))`; the
+    byte-to-string conversion is stack-allocated by the compiler (measured 0
+    allocs), so the primitive read path does not allocate.
+  - Tests: unescaping (`\n \t \" \\ \/ \uXXXX`, surrogate pair, lone surrogate);
+    int/float range, overflow, `-0`, exponents; bool/null and type mismatches;
+    `$.a.b[2].c` path and offset exactness; quoted-key path; `errors.As`/
+    `errors.Unwrap` for type and syntax errors; and `TestPrimitiveNoAllocs`
+    (differential against tokenizer construction). `make verify`, `-race`, the
+    scanner benchmarks (no change) are green.
+- **T3** (`marshal/schema.go` + `marshal/field.go` + `marshal/schema_test.go`):
+  `Schema[T]` and struct binding.
+  - `Field[T]` (`Name`, `Decode func(*Reader, *T) error`) plus the constructors
+    `String`/`Int`/`Float`/`Bool` (value fields) and `StringPtr`/`IntPtr`/
+    `FloatPtr`/`BoolPtr` (pointer fields), and `Object[T, S]` for a nested
+    `*Schema[S]`. All are sanctioned by Article VI ("the `Field[T]`
+    constructors"); no new amendment.
+  - `Schema[T]` with `Struct[T](fields ...Field[T])` (sorts fields by name),
+    `Decode`, `Unmarshal`, `UnmarshalInto`, and the strict opt-ins
+    `RejectUnknown` / `RejectDuplicate`.
+  - **Key allocation resolved** (the T3 design pressure): a new unexported
+    `Reader.objectRaw(fn func(raw []byte) error)` iterates members with the raw
+    (still escaped) key bytes and does not touch the path; `Schema` matches the
+    key against field names with a byte-wise binary search (`compareKey`), so the
+    hot path never builds a key string. A key containing `\` is unescaped and
+    re-matched (rare path).
+  - **Pointer fields**: the union-constraint trick (`E string | *string`) was
+    rejected — boxing `*E` to `any` for the type switch allocates (measured 1
+    alloc/field). Separate `*Ptr` constructors keep the scalar path at 0 allocs.
+  - **Null semantics**: a JSON `null` leaves a value field unchanged (zero for a
+    fresh value) and sets a pointer field to nil. Documented in `doc.go`.
+  - **Type vs syntax**: a non-object where an object is expected is now a
+    `KindType` error, not `KindSyntax`. New `Reader.beginObject`/`beginArray`
+    helpers peek and report a type mismatch; `Object`, `Array` and `objectRaw`
+    all use them (previously `BeginObject` surfaced a syntax error).
+  - Tests: flat struct (all field types), key-order independence, escaped key,
+    unknown ignored/rejected, duplicate last-wins/rejected, nested object and
+    nested error path (`$.origin.x`), null into scalar/pointer (fresh and merge),
+    pointer fields, non-object input, trailing data, empty object,
+    `TestStructFieldLookup` (1/2/7/64 fields), and `TestStructNoAllocs` (the
+    decode machinery allocates 0; the target is hoisted so `&v` is not counted).
+  - **Benchmark recorded** (Apple M1, go1.27.3):
+    `BenchmarkStructDecode-8  412.0 ns/op  1048 B/op  4 allocs/op` — the four
+    allocations are the tokenizer, the reader, the escaped result value, and the
+    decoded string.
+- **Not started**: `marshal/unmarshal.go` (T4) and the containers in `field.go`
+  (T5).
+- **Next action**: start **T4**: `marshal/unmarshal.go` — the generic entry point
+  `Unmarshal[T any, PT interface{ *T; Decoder }]` / `UnmarshalInto`, the
+  `Decoder` interface, and invalid-target handling; then confirm `go doc
+  ./marshal` shows only the intended surface.
 - **Honor**: D1 (reflection-free generic API), D2 (tokenizer in `scanner`),
   D3 (correctness first).
 - **Do not**: import `encoding/json`; use `reflect` or `unsafe` in `marshal`; add
