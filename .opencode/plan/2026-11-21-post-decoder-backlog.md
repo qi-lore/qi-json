@@ -1,7 +1,7 @@
 # qi-json — post-decoder backlog (T11+)
 
 **Date**: 2026-11-21
-**Status**: plan agreed; task 4 done, task 2 next.
+**Status**: plan agreed; tasks 4 and 2 done, task 1 next.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -154,6 +154,29 @@ Today `cmd/qi-json-gen` resolves only same-package named types; a selector type
 **Acceptance**: a field of a cross-package named scalar type generates and
 decodes; unsupported cross-package shapes error precisely; drift guard green;
 `make verify`, `-race` green.
+
+### 4.2 Results (T2 done, 2026-11-21)
+
+- **Approach**: the stdlib `go/types` + `importer.ForCompiler(fset, "source",
+  nil)` source importer resolves selectors, empirically working in module mode
+  for both stdlib (`time`) and module-local packages. The pass is **best-effort**:
+  on a type-check error `g.info` stays nil and a cross-package field falls back to
+  a precise unsupported-type error, so the change is additive.
+- **Shipped**: `cmd/qi-json-gen/types.go` (`typecheck`, `namedOf`, `addImport`,
+  `crossFieldCodec`/`crossFieldCodecPtr`, `crossNamedCodec`, `crossScalarCodec`,
+  `crossElemDecoder`, `basicKindName`, `crossHelperSuffix`); `gen.go` gains the
+  `info`/`extraImports` state, a `SelectorExpr` case in `fieldCodec`, selector
+  handling in `starCodec` and `elemDecoder`, a type-checked file list in `load`,
+  and alias-aware imports in `writeImports`.
+- **Scope**: cross-package named types with a basic-scalar underlying
+  (string/bool/integer/float), as a field, a pointer field, and a slice or map
+  element. A non-scalar underlying (cross-package struct) is a precise error.
+- **Fixture**: `internal/gentest/xtypes` adds named `Label string` / `Flag bool`;
+  `Config` gains `time.Duration` (value, pointer, slice) and `xtypes` (value, map
+  element) fields; the checked-in generated file is regenerated and the
+  end-to-end fixture test decodes them.
+- **Verification**: `make verify` green (0 lint issues); `-race` green; drift
+  guard green.
 
 ---
 

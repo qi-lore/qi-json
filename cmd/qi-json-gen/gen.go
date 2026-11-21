@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"sort"
@@ -64,6 +65,15 @@ type gen struct {
 	needRange   bool
 	helpers     map[string]string
 	helperOrder []string
+
+	// info is the package's type information, used to resolve cross-package
+	// named types. It is nil when type checking failed, in which case such a
+	// field reports a precise unsupported-type error.
+	info *types.Info
+
+	// extraImports maps an import path to the name it is imported under, for
+	// packages referenced by cross-package field types.
+	extraImports map[string]string
 }
 
 // generate parses dir and returns the formatted generated source for types. When
@@ -77,6 +87,7 @@ func generate(dir string, types []string) ([]byte, error) {
 		hasDecodeJSON: map[string]bool{},
 		known:         map[string]bool{},
 		helpers:       map[string]string{},
+		extraImports:  map[string]string{},
 	}
 	if err := g.load(dir); err != nil {
 		return nil, err
@@ -94,6 +105,7 @@ func (g *gen) load(dir string) error {
 	if err != nil {
 		return err
 	}
+	var typeFiles []*ast.File
 	for _, e := range entries {
 		name := e.Name()
 		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
@@ -103,12 +115,15 @@ func (g *gen) load(dir string) error {
 		if err != nil {
 			return err
 		}
-		if ast.IsGenerated(f) {
-			continue
-		}
 		if g.pkg == "" {
 			g.pkg = f.Name.Name
 		} else if f.Name.Name != g.pkg {
+			continue
+		}
+		// Generated files are type-checked (so the package resolves fully) but
+		// not collected, so re-running over the tool's own output is a no-op.
+		typeFiles = append(typeFiles, f)
+		if ast.IsGenerated(f) {
 			continue
 		}
 		g.collect(f)
@@ -116,6 +131,7 @@ func (g *gen) load(dir string) error {
 	if g.pkg == "" {
 		return fmt.Errorf("no Go files in %s", dir)
 	}
+	g.typecheck(typeFiles)
 	return nil
 }
 
@@ -216,19 +232,32 @@ func (g *gen) render() ([]byte, error) {
 	return src, nil
 }
 
-// writeImports writes the import block, sorted.
+// writeImports writes the import block, sorted by path.
 func (g *gen) writeImports(buf *bytes.Buffer) {
-	imports := []string{`"qi-json/marshal"`}
+	lines := map[string]string{ // import path -> import line
+		"qi-json/marshal": `"qi-json/marshal"`,
+	}
 	if g.needScanner {
-		imports = append(imports, `"qi-json/scanner"`)
+		lines["qi-json/scanner"] = `"qi-json/scanner"`
 	}
 	if g.needMath {
-		imports = append(imports, `"math"`)
+		lines["math"] = `"math"`
 	}
-	sort.Strings(imports)
+	for path, name := range g.extraImports {
+		if name == filepath.Base(path) {
+			lines[path] = fmt.Sprintf("%q", path)
+		} else {
+			lines[path] = fmt.Sprintf("%s %q", name, path)
+		}
+	}
+	paths := make([]string, 0, len(lines))
+	for p := range lines {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
 	buf.WriteString("import (\n")
-	for _, imp := range imports {
-		fmt.Fprintf(buf, "\t%s\n", imp)
+	for _, p := range paths {
+		fmt.Fprintf(buf, "\t%s\n", lines[p])
 	}
 	buf.WriteString(")\n\n")
 }
@@ -304,6 +333,8 @@ func (g *gen) fieldCodec(owner, fname, jname string, expr ast.Expr) (string, err
 		return g.identCodec(owner, fname, jname, t.Name)
 	case *ast.StarExpr:
 		return g.starCodec(owner, fname, jname, t.X)
+	case *ast.SelectorExpr:
+		return g.crossFieldCodec(owner, fname, jname, t)
 	case *ast.ArrayType:
 		return g.arrayCodec(owner, fname, jname, t)
 	case *ast.MapType:
@@ -341,6 +372,9 @@ func (g *gen) identCodec(owner, fname, jname, tname string) (string, error) {
 
 // starCodec builds a codec for a pointer field.
 func (g *gen) starCodec(owner, fname, jname string, x ast.Expr) (string, error) {
+	if sel, ok := x.(*ast.SelectorExpr); ok {
+		return g.crossFieldCodecPtr(owner, fname, jname, sel)
+	}
 	id, ok := x.(*ast.Ident)
 	if !ok {
 		return "", fmt.Errorf("%s.%s: unsupported pointer type %s", owner, fname, typeString(g.fset, x))
@@ -467,6 +501,9 @@ func (g *gen) numericCodec(owner, fname, jname, goType, basic string, ptr bool) 
 
 // elemDecoder returns the decoder expression for a container element type.
 func (g *gen) elemDecoder(expr ast.Expr) (string, error) {
+	if sel, ok := expr.(*ast.SelectorExpr); ok {
+		return g.crossElemDecoderExpr(sel)
+	}
 	id, ok := expr.(*ast.Ident)
 	if !ok {
 		return "", fmt.Errorf("unsupported element type %s", typeString(g.fset, expr))

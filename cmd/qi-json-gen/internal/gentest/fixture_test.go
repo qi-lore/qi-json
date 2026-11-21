@@ -3,7 +3,9 @@ package gentest
 import (
 	"errors"
 	"testing"
+	"time"
 
+	"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
 	"qi-json/marshal"
 )
 
@@ -28,6 +30,12 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 		"origin": {"x": 1, "y": 2},
 		"points": [{"x": 3, "y": 4}],
 		"ports": {"http": {"x": 80, "y": 80}},
+		"timeout": 5000000000,
+		"deadline": 250,
+		"durations": [1, 2, 3],
+		"label": "prod",
+		"labels": {"a": "x", "b": "y"},
+		"flag": true,
 		"skipped": "ignored"
 	}`)
 
@@ -68,6 +76,24 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 	}
 	if c.Ports["http"] != (Point{X: 80, Y: 80}) {
 		t.Errorf("Ports = %v", c.Ports)
+	}
+	if c.Timeout != time.Duration(5000000000) {
+		t.Errorf("Timeout = %v, want 5000000000", c.Timeout)
+	}
+	if c.Deadline == nil || *c.Deadline != 250 {
+		t.Errorf("Deadline = %v, want 250", c.Deadline)
+	}
+	if len(c.Durations) != 3 || c.Durations[2] != 3 {
+		t.Errorf("Durations = %v", c.Durations)
+	}
+	if c.Label != xtypes.Label("prod") {
+		t.Errorf("Label = %q, want prod", c.Label)
+	}
+	if c.Labels["a"] != "x" || c.Labels["b"] != "y" {
+		t.Errorf("Labels = %v", c.Labels)
+	}
+	if !c.Flag {
+		t.Errorf("Flag = false, want true")
 	}
 	if c.Skipped != "" || c.hidden != "" {
 		t.Errorf("skipped/unexported fields must stay zero: %q %q", c.Skipped, c.hidden)

@@ -16,6 +16,11 @@
 // The generated code targets only the exported marshal surface; it is ordinary
 // source in the caller's package. The tool is stdlib-only and uses no reflect or
 // unsafe.
+//
+// A field whose type is a named type from another package is resolved with the
+// standard library's type checker when its underlying type is a basic scalar
+// (for example time.Duration, or a named string or bool); a cross-package type
+// with a non-scalar underlying type is reported as an error.
 package main
 
 import (

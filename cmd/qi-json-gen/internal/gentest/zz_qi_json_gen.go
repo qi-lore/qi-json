@@ -4,8 +4,10 @@ package gentest
 
 import (
 	"math"
+	"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
 	"qi-json/marshal"
 	"qi-json/scanner"
+	"time"
 )
 
 var configSchema = marshal.Struct[Config](
@@ -116,6 +118,79 @@ var configSchema = marshal.Struct[Config](
 	marshal.Object[Config, Point]("origin", func(v *Config) *Point { return &v.Origin }, pointSchema),
 	marshal.Slice[Config, Point]("points", func(v *Config) *[]Point { return &v.Points }, qiDecodePoint),
 	marshal.Map[Config, Point]("ports", func(v *Config) *map[string]Point { return &v.Ports }, qiDecodePoint),
+	marshal.Field[Config]{Name: "timeout", Decode: func(r *marshal.Reader, v *Config) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == scanner.KindNull {
+			return r.ReadNull()
+		}
+		n, err := r.ReadInt()
+		if err != nil {
+			return err
+		}
+		if int64(time.Duration(n)) != n {
+			return qiRangeError(r, "time.Duration")
+		}
+		v.Timeout = time.Duration(n)
+		return nil
+	}},
+	marshal.Field[Config]{Name: "deadline", Decode: func(r *marshal.Reader, v *Config) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == scanner.KindNull {
+			if err := r.ReadNull(); err != nil {
+				return err
+			}
+			v.Deadline = nil
+			return nil
+		}
+		n, err := r.ReadInt()
+		if err != nil {
+			return err
+		}
+		if int64(time.Duration(n)) != n {
+			return qiRangeError(r, "time.Duration")
+		}
+		e := time.Duration(n)
+		v.Deadline = &e
+		return nil
+	}},
+	marshal.Slice[Config, time.Duration]("durations", func(v *Config) *[]time.Duration { return &v.Durations }, qiDecodeTimeDuration),
+	marshal.Field[Config]{Name: "label", Decode: func(r *marshal.Reader, v *Config) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == scanner.KindNull {
+			return r.ReadNull()
+		}
+		s, err := r.ReadString()
+		if err != nil {
+			return err
+		}
+		v.Label = xtypes.Label(s)
+		return nil
+	}},
+	marshal.Map[Config, xtypes.Label]("labels", func(v *Config) *map[string]xtypes.Label { return &v.Labels }, qiDecodeXtypesLabel),
+	marshal.Field[Config]{Name: "flag", Decode: func(r *marshal.Reader, v *Config) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == scanner.KindNull {
+			return r.ReadNull()
+		}
+		b, err := r.ReadBool()
+		if err != nil {
+			return err
+		}
+		v.Flag = xtypes.Flag(b)
+		return nil
+	}},
 )
 
 func (v *Config) DecodeJSON(r *marshal.Reader) error {
@@ -203,6 +278,25 @@ func qiDecodePoint(r *marshal.Reader) (Point, error) {
 		return v, err
 	}
 	return v, nil
+}
+
+func qiDecodeTimeDuration(r *marshal.Reader) (time.Duration, error) {
+	n, err := r.ReadInt()
+	if err != nil {
+		return 0, err
+	}
+	if int64(time.Duration(n)) != n {
+		return 0, qiRangeError(r, "time.Duration")
+	}
+	return time.Duration(n), nil
+}
+
+func qiDecodeXtypesLabel(r *marshal.Reader) (xtypes.Label, error) {
+	s, err := r.ReadString()
+	if err != nil {
+		return "", err
+	}
+	return xtypes.Label(s), nil
 }
 
 func qiDecodeInt8(r *marshal.Reader) (int8, error) {

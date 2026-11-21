@@ -205,6 +205,9 @@ amendment. Amend together, before code:
   `go generate ./...` reproduces the checked-in file with no diff; 5s
   `FuzzValid` (`./scanner`) and 5s `FuzzUnmarshal`/`FuzzUnmarshalMatchesValid`
   (`./marshal`) green.
-- **Not done / next**: cross-package named types; a `go/types` upgrade; a
-  `-strict` flag to emit `RejectUnknown`/`RejectDuplicate`; T10 (the non-generic
-  `marshal.Decode`, blocked on its own amendment — a stash holds a WIP draft).
+- **Update (2026-11-21)**: cross-package named types with a basic-scalar
+  underlying type are now supported via the standard library's type checker (see
+  `.opencode/plan/2026-11-21-post-decoder-backlog.md` §4). T10 is done as
+  `marshal.Decode`.
+- **Not done / next**: a `-strict` flag to emit
+  `RejectUnknown`/`RejectDuplicate`.

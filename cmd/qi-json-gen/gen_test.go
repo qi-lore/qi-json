@@ -201,6 +201,55 @@ type Point struct{ X int }
 	}
 }
 
+func TestGenerateCrossPackageScalar(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "time"
+
+type Config struct {
+	Timeout  time.Duration  `+"`json:\"timeout\"`"+`
+	Deadline *time.Duration `+"`json:\"deadline\"`"+`
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		`"time"`,
+		`marshal.Field[Config]{Name: "timeout"`,
+		`int64(time.Duration(n)) != n`,
+		`v.Timeout = time.Duration(n)`,
+		`marshal.Field[Config]{Name: "deadline"`,
+		`v.Deadline = &e`,
+		`if k == scanner.KindNull`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+}
+
+func TestGenerateCrossPackageUnsupported(t *testing.T) {
+	dir := writePkg(t, `package example
+
+import "time"
+
+type Config struct {
+	When time.Time
+}
+`)
+	_, err := generate(dir, []string{"Config"})
+	if err == nil {
+		t.Fatal("generate error = nil, want an error for a cross-package struct type")
+	}
+	if !strings.Contains(err.Error(), "cross-package") {
+		t.Errorf("error = %q, want it to mention cross-package", err)
+	}
+}
+
 func TestGenerateErrors(t *testing.T) {
 	cases := []struct {
 		name string

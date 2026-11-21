@@ -196,11 +196,16 @@ type Config struct {
 The generator supports `string`, `bool`, `float32`/`float64`, every signed and
 unsigned integer width (plus pointers), same-package named types with those
 underlying types, `[]E`, `map[string]V`, `[N]E`, `[]byte`, `any`, and nested
-same-package structs that are generated too. It honours `json:"name"`,
-`json:"-"`, and `json:"-,"`; `omitempty` is ignored because it is an encode
-concern, and an untagged field uses the field name. Unsupported in v1 and
-reported as errors: cross-package named types, pointer-to-struct fields, embedded
-fields, non-string map keys, and numbers above `2^63-1` in `uint64` fields.
+same-package structs that are generated too. It also resolves **cross-package
+named types whose underlying type is a basic scalar** (`time.Duration`,
+`net/http.Dir`, or any named string, bool, integer or float from another
+package), both as a field and as a slice or map element type, using the standard
+library's type checker. It honours `json:"name"`, `json:"-"`, and `json:"-,"`;
+`omitempty` is ignored because it is an encode concern, and an untagged field
+uses the field name. Still reported as errors: a cross-package type whose
+underlying type is not a basic scalar (such as a cross-package struct),
+pointer-to-struct fields, embedded fields, non-string map keys, and numbers above
+`2^63-1` in `uint64` fields.
 
 Run it directly as:
 

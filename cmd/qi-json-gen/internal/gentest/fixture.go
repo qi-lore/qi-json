@@ -4,6 +4,12 @@
 // TestGeneratedFixtureUpToDate fails if the checked-in file drifts.
 package gentest
 
+import (
+	"time"
+
+	"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+)
+
 //go:generate go run qi-json/cmd/qi-json-gen -type=Config,Point,Nums
 
 // Config exercises every field family the generator supports.
@@ -28,6 +34,14 @@ type Config struct {
 	Skipped string           `json:"-"`
 	//lint:ignore U1000 unexported fields must be ignored by the generator
 	hidden string
+
+	// Cross-package named scalars: the generator resolves these through go/types.
+	Timeout   time.Duration           `json:"timeout"`
+	Deadline  *time.Duration          `json:"deadline"`
+	Durations []time.Duration         `json:"durations"`
+	Label     xtypes.Label            `json:"label"`
+	Labels    map[string]xtypes.Label `json:"labels"`
+	Flag      xtypes.Flag             `json:"flag"`
 }
 
 // Point is a nested struct used by Config, so it must be generated too.
