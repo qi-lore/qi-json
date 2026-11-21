@@ -244,12 +244,16 @@ the decoder or scanner. Results are recorded in each task's handoff.
 Recorded so a later session can pick them up. Two items are **open** (2026-11-22);
 the rest are done.
 
-- **Foreign struct fields — release blocker (OPEN, next task).** A struct field
-  whose type is a struct from another package cannot be bound: the generator
-  refuses it (`unsupported cross-package type …`) and the manual fallback is
-  limited (exported fields only, no one-liner for non-canonical widths, no
-  `Decoder`-based constructor). Research task:
-  `.opencode/plan/2026-11-22-third-party-struct-fields.md`; user evidence:
+- **Foreign struct fields — release blocker (research DONE 2026-11-22;
+  implementation OPEN, next task).** A struct field whose type is a struct from
+  another package cannot be bound: the generator refuses it (`unsupported
+  cross-package type …`) and the manual fallback is limited (exported fields only,
+  no one-liner for non-canonical widths, no `Decoder`-based constructor). Research
+  decided a layered fix — delegate to a qi-json-aware foreign type (B), synthesize
+  a schema for a plain foreign struct (A), a small new delegation constructor (C),
+  and a `-foreign` escape hatch (D). Research:
+  `.opencode/plan/2026-11-22-third-party-struct-fields.md`; implementation plan:
+  `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`; user evidence:
   `.opencode/plan/user-scenarios.md` §3.
 - **Go-version floor mismatch (OPEN).** `docs/constitution.md` documents a
   `Go >= 1.23` floor but `go.mod` declares `go 1.27.3`, so a 1.23 consumer is
