@@ -76,8 +76,8 @@ func validate(data []byte) (parseError, bool)
 
 `Valid` is the scanner's syntax validator. The package additionally exposes a
 pull tokenizer — `Kind` and `Tokenizer`, in `scanner/token.go` — so the semantic
-layer in `marshal` consumes the same engine instead of re-scanning. That export,
-and the `marshal` decoder, are sanctioned by `docs/constitution.md` Article VI
+layer in `qijson` consumes the same engine instead of re-scanning. That export,
+and the `qijson` decoder, are sanctioned by `docs/constitution.md` Article VI
 and specified in `.opencode/plan/2026-11-21-json-decoder.md`; this document
 specifies the syntax validator only.
 
@@ -464,11 +464,13 @@ unexpected end of JSON input
 scanner/
   valid.go   // package doc, Valid, validate
   scan.go    // validator, dispatch, scanners, tables, parseError
-  token.go   // Kind and the tokenizer used by marshal
+  token.go   // Kind and the tokenizer used by qijson
   *_test.go  // tests and benchmarks
-marshal/
-  doc.go     // placeholder for the encoding layer; exports nothing
 ```
+
+The semantic layer itself (the reflection-free decoder and encoder, package
+`qijson`) lives at the module root and is specified by its own plans; this
+document specifies the syntax validator only.
 
 ## 12. Verification
 

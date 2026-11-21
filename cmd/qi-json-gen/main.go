@@ -1,6 +1,6 @@
-// qi-json-gen generates marshal.Schema values and DecodeJSON methods from
+// qi-json-gen generates qijson.Schema values and DecodeJSON methods from
 // struct tags, so callers need not hand-write the compile-time accessor closures
-// that marshal's reflection-free decoder uses.
+// that qijson's reflection-free decoder uses.
 //
 // Usage:
 //
@@ -14,7 +14,7 @@
 // <dir>/zz_qi_json_gen.go. With -strict every generated schema rejects unknown
 // and duplicate object members.
 //
-// The generated code targets only the exported marshal surface; it is ordinary
+// The generated code targets only the exported qijson surface; it is ordinary
 // source in the caller's package. The tool is stdlib-only and uses no reflect or
 // unsafe.
 //

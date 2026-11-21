@@ -1,4 +1,4 @@
-package marshal
+package qijson
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 // with the Write* methods, framing objects and arrays with Begin/End and naming
 // object members with Key:
 //
-//	var w marshal.Writer
+//	var w qijson.Writer
 //	w.BeginObject()
 //	w.Key("name")
 //	w.WriteString("qi-json")
@@ -46,15 +46,15 @@ type writerFrame struct {
 }
 
 // Errors reported for misuse of the Writer API. They are programming errors, not
-// properties of input, so they are plain errors rather than *marshal.Error.
+// properties of input, so they are plain errors rather than *qijson.Error.
 var (
-	errKeyOutsideObject = errors.New("marshal: Key called outside an object")
-	errKeyWithoutValue  = errors.New("marshal: object member has a Key but no value")
-	errValueWithoutKey  = errors.New("marshal: object member needs a Key before its value")
-	errEndWithoutBegin  = errors.New("marshal: End called without a matching Begin")
-	errMultipleRoots    = errors.New("marshal: multiple top-level values")
-	errNonFinite        = errors.New("marshal: cannot encode a non-finite number")
-	errIncomplete       = errors.New("marshal: encoder did not write one complete JSON value")
+	errKeyOutsideObject = errors.New("qijson: Key called outside an object")
+	errKeyWithoutValue  = errors.New("qijson: object member has a Key but no value")
+	errValueWithoutKey  = errors.New("qijson: object member needs a Key before its value")
+	errEndWithoutBegin  = errors.New("qijson: End called without a matching Begin")
+	errMultipleRoots    = errors.New("qijson: multiple top-level values")
+	errNonFinite        = errors.New("qijson: cannot encode a non-finite number")
+	errIncomplete       = errors.New("qijson: encoder did not write one complete JSON value")
 )
 
 // NewWriter returns a new, empty Writer.

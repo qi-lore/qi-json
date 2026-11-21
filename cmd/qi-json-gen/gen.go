@@ -23,14 +23,14 @@ const marker = "qi-json:generate"
 const defaultOutput = "zz_qi_json_gen.go"
 
 // rangeHelper is emitted once, when a generated field range-checks a number,
-// and reports the failure as a marshal type error: the same shape the runtime
+// and reports the failure as a qijson type error: the same shape the runtime
 // builds for a number that does not fit its target.
-const rangeHelper = `func qiRangeError(r *marshal.Reader, want string) error {
-	return &marshal.Error{
+const rangeHelper = `func qiRangeError(r *qijson.Reader, want string) error {
+	return &qijson.Error{
 		Path:   r.Path(),
 		Offset: r.Offset(),
-		Kind:   marshal.KindType,
-		Err:    &marshal.TypeError{Want: want, Got: "number out of range"},
+		Kind:   qijson.KindType,
+		Err:    &qijson.TypeError{Want: want, Got: "number out of range"},
 	}
 }
 `
@@ -260,7 +260,7 @@ func (g *gen) render() ([]byte, error) {
 // writeImports writes the import block, sorted by path.
 func (g *gen) writeImports(buf *bytes.Buffer) {
 	lines := map[string]string{ // import path -> import line
-		"qi-json/marshal": `"qi-json/marshal"`,
+		"qi-json": `"qi-json"`,
 	}
 	if g.needScanner {
 		lines["qi-json/scanner"] = `"qi-json/scanner"`
@@ -292,7 +292,7 @@ func (g *gen) renderType(buf *bytes.Buffer, name string) error {
 	st := g.structs[name]
 	schemaVar := schemaVarName(name)
 
-	fmt.Fprintf(buf, "var %s = marshal.Struct[%s](\n", schemaVar, name)
+	fmt.Fprintf(buf, "var %s = qijson.Struct[%s](\n", schemaVar, name)
 	used := map[string]bool{}
 	for _, field := range st.Fields.List {
 		codecs, err := g.fieldCodecs(name, field)
@@ -312,13 +312,13 @@ func (g *gen) renderType(buf *bytes.Buffer, name string) error {
 	} else {
 		buf.WriteString(")\n\n")
 	}
-	fmt.Fprintf(buf, "func (v *%s) DecodeJSON(r *marshal.Reader) error {\n\treturn %s.Decode(r, v)\n}\n", name, schemaVar)
-	fmt.Fprintf(buf, "\nfunc (v *%s) EncodeJSON(w *marshal.Writer) error {\n\treturn %s.Encode(w, v)\n}\n", name, schemaVar)
+	fmt.Fprintf(buf, "func (v *%s) DecodeJSON(r *qijson.Reader) error {\n\treturn %s.Decode(r, v)\n}\n", name, schemaVar)
+	fmt.Fprintf(buf, "\nfunc (v *%s) EncodeJSON(w *qijson.Writer) error {\n\treturn %s.Encode(w, v)\n}\n", name, schemaVar)
 	return nil
 }
 
 // codec is one generated field: its JSON member name and the Go expression that
-// builds the marshal.Field.
+// builds the qijson.Field.
 type codec struct {
 	json string
 	code string
@@ -359,7 +359,7 @@ func (g *gen) fieldCodecs(owner string, field *ast.Field) ([]codec, error) {
 	return out, nil
 }
 
-// fieldCodec builds the marshal.Field expression for one field.
+// fieldCodec builds the qijson.Field expression for one field.
 func (g *gen) fieldCodec(owner, fname, jname string, expr ast.Expr) (string, error) {
 	switch t := expr.(type) {
 	case *ast.Ident:
@@ -445,14 +445,14 @@ func (g *gen) arrayCodec(owner, fname, jname string, t *ast.ArrayType) (string, 
 		if err != nil {
 			return "", fmt.Errorf("%s.%s: %w", owner, fname, err)
 		}
-		return fmt.Sprintf("marshal.Slice[%s, %s](%q, func(v *%s) *[]%s { return &v.%s }, %s)",
+		return fmt.Sprintf("qijson.Slice[%s, %s](%q, func(v *%s) *[]%s { return &v.%s }, %s)",
 			owner, elem, jname, owner, elem, fname, el), nil
 	}
 	el, err := g.elemCodec(t.Elt)
 	if err != nil {
 		return "", fmt.Errorf("%s.%s: %w", owner, fname, err)
 	}
-	return fmt.Sprintf("marshal.Array[%s, %s](%q, func(v *%s) []%s { return v.%s[:] }, %s)",
+	return fmt.Sprintf("qijson.Array[%s, %s](%q, func(v *%s) []%s { return v.%s[:] }, %s)",
 		owner, elem, jname, owner, elem, fname, el), nil
 }
 
@@ -466,13 +466,13 @@ func (g *gen) mapCodec(owner, fname, jname string, t *ast.MapType) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("%s.%s: %w", owner, fname, err)
 	}
-	return fmt.Sprintf("marshal.Map[%s, %s](%q, func(v *%s) *map[string]%s { return &v.%s }, %s)",
+	return fmt.Sprintf("qijson.Map[%s, %s](%q, func(v *%s) *map[string]%s { return &v.%s }, %s)",
 		owner, val, jname, owner, val, fname, el), nil
 }
 
 // anyCodec builds a codec for an any field.
 func (g *gen) anyCodec(owner, fname, jname string) string {
-	return fmt.Sprintf("marshal.Any[%s](%q, func(v *%s) *any { return &v.%s })", owner, jname, owner, fname)
+	return fmt.Sprintf("qijson.Any[%s](%q, func(v *%s) *any { return &v.%s })", owner, jname, owner, fname)
 }
 
 // objectCodec builds a codec for a nested struct field.
@@ -480,14 +480,14 @@ func (g *gen) objectCodec(owner, fname, jname, sn string) (string, error) {
 	if !g.known[sn] {
 		return "", fmt.Errorf("%s.%s: nested struct %s is not generated; add -type=%s", owner, fname, sn, sn)
 	}
-	return fmt.Sprintf("marshal.Object[%s, %s](%q, func(v *%s) *%s { return &v.%s }, %s)",
+	return fmt.Sprintf("qijson.Object[%s, %s](%q, func(v *%s) *%s { return &v.%s }, %s)",
 		owner, sn, jname, owner, sn, fname, schemaVarName(sn)), nil
 }
 
-// ctor builds a call to one of marshal's scalar constructors. retType is the
+// ctor builds a call to one of qijson's scalar constructors. retType is the
 // accessor's return type, such as "*string" or "**string".
 func ctor(fn, owner, jname, fname, retType string) string {
-	return fmt.Sprintf("marshal.%s[%s](%q, func(v *%s) %s { return &v.%s })", fn, owner, jname, owner, retType, fname)
+	return fmt.Sprintf("qijson.%s[%s](%q, func(v *%s) %s { return &v.%s })", fn, owner, jname, owner, retType, fname)
 }
 
 // scalarClosure builds a Field literal for a named string or bool type, whether
@@ -502,7 +502,7 @@ func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) 
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "marshal.Field[%s]{Name: %q, Decode: func(r *marshal.Reader, v *%s) error {\n", owner, jname, owner)
+	fmt.Fprintf(&b, "qijson.Field[%s]{Name: %q, Decode: func(r *qijson.Reader, v *%s) error {\n", owner, jname, owner)
 	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
 	if ptr {
 		b.WriteString("\tif k == scanner.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
@@ -519,7 +519,7 @@ func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) 
 	b.WriteString("\treturn nil\n\t},\n")
 
 	access := "v." + fname
-	fmt.Fprintf(&b, "\tEncode: func(w *marshal.Writer, v *%s) error {\n", owner)
+	fmt.Fprintf(&b, "\tEncode: func(w *qijson.Writer, v *%s) error {\n", owner)
 	if ptr {
 		fmt.Fprintf(&b, "\t\tif %s == nil {\n\t\t\treturn w.WriteNull()\n\t\t}\n", access)
 		access = "*" + access
@@ -545,14 +545,14 @@ func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) 
 }
 
 // numericCodec builds an inline closure for a numeric field whose Go type is
-// goType and whose underlying basic type is basic. marshal has no width-aware
+// goType and whose underlying basic type is basic. qijson has no width-aware
 // constructor, so the closure converts and range-checks by round-trip.
 func (g *gen) numericCodec(owner, fname, jname, goType, basic string, ptr bool) string {
 	g.needScanner = true
 	g.needRange = true
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "marshal.Field[%s]{Name: %q, Decode: func(r *marshal.Reader, v *%s) error {\n", owner, jname, owner)
+	fmt.Fprintf(&b, "qijson.Field[%s]{Name: %q, Decode: func(r *qijson.Reader, v *%s) error {\n", owner, jname, owner)
 	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
 	if ptr {
 		b.WriteString("\tif k == scanner.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
@@ -599,7 +599,7 @@ func (g *gen) numericCodec(owner, fname, jname, goType, basic string, ptr bool) 
 // is the field selector; a pointer field writes null when nil.
 func (g *gen) writeNumericEncode(b *strings.Builder, owner, fname, basic string, ptr bool) {
 	access := "v." + fname
-	fmt.Fprintf(b, "\tEncode: func(w *marshal.Writer, v *%s) error {\n", owner)
+	fmt.Fprintf(b, "\tEncode: func(w *qijson.Writer, v *%s) error {\n", owner)
 	if ptr {
 		fmt.Fprintf(b, "\t\tif %s == nil {\n\t\t\treturn w.WriteNull()\n\t\t}\n", access)
 		access = "*" + access
@@ -625,7 +625,7 @@ func (g *gen) writeEmpty(b *strings.Builder, owner, fname string, ptr bool) {
 	}
 }
 
-// elemCodec returns a marshal.Codec expression for a container element type,
+// elemCodec returns a qijson.Codec expression for a container element type,
 // pairing the element's decoder and encoder.
 func (g *gen) elemCodec(expr ast.Expr) (string, error) {
 	if sel, ok := expr.(*ast.SelectorExpr); ok {
@@ -637,19 +637,19 @@ func (g *gen) elemCodec(expr ast.Expr) (string, error) {
 	}
 	switch id.Name {
 	case "string":
-		return "marshal.NewCodec((*marshal.Reader).ReadString, (*marshal.Writer).WriteString)", nil
+		return "qijson.NewCodec((*qijson.Reader).ReadString, (*qijson.Writer).WriteString)", nil
 	case "bool":
-		return "marshal.NewCodec((*marshal.Reader).ReadBool, (*marshal.Writer).WriteBool)", nil
+		return "qijson.NewCodec((*qijson.Reader).ReadBool, (*qijson.Writer).WriteBool)", nil
 	case "int64":
-		return "marshal.NewCodec((*marshal.Reader).ReadInt, (*marshal.Writer).WriteInt)", nil
+		return "qijson.NewCodec((*qijson.Reader).ReadInt, (*qijson.Writer).WriteInt)", nil
 	case "float64":
-		return "marshal.NewCodec((*marshal.Reader).ReadFloat, (*marshal.Writer).WriteFloat)", nil
+		return "qijson.NewCodec((*qijson.Reader).ReadFloat, (*qijson.Writer).WriteFloat)", nil
 	}
 	if basic, ok := g.basicUnderlying(id.Name); ok {
-		return fmt.Sprintf("marshal.NewCodec(%s, %s)", g.numericHelper(id.Name, basic), g.numericEncodeHelper(id.Name, basic)), nil
+		return fmt.Sprintf("qijson.NewCodec(%s, %s)", g.numericHelper(id.Name, basic), g.numericEncodeHelper(id.Name, basic)), nil
 	}
 	if kind, ok := g.stringOrBoolUnderlying(id.Name); ok {
-		return fmt.Sprintf("marshal.NewCodec(%s, %s)", g.scalarHelper(id.Name, kind), g.scalarEncodeHelper(id.Name, kind)), nil
+		return fmt.Sprintf("qijson.NewCodec(%s, %s)", g.scalarHelper(id.Name, kind), g.scalarEncodeHelper(id.Name, kind)), nil
 	}
 	if _, ok := g.structs[id.Name]; ok {
 		dec, err := g.structHelper(id.Name)
@@ -660,7 +660,7 @@ func (g *gen) elemCodec(expr ast.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("marshal.NewCodec(%s, %s)", dec, enc), nil
+		return fmt.Sprintf("qijson.NewCodec(%s, %s)", dec, enc), nil
 	}
 	return "", fmt.Errorf("unsupported element type %s", id.Name)
 }
@@ -675,7 +675,7 @@ func (g *gen) numericHelper(goType, basic string) string {
 	g.needRange = true
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "func %s(r *marshal.Reader) (%s, error) {\n", hn, goType)
+	fmt.Fprintf(&b, "func %s(r *qijson.Reader) (%s, error) {\n", hn, goType)
 	switch basic {
 	case "float32", "float64":
 		if basic == "float32" {
@@ -728,7 +728,7 @@ func (g *gen) scalarEncodeHelper(goType, kind string) string {
 // string or bool type goType, where kind is "string" or "bool".
 func namedScalarDecodeBody(hn, goType, kind string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "func %s(r *marshal.Reader) (%s, error) {\n", hn, goType)
+	fmt.Fprintf(&b, "func %s(r *qijson.Reader) (%s, error) {\n", hn, goType)
 	if kind == "string" {
 		b.WriteString("\ts, err := r.ReadString()\n\tif err != nil {\n\t\treturn \"\", err\n\t}\n")
 		fmt.Fprintf(&b, "\treturn %s(s), nil\n}\n", goType)
@@ -743,7 +743,7 @@ func namedScalarDecodeBody(hn, goType, kind string) string {
 // string or bool type goType, where kind is "string" or "bool".
 func namedScalarEncodeBody(hn, goType, kind string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "func %s(w *marshal.Writer, v %s) error {\n", hn, goType)
+	fmt.Fprintf(&b, "func %s(w *qijson.Writer, v %s) error {\n", hn, goType)
 	if kind == "string" {
 		b.WriteString("\treturn w.WriteString(string(v))\n}\n")
 	} else {
@@ -763,7 +763,7 @@ func (g *gen) structHelper(name string) (string, error) {
 		return hn, nil
 	}
 	g.helpers[hn] = fmt.Sprintf(
-		"func %s(r *marshal.Reader) (%s, error) {\n\tvar v %s\n\tif err := %s.Decode(r, &v); err != nil {\n\t\treturn v, err\n\t}\n\treturn v, nil\n}\n",
+		"func %s(r *qijson.Reader) (%s, error) {\n\tvar v %s\n\tif err := %s.Decode(r, &v); err != nil {\n\t\treturn v, err\n\t}\n\treturn v, nil\n}\n",
 		hn, name, name, schemaVarName(name))
 	g.helperOrder = append(g.helperOrder, hn)
 	return hn, nil
@@ -777,7 +777,7 @@ func (g *gen) numericEncodeHelper(goType, basic string) string {
 		return hn
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "func %s(w *marshal.Writer, v %s) error {\n", hn, goType)
+	fmt.Fprintf(&b, "func %s(w *qijson.Writer, v %s) error {\n", hn, goType)
 	switch {
 	case basic == "float32" || basic == "float64":
 		b.WriteString("\treturn w.WriteFloat(float64(v))\n}\n")
@@ -802,7 +802,7 @@ func (g *gen) structEncodeHelper(name string) (string, error) {
 		return hn, nil
 	}
 	g.helpers[hn] = fmt.Sprintf(
-		"func %s(w *marshal.Writer, v %s) error {\n\treturn %s.Encode(w, &v)\n}\n",
+		"func %s(w *qijson.Writer, v %s) error {\n\treturn %s.Encode(w, &v)\n}\n",
 		hn, name, schemaVarName(name))
 	g.helperOrder = append(g.helperOrder, hn)
 	return hn, nil

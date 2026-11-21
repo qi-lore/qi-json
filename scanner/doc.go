@@ -1,5 +1,5 @@
 // Package scanner is the syntax layer of qi-json. It exports Valid, the syntax
-// validator, and the Tokenizer that the semantic layer in qi-json/marshal
+// validator, and the Tokenizer that the semantic layer in package qijson
 // consumes. Valid's name and signature match encoding/json.Valid.
 //
 // Valid reports whether a byte slice is a syntactically valid JSON text. It is
@@ -45,7 +45,7 @@
 // state and must not be copied or used concurrently.
 //
 // The exported surface — Valid plus the tokenizer (Kind and Tokenizer) — is
-// sanctioned by docs/constitution.md Article VI; the decoder in qi-json/marshal
+// sanctioned by docs/constitution.md Article VI; the decoder in package qijson
 // consumes the tokenizer. The implementation stays allocation-free for documents
 // nesting at most nestingInline levels.
 package scanner

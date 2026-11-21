@@ -1,9 +1,9 @@
 # qi-json — post-decoder backlog (T11+)
 
 **Date**: 2026-11-21
-**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done, and the codegen
-named `string`/`bool` follow-up is done. One open follow-up remains (the package
-rename), tracked in §9.
+**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done, the codegen
+named `string`/`bool` follow-up is done, and the package relocation + rename is
+done. No open follow-ups remain (§9).
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -243,12 +243,12 @@ the decoder or scanner. Results are recorded in each task's handoff.
 
 Not started; recorded so a later session can pick them up.
 
-- **Package relocation + rename** — move the semantic layer from `marshal/` to
-  the module root and rename it: the root package is `qijson` at import path
-  `qi-json` (`qi-json` is not a valid Go identifier, so the clause differs from
-  the path); `scanner` stays a subpackage and `Codec[E]` keeps its name. Needs a
-  constitution amendment (Article VI names the package). Plan:
-  `.opencode/plan/2026-11-21-package-rename.md`.
+- **Package relocation + rename** — **done (2026-11-21)**: the semantic layer
+  moved from `marshal/` to the module root and is now `package qijson` at import
+  path `qi-json` (`qi-json` is not a valid Go identifier, so the clause differs
+  from the path); `scanner` stays a subpackage and `Codec[E]` kept its name.
+  Constitution amended to 3.3.0 (Article VI and Additional Constraints).
+  Plan and results: `.opencode/plan/2026-11-21-package-rename.md`.
 - **Codegen named `string`/`bool` types** — **done (2026-11-21)**: a
   same-package named type whose underlying type is `string` or `bool` is now
   generated (field, pointer, slice/map element), matching the cross-package path.

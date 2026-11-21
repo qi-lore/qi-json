@@ -7,7 +7,7 @@ accessor closures, optionally generated from struct tags.
 | Package | Import path | Role |
 |---|---|---|
 | `scanner` | `qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
-| `marshal` | `qi-json/marshal` | Semantic layer: the reflection-free decoder |
+| `qijson` | `qi-json` | Semantic layer: the reflection-free decoder and encoder |
 | `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
 Released as **v0.1.0** (2026-11-21). The decoder is complete and benchmarked; as
@@ -17,7 +17,7 @@ a pre-1.0 release the API may still change.
 
 Current release: **v0.1.0** (2026-11-21).
 
-This is the first release that includes the `marshal` decoder and the optional
+This is the first release that includes the `qijson` decoder and the optional
 `cmd/qi-json-gen` code generator. Being pre-1.0, the exported API may still
 change in a minor release. See [CHANGELOG.md](CHANGELOG.md) for the change
 history; the git tags record the release series.
@@ -27,15 +27,15 @@ history; the git tags record the release series.
 - **Independent implementation.** The scanner and decoder are written from
   scratch against `docs/task.md`. `encoding/json` is not imported anywhere in the
   module, including tests and benchmarks.
-- **No reflection.** `marshal` decodes into concrete Go types through accessor
+- **No reflection.** `qijson` decodes into concrete Go types through accessor
   closures. That keeps struct decoding predictable and allocation-tight — and it
   is why the API is deliberately **not** `encoding/json`-compatible.
 - **Fast syntax layer.** `Valid` is a single pass over the byte slice with an
   explicit container stack; it does no per-byte handler dispatch and allocates
   nothing for documents nesting up to 32 levels.
-- **Precise errors.** Every decode failure is a `*marshal.Error` carrying the
+- **Precise errors.** Every decode failure is a `*qijson.Error` carrying the
   JSON path (`$.items[2].name`), the byte offset, and a failure kind, wrapping a
-  `*marshal.TypeError` for type mismatches.
+  `*qijson.TypeError` for type mismatches.
 - **Boilerplate is optional.** Hand-write the field mapping, or let
   `qi-json-gen` emit it from `json` struct tags.
 
@@ -56,36 +56,36 @@ Map JSON members to struct fields with a `Schema`, then implement `DecodeJSON`:
 ```go
 package example
 
-import "qi-json/marshal"
+import "qi-json"
 
 type Config struct {
 	Name string
 	Port int64
 }
 
-var configSchema = marshal.Struct(
-	marshal.String[Config]("name", func(c *Config) *string { return &c.Name }),
-	marshal.Int[Config]("port", func(c *Config) *int64 { return &c.Port }),
+var configSchema = qijson.Struct(
+	qijson.String[Config]("name", func(c *Config) *string { return &c.Name }),
+	qijson.Int[Config]("port", func(c *Config) *int64 { return &c.Port }),
 )
 
-func (c *Config) DecodeJSON(r *marshal.Reader) error {
+func (c *Config) DecodeJSON(r *qijson.Reader) error {
 	return configSchema.Decode(r, c)
 }
 
-func (c *Config) EncodeJSON(w *marshal.Writer) error {
+func (c *Config) EncodeJSON(w *qijson.Writer) error {
 	return configSchema.Encode(w, c)
 }
 
 func Load(data []byte) (Config, error) {
-	return marshal.Unmarshal[Config](data)   // fresh value
+	return qijson.Unmarshal[Config](data)   // fresh value
 }
 
 func Merge(data []byte, cfg *Config) error {
-	return marshal.Decode(data, cfg)         // no type argument; in place
+	return qijson.Decode(data, cfg)         // no type argument; in place
 }
 
 func Save(cfg Config) ([]byte, error) {
-	return marshal.Marshal[Config](cfg)      // encode to JSON
+	return qijson.Marshal[Config](cfg)      // encode to JSON
 }
 ```
 
@@ -129,14 +129,14 @@ argument:
 
 ```go
 var cfg Config
-err := marshal.Decode(data, &cfg)
+err := qijson.Decode(data, &cfg)
 ```
 
 `UnmarshalInto[Config](data, &cfg)` is the same operation spelled generically;
 `Decode` is a thin wrapper over it. All three report the same failures: a syntax
 error, a JSON type that does not match the target, or trailing input. `Decode`
-with a nil interface returns `marshal: nil target`, a programming error rather
-than a `*marshal.Error`; a typed-nil target is not detected because `marshal`
+with a nil interface returns `qijson: nil target`, a programming error rather
+than a `*qijson.Error`; a typed-nil target is not detected because `qijson`
 may not use reflection.
 
 ### Field constructors
@@ -154,7 +154,7 @@ Constructors are generic in the target type and take an accessor, so the field
 set is fixed at compile time. `Array` takes a slice view of the array
 (`func(c *C) []E { return c.V[:] }`) and requires the exact element count. A
 container constructor takes a `Codec[E]` — a pair of the element's decode and
-encode functions, built with `marshal.NewCodec(decode, encode)`.
+encode functions, built with `qijson.NewCodec(decode, encode)`.
 
 ### Decoding rules
 
@@ -183,9 +183,9 @@ usually by delegating to its `Schema`. `Marshal[T](v)` returns the bytes;
 `Encode(w, &v)` writes into a reused `Writer`:
 
 ```go
-data, err := marshal.Marshal[Config](cfg)   // generic, value in
-var w marshal.Writer
-err = marshal.Encode(&w, &cfg)              // non-generic, into a Writer
+data, err := qijson.Marshal[Config](cfg)   // generic, value in
+var w qijson.Writer
+err = qijson.Encode(&w, &cfg)              // non-generic, into a Writer
 ```
 
 Encoding rules:
@@ -204,20 +204,20 @@ Encoding rules:
 - A `float64` is written in the shortest form that round-trips; `NaN` and `±Inf`
   are an error. An `any` value is written from its dynamic type — nil, `bool`,
   `string`, the integer and float kinds, `[]any`, `map[string]any`, or a nested
-  `Encoder` — and any other dynamic type is an error, since `marshal` may not use
+  `Encoder` — and any other dynamic type is an error, since `qijson` may not use
   reflection.
-- Encode failures are plain `error` values, not `*marshal.Error` (which is a
+- Encode failures are plain `error` values, not `*qijson.Error` (which is a
   decode diagnostic carrying a path and offset).
 
 ### Inspecting errors
 
 ```go
-var e *marshal.Error
+var e *qijson.Error
 if errors.As(err, &e) {
 	// e.Path   "$.port"
 	// e.Offset 8
-	// e.Kind   marshal.KindType
-	// e.Err    *marshal.TypeError{Want: "integer", Got: "number 1.5 is not an integer"}
+	// e.Kind   qijson.KindType
+	// e.Err    *qijson.TypeError{Want: "integer", Got: "number 1.5 is not an integer"}
 }
 ```
 
@@ -243,7 +243,7 @@ type Config struct {
 
 `go generate ./...` emits `zz_qi_json_gen.go` in the same package with a
 `configSchema`, a `DecodeJSON` method, and an `EncodeJSON` method, after which
-`marshal.Unmarshal[Config](data)` and `marshal.Marshal[Config](cfg)` both work
+`qijson.Unmarshal[Config](data)` and `qijson.Marshal[Config](cfg)` both work
 unchanged.
 
 The generator supports `string`, `bool`, `float32`/`float64`, every signed and
@@ -287,14 +287,14 @@ raw, err := tok.ReadString()                      // aliases data, still escaped
 and does not check UTF-8 or surrogate pairing. `Tokenizer` is pull-based and
 shares the same scalar scanners and error contract, so a decode failure reports
 the same message and 1-based position as `Valid` would. It is the engine behind
-`marshal`; most callers should use `marshal` instead. Byte slices returned by
+`qijson`; most callers should use `qijson` instead. Byte slices returned by
 `ReadString`, `ReadNumber`, and `ReadRaw` alias the input. `Valid` is safe for
 concurrent use; a `Tokenizer` must not be copied or shared.
 
 ## Design constraints
 
 - Standard library only; no `encoding/json` anywhere, including tests.
-- `marshal` and `cmd/qi-json-gen` use neither `reflect` nor `unsafe`.
+- `qijson` and `cmd/qi-json-gen` use neither `reflect` nor `unsafe`.
 - The scanner's `Valid` hot path stays allocation-free for nesting up to 32
   levels, with no `goto`, labels, or per-byte handler dispatch.
 - The decoder and encoder APIs are intentionally not drop-in replacements for
@@ -353,8 +353,8 @@ make cover     # coverage profile and per-function output
 ## Repository layout
 
 ```
+.                        Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package qijson)
 scanner/                 Valid, the tokenizer, benchmarks and differential tests
-marshal/                 Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
 docs/task.md             scanner specification
 docs/constitution.md     governing rules and the sanctioned public surface

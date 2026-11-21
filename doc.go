@@ -1,4 +1,4 @@
-// Package marshal is the semantic layer of qi-json: a reflection-free JSON
+// Package qijson is the semantic layer of qi-json: a reflection-free JSON
 // decoder and encoder built on the syntax engine in qi-json/scanner.
 //
 // The API is deliberately not compatible with encoding/json. Decoding and
@@ -13,9 +13,9 @@
 // Float, Bool, Object, Slice, Map, Array, Any, Raw and their Ptr variants), then
 // decode with Schema.Unmarshal or Schema.Decode.
 //
-//	var configSchema = marshal.Struct(
-//	    marshal.String[Config]("name", func(c *Config) *string { return &c.Name }),
-//	    marshal.Int[Config]("port", func(c *Config) *int64 { return &c.Port }),
+//	var configSchema = qijson.Struct(
+//	    qijson.String[Config]("name", func(c *Config) *string { return &c.Name }),
+//	    qijson.Int[Config]("port", func(c *Config) *int64 { return &c.Port }),
 //	)
 //
 //	cfg, err := configSchema.Unmarshal(data)
@@ -32,23 +32,23 @@
 // A type that implements Decoder can be decoded without naming its Schema. The
 // usual implementation delegates to a Schema:
 //
-//	func (c *Config) DecodeJSON(r *marshal.Reader) error {
+//	func (c *Config) DecodeJSON(r *qijson.Reader) error {
 //	    return configSchema.Decode(r, c)
 //	}
 //
-//	cfg, err := marshal.Unmarshal[Config](data)        // fresh value
-//	err = marshal.UnmarshalInto[Config](data, &cfg)    // merge into an existing value
-//	err = marshal.Decode(data, &cfg)                   // merge, with no type argument
+//	cfg, err := qijson.Unmarshal[Config](data)        // fresh value
+//	err = qijson.UnmarshalInto[Config](data, &cfg)    // merge into an existing value
+//	err = qijson.Decode(data, &cfg)                   // merge, with no type argument
 //
 // The encoder is the mirror image. A type implements Encoder by writing itself
 // to a Writer, usually by delegating to its Schema:
 //
-//	func (c *Config) EncodeJSON(w *marshal.Writer) error {
+//	func (c *Config) EncodeJSON(w *qijson.Writer) error {
 //	    return configSchema.Encode(w, c)
 //	}
 //
-//	data, err := marshal.Marshal[Config](cfg)   // generic, value in
-//	err = marshal.Encode(&w, &cfg)              // non-generic, into a Writer
+//	data, err := qijson.Marshal[Config](cfg)   // generic, value in
+//	err = qijson.Encode(&w, &cfg)              // non-generic, into a Writer
 //
 // Schema.Encode writes object members in declaration order and skips a field
 // tagged `json:",omitempty"` whose value is empty. A container field constructor
@@ -56,4 +56,4 @@
 // encoder. The encoder writes a nil slice or map as null, sorts map keys, and
 // replaces invalid UTF-8 in a string with U+FFFD (the decoder, in contrast,
 // rejects invalid UTF-8). It never uses reflection.
-package marshal
+package qijson

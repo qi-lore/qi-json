@@ -1,4 +1,4 @@
-package marshal
+package qijson
 
 import "testing"
 
@@ -62,7 +62,7 @@ var encAllSchema = Struct(
 )
 
 // EncodeJSON makes encAll a top-level Encoder, so Marshal[T] and
-// marshal.Encode can be tested against the same schema.
+// qijson.Encode can be tested against the same schema.
 func (c *encAll) EncodeJSON(w *Writer) error { return encAllSchema.Encode(w, c) }
 
 func TestSchemaMarshalRoundTrip(t *testing.T) {

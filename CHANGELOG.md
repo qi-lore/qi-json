@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `marshal`: the decoder rejects invalid UTF-8 in a string value or object
+- `qijson`: the decoder rejects invalid UTF-8 in a string value or object
   member name as a syntax error. The scanner stays syntax-only, so it remains
   more permissive than the decoder on this one point.
 - `cmd/qi-json-gen`: cross-package named types whose underlying type is a basic
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pointer field, and slice or map element, matching the cross-package path.
 - `cmd/qi-json-gen`: a `-strict` flag that makes every generated schema reject
   unknown and duplicate object members.
-- `marshal`: a reflection-free **encoder**, the mirror of the decoder:
+- `qijson`: a reflection-free **encoder**, the mirror of the decoder:
   - `Writer`, an append-only JSON buffer with a sticky error, `Write*` methods,
     and `Begin*`/`End*` object and array framing.
   - The `Encoder` interface (`EncodeJSON(*Writer) error`) and two entry points:
@@ -36,7 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `marshal` container field constructors (`Slice`, `Map`, `Array`) now take a
+- **Breaking:** the semantic layer moved from the `marshal` package
+  (`qi-json/marshal`) to the module root, and was renamed to `qijson`
+  (`qi-json`). Callers now `import "qi-json"` and use `qijson.Marshal`,
+  `qijson.Unmarshal`, `qijson.Schema`, and so on; the diagnostic prefix changed
+  from `marshal:` to `qijson:`. `scanner` (`qi-json/scanner`) is unchanged. The
+  module is pre-1.0 and deliberately not `encoding/json`-compatible.
+- `qijson` container field constructors (`Slice`, `Map`, `Array`) now take a
   `Codec[E]` instead of a bare element decode function, so one value carries both
   the decoder and the encoder. This is a breaking change to those three
   constructors (the module is pre-1.0 and deliberately not `encoding/json`-compatible).

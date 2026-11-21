@@ -55,29 +55,31 @@ diagnostics stay testable without widening the API.
 Four further surfaces are sanctioned (amended 2026-11-21; rationale:
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
-`.opencode/plan/2026-11-21-json-encoder.md`):
+`.opencode/plan/2026-11-21-json-encoder.md`; the decoder/encoder package was
+relocated to the module root and renamed `qijson` per
+`.opencode/plan/2026-11-21-package-rename.md`):
 
 - **`scanner` tokenizer** — a `Kind` and a tokenizing type exposing
   `Peek`/`Read*`/`Begin*`/`End*`/`Skip`/`Offset`/`Err`, so the semantic layer
   consumes the same engine.
-- **`marshal` decoder** — the reflection-free semantic layer: a generic
+- **`qijson` decoder** — the reflection-free semantic layer: a generic
   `Unmarshal`/`UnmarshalInto` and the non-generic `Decode`, the `Decoder`
   interface (`DecodeJSON(*Reader) error`), `Schema[T]`/`Struct`, the `Field[T]`
   constructors, `Reader`, and the error types.
-- **`marshal` encoder** — the reflection-free encode layer, the mirror of the
+- **`qijson` encoder** — the reflection-free encode layer, the mirror of the
   decoder: the `Encoder` interface (`EncodeJSON(*Writer) error`), `Writer` and
   `NewWriter`, the generic `Marshal` and non-generic `Encode`,
   `Schema.Encode`/`Schema.Marshal`, `Field.Encode`/`Field.Empty`/`Field.OmitEmpty`,
   and the element `Codec` with `NewCodec`. Like the decoder it MUST NOT import
   `encoding/json` and MUST NOT use `reflect` or `unsafe`.
 - **`cmd/qi-json-gen`** — an optional, stdlib-only code generator that emits
-  `marshal` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
+  `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags, so callers need not hand-write the accessor closures. It is a `main`
-  package, targets only the exported `marshal` surface, and MUST NOT import
+  package, targets only the exported `qijson` surface, and MUST NOT import
   `encoding/json` or use `reflect`/`unsafe`. Generated code is ordinary source
-  in the caller's package; the `marshal` runtime is unchanged by it.
+  in the caller's package; the `qijson` runtime is unchanged by it.
 
-`marshal` is **not** API-compatible with `encoding/json`; that is deliberate. It
+`qijson` is **not** API-compatible with `encoding/json`; that is deliberate. It
 MUST NOT import `encoding/json` and MUST NOT use `reflect` or `unsafe`; struct
 binding is by compile-time accessor closures. Internal identifiers stay
 repo-specific (`validator`, `container`/`containerObject`/`containerArray`,
@@ -100,10 +102,11 @@ results in the final summary.
 ## Additional Constraints
 
 - Go >= 1.23 (toolchain in `go.mod`: 1.27.3).
-- Three packages under module `qi-json`, no root Go package:
+- Three packages under module `qi-json` (the module root is a package):
+  - `.` (module root) — `qijson`, the reflection-free semantic layer (decode
+    and encode);
   - `scanner/` — `Valid` and the tokenizer over the single-pass scanner
     (`valid.go`, `scan.go`, `token.go`, `doc.go`);
-  - `marshal/` — the reflection-free semantic layer (decode and encode);
   - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
@@ -114,4 +117,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.2.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21
+**Version**: 3.3.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-21

@@ -3,18 +3,18 @@
 package gentest
 
 import (
-	"qi-json/marshal"
+	"qi-json"
 )
 
-var strictSchema = marshal.Struct[Strict](
-	marshal.Int[Strict]("a", func(v *Strict) *int64 { return &v.A }),
-	marshal.String[Strict]("b", func(v *Strict) *string { return &v.B }),
+var strictSchema = qijson.Struct[Strict](
+	qijson.Int[Strict]("a", func(v *Strict) *int64 { return &v.A }),
+	qijson.String[Strict]("b", func(v *Strict) *string { return &v.B }),
 ).RejectUnknown().RejectDuplicate()
 
-func (v *Strict) DecodeJSON(r *marshal.Reader) error {
+func (v *Strict) DecodeJSON(r *qijson.Reader) error {
 	return strictSchema.Decode(r, v)
 }
 
-func (v *Strict) EncodeJSON(w *marshal.Writer) error {
+func (v *Strict) EncodeJSON(w *qijson.Writer) error {
 	return strictSchema.Encode(w, v)
 }

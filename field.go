@@ -1,4 +1,4 @@
-package marshal
+package qijson
 
 import (
 	"errors"
@@ -186,7 +186,7 @@ func Slice[T, E any](name string, field func(*T) *[]E, elem Codec[E]) Field[T] {
 				return r.ReadNull()
 			}
 			if elem.Decode == nil {
-				return errors.New("marshal: nil element decoder")
+				return errors.New("qijson: nil element decoder")
 			}
 
 			out := make([]E, 0)
@@ -210,7 +210,7 @@ func Slice[T, E any](name string, field func(*T) *[]E, elem Codec[E]) Field[T] {
 				return w.WriteNull()
 			}
 			if elem.Encode == nil {
-				return errors.New("marshal: nil element encoder")
+				return errors.New("qijson: nil element encoder")
 			}
 			if err := w.BeginArray(); err != nil {
 				return err
@@ -243,7 +243,7 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem Codec[V]) Fie
 				return r.ReadNull()
 			}
 			if elem.Decode == nil {
-				return errors.New("marshal: nil element decoder")
+				return errors.New("qijson: nil element decoder")
 			}
 
 			m := make(map[string]V)
@@ -267,7 +267,7 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem Codec[V]) Fie
 				return w.WriteNull()
 			}
 			if elem.Encode == nil {
-				return errors.New("marshal: nil element encoder")
+				return errors.New("qijson: nil element encoder")
 			}
 			if err := w.BeginObject(); err != nil {
 				return err
@@ -304,7 +304,7 @@ func Array[T, E any](name string, field func(*T) []E, elem Codec[E]) Field[T] {
 				return r.ReadNull()
 			}
 			if elem.Decode == nil {
-				return errors.New("marshal: nil element decoder")
+				return errors.New("qijson: nil element decoder")
 			}
 
 			view := field(v)
@@ -331,7 +331,7 @@ func Array[T, E any](name string, field func(*T) []E, elem Codec[E]) Field[T] {
 		},
 		Encode: func(w *Writer, v *T) error {
 			if elem.Encode == nil {
-				return errors.New("marshal: nil element encoder")
+				return errors.New("qijson: nil element encoder")
 			}
 			view := field(v)
 			if err := w.BeginArray(); err != nil {
@@ -453,7 +453,7 @@ func decodeAny(r *Reader) (any, error) {
 // there, back as JSON: nil to null, bool, string, float and integer kinds at
 // their natural width, []any to an array, map[string]any to an object with
 // sorted keys, and an Encoder through its EncodeJSON. Any other dynamic type is
-// an error, since marshal may not use reflection to discover one.
+// an error, since qijson may not use reflection to discover one.
 func encodeAny(w *Writer, v any) error {
 	switch x := v.(type) {
 	case nil:
@@ -512,7 +512,7 @@ func encodeAny(w *Writer, v any) error {
 	case Encoder:
 		return x.EncodeJSON(w)
 	default:
-		return w.fail(fmt.Errorf("marshal: cannot encode %T as JSON", v))
+		return w.fail(fmt.Errorf("qijson: cannot encode %T as JSON", v))
 	}
 }
 

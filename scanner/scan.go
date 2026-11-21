@@ -22,7 +22,7 @@ const (
 
 // parseError describes the first syntax error found while scanning. It is a
 // value type so that validate can return it without making the validator escape
-// to the heap, and it implements error so the future marshal layer can surface
+// to the heap, and it implements error so the qijson layer can surface
 // the same diagnostic.
 type parseError struct {
 	// at is the 1-based position of the offending byte. For end-of-input

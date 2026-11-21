@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"qi-json"
 	"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
-	"qi-json/marshal"
 )
 
 // TestGeneratedDecodeConfig decodes a document covering every field family and
@@ -46,7 +46,7 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 	}`)
 
 	var c Config
-	if err := marshal.UnmarshalInto[Config](data, &c); err != nil {
+	if err := qijson.UnmarshalInto[Config](data, &c); err != nil {
 		t.Fatalf("UnmarshalInto: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestGeneratedDecodeConfig(t *testing.T) {
 // TestGeneratedDecodeNums exercises the generated element helpers.
 func TestGeneratedDecodeNums(t *testing.T) {
 	var n Nums
-	if err := marshal.UnmarshalInto[Nums]([]byte(`{"ints":[-128,127],"uints":[0,4294967295],"float":[1.5,2]}`), &n); err != nil {
+	if err := qijson.UnmarshalInto[Nums]([]byte(`{"ints":[-128,127],"uints":[0,4294967295],"float":[1.5,2]}`), &n); err != nil {
 		t.Fatalf("UnmarshalInto: %v", err)
 	}
 	if len(n.Ints) != 2 || n.Ints[0] != -128 || n.Ints[1] != 127 {
@@ -155,16 +155,16 @@ func TestGeneratedRangeErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var c Config
-			err := marshal.UnmarshalInto[Config]([]byte(tc.data), &c)
+			err := qijson.UnmarshalInto[Config]([]byte(tc.data), &c)
 			if err == nil {
 				t.Fatal("error = nil, want a type error")
 			}
-			var e *marshal.Error
+			var e *qijson.Error
 			if !errors.As(err, &e) {
-				t.Fatalf("error type = %T, want *marshal.Error", err)
+				t.Fatalf("error type = %T, want *qijson.Error", err)
 			}
-			if e.Kind != marshal.KindType {
-				t.Errorf("Kind = %v, want %v", e.Kind, marshal.KindType)
+			if e.Kind != qijson.KindType {
+				t.Errorf("Kind = %v, want %v", e.Kind, qijson.KindType)
 			}
 		})
 	}
@@ -174,21 +174,21 @@ func TestGeneratedRangeErrors(t *testing.T) {
 // members end to end.
 func TestGeneratedStrict(t *testing.T) {
 	var s Strict
-	if err := marshal.UnmarshalInto[Strict]([]byte(`{"a":1,"b":"x"}`), &s); err != nil {
+	if err := qijson.UnmarshalInto[Strict]([]byte(`{"a":1,"b":"x"}`), &s); err != nil {
 		t.Fatalf("UnmarshalInto: %v", err)
 	}
 	if s.A != 1 || s.B != "x" {
 		t.Errorf("Strict = %+v", s)
 	}
 
-	var e *marshal.Error
-	err := marshal.UnmarshalInto[Strict]([]byte(`{"a":1,"nope":2}`), &s)
-	if !errors.As(err, &e) || e.Kind != marshal.KindUnknownField {
+	var e *qijson.Error
+	err := qijson.UnmarshalInto[Strict]([]byte(`{"a":1,"nope":2}`), &s)
+	if !errors.As(err, &e) || e.Kind != qijson.KindUnknownField {
 		t.Errorf("unknown member: err = %v, want KindUnknownField", err)
 	}
 
-	err = marshal.UnmarshalInto[Strict]([]byte(`{"a":1,"a":2}`), &s)
-	if !errors.As(err, &e) || e.Kind != marshal.KindDuplicateField {
+	err = qijson.UnmarshalInto[Strict]([]byte(`{"a":1,"a":2}`), &s)
+	if !errors.As(err, &e) || e.Kind != qijson.KindDuplicateField {
 		t.Errorf("duplicate member: err = %v, want KindDuplicateField", err)
 	}
 }
@@ -196,7 +196,7 @@ func TestGeneratedStrict(t *testing.T) {
 // TestGeneratedEncodeConfig proves the generated EncodeJSON works end to end,
 // writes members in declaration order, and honours omitempty.
 func TestGeneratedEncodeConfig(t *testing.T) {
-	data, err := marshal.Marshal[Config](Config{})
+	data, err := qijson.Marshal[Config](Config{})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestGeneratedEncodeConfig(t *testing.T) {
 		Status:  "active",
 		Mode:    true,
 	}
-	data, err = marshal.Marshal[Config](populated)
+	data, err = qijson.Marshal[Config](populated)
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -236,10 +236,10 @@ func TestGeneratedEncodeConfig(t *testing.T) {
 		t.Errorf("named string/bool fields must be written: %s", data)
 	}
 	var back Config
-	if err := marshal.UnmarshalInto[Config](data, &back); err != nil {
+	if err := qijson.UnmarshalInto[Config](data, &back); err != nil {
 		t.Fatalf("UnmarshalInto: %v", err)
 	}
-	data2, err := marshal.Marshal[Config](back)
+	data2, err := qijson.Marshal[Config](back)
 	if err != nil {
 		t.Fatalf("re-Marshal: %v", err)
 	}

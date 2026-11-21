@@ -1,9 +1,9 @@
 # qi-json — relocate and rename the public API package
 
 **Date**: 2026-11-21 (decision updated 2026-11-21)
-**Status**: **decided, not started.** Destination and name chosen (§2); needs a
-constitution amendment before any code.
-**Related**: `AGENTS.md`, `docs/constitution.md` (Article VI), `marshal/doc.go`,
+**Status**: **done (2026-11-21).** The semantic layer now lives at the module
+root as package `qijson` (`qi-json`); constitution amended to 3.3.0. See §7.
+**Related**: `AGENTS.md`, `docs/constitution.md` (Article VI), `doc.go`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
 
 ---
@@ -97,3 +97,36 @@ historical plan docs (which are a log and stay as written, with a one-line note)
   root); a superseded-note in the plan docs that name the old package.
 - **R4 — governance + verify**: amend Article VI and the footer version, run the
   full mandated verification, commit (no push).
+
+---
+
+## 7. Results (R2–R4 done, 2026-11-21)
+
+- **R2 — relocate and rename.** `marshal/*.go` (source and tests) moved to the
+  module root; `package marshal` → `package qijson` in every file. The generator
+  (`cmd/qi-json-gen/gen.go`, `types.go`) now emits `import "qi-json"` and the
+  `qijson.` qualifier; `main.go`'s package doc, `gen_test.go`, and the `gentest`
+  fixtures were updated to match, and the checked-in generated files were
+  regenerated (`go generate ./...`); the drift guards are green.
+- **Error prefix.** The diagnostic prefix changed from `marshal:` to `qijson:`
+  (for example `qijson: nil target`), so the §5 `\bmarshal\b` audit is clean.
+  Tests compare sentinels with `errors.Is`/`errors.As`, so no test churn.
+- **R3 — docs.** `README.md` (package table, quick start, decoding/encoding
+  rules, error inspection, layout), `CHANGELOG.md` (an Unreleased **Breaking**
+  entry for the import-path break and rename), `docs/task.md` (the tokenizer note
+  and the file layout), and `doc.go` (moved from `marshal/doc.go`) were updated.
+  `scanner/doc.go` and `scanner/scan.go` comments now say "package qijson".
+- **R4 — governance.** Article VI and Additional Constraints in
+  `docs/constitution.md` name `qijson`; the footer is **3.3.0** (rename and
+  relocation, no new surface). `AGENTS.md` matches. The rename plan is the
+  rationale pointer added to Article VI.
+- **Audit.** `git grep '\bmarshal\b'` leaves only: the historical plan docs and
+  released CHANGELOG entries (a log, kept as written), and the changelog and this
+  plan's own prose that deliberately names the old package. No live code, import,
+  qualifier, or `go:generate` directive refers to `marshal`.
+- **Verification.** `make verify` green (0 lint issues); `go test -race ./...`
+  green.
+
+Older plan docs that name the package by its former name are a historical log
+and are kept as written; from this plan forward the package is `qijson` at
+import path `qi-json`.

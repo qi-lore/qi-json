@@ -1,4 +1,4 @@
-package marshal
+package qijson
 
 import (
 	"bytes"
@@ -95,7 +95,7 @@ func (s *Schema[T]) Encode(w *Writer, v *T) error {
 			continue
 		}
 		if f.Encode == nil {
-			return fmt.Errorf("marshal: field %q has no encoder", f.Name)
+			return fmt.Errorf("qijson: field %q has no encoder", f.Name)
 		}
 		if err := w.Key(f.Name); err != nil {
 			return err

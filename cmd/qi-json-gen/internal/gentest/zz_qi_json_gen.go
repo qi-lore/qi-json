@@ -4,18 +4,18 @@ package gentest
 
 import (
 	"math"
+	"qi-json"
 	"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
-	"qi-json/marshal"
 	"qi-json/scanner"
 	"time"
 )
 
-var configSchema = marshal.Struct[Config](
-	marshal.String[Config]("name", func(v *Config) *string { return &v.Name }),
-	marshal.Int[Config]("port", func(v *Config) *int64 { return &v.Port }),
-	marshal.Float[Config]("rate", func(v *Config) *float64 { return &v.Rate }),
-	marshal.Bool[Config]("debug", func(v *Config) *bool { return &v.Debug }),
-	marshal.Field[Config]{Name: "level", Decode: func(r *marshal.Reader, v *Config) error {
+var configSchema = qijson.Struct[Config](
+	qijson.String[Config]("name", func(v *Config) *string { return &v.Name }),
+	qijson.Int[Config]("port", func(v *Config) *int64 { return &v.Port }),
+	qijson.Float[Config]("rate", func(v *Config) *float64 { return &v.Rate }),
+	qijson.Bool[Config]("debug", func(v *Config) *bool { return &v.Debug }),
+	qijson.Field[Config]{Name: "level", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -33,12 +33,12 @@ var configSchema = marshal.Struct[Config](
 		v.Level = int8(n)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteInt(int64(v.Level))
 		},
 		Empty: func(v *Config) bool { return v.Level == 0 },
 	},
-	marshal.Field[Config]{Name: "count", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Field[Config]{Name: "count", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -56,12 +56,12 @@ var configSchema = marshal.Struct[Config](
 		v.Count = uint16(n)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteUint(uint64(v.Count))
 		},
 		Empty: func(v *Config) bool { return v.Count == 0 },
 	},
-	marshal.Field[Config]{Name: "ratio", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Field[Config]{Name: "ratio", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -79,12 +79,12 @@ var configSchema = marshal.Struct[Config](
 		v.Ratio = float32(f)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteFloat(float64(v.Ratio))
 		},
 		Empty: func(v *Config) bool { return v.Ratio == 0 },
 	},
-	marshal.Field[Config]{Name: "size", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Field[Config]{Name: "size", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -102,12 +102,12 @@ var configSchema = marshal.Struct[Config](
 		v.Size = int(n)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteInt(int64(v.Size))
 		},
 		Empty: func(v *Config) bool { return v.Size == 0 },
 	},
-	marshal.Field[Config]{Name: "limit", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Field[Config]{Name: "limit", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -130,7 +130,7 @@ var configSchema = marshal.Struct[Config](
 		v.Limit = &e
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			if v.Limit == nil {
 				return w.WriteNull()
 			}
@@ -138,16 +138,16 @@ var configSchema = marshal.Struct[Config](
 		},
 		Empty: func(v *Config) bool { return v.Limit == nil },
 	},
-	marshal.Slice[Config, string]("tags", func(v *Config) *[]string { return &v.Tags }, marshal.NewCodec((*marshal.Reader).ReadString, (*marshal.Writer).WriteString)),
-	marshal.Array[Config, int]("matrix", func(v *Config) []int { return v.Matrix[:] }, marshal.NewCodec(qiDecodeInt, qiEncodeInt)),
-	marshal.Map[Config, int32]("scores", func(v *Config) *map[string]int32 { return &v.Scores }, marshal.NewCodec(qiDecodeInt32, qiEncodeInt32)),
-	marshal.Raw[Config]("blob", func(v *Config) *[]byte { return &v.Blob }),
-	marshal.Any[Config]("meta", func(v *Config) *any { return &v.Meta }),
-	marshal.Object[Config, Point]("origin", func(v *Config) *Point { return &v.Origin }, pointSchema),
-	marshal.Slice[Config, Point]("points", func(v *Config) *[]Point { return &v.Points }, marshal.NewCodec(qiDecodePoint, qiEncodePoint)),
-	marshal.Map[Config, Point]("ports", func(v *Config) *map[string]Point { return &v.Ports }, marshal.NewCodec(qiDecodePoint, qiEncodePoint)),
-	marshal.String[Config]("note", func(v *Config) *string { return &v.Note }).OmitEmpty(),
-	marshal.Field[Config]{Name: "timeout", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Slice[Config, string]("tags", func(v *Config) *[]string { return &v.Tags }, qijson.NewCodec((*qijson.Reader).ReadString, (*qijson.Writer).WriteString)),
+	qijson.Array[Config, int]("matrix", func(v *Config) []int { return v.Matrix[:] }, qijson.NewCodec(qiDecodeInt, qiEncodeInt)),
+	qijson.Map[Config, int32]("scores", func(v *Config) *map[string]int32 { return &v.Scores }, qijson.NewCodec(qiDecodeInt32, qiEncodeInt32)),
+	qijson.Raw[Config]("blob", func(v *Config) *[]byte { return &v.Blob }),
+	qijson.Any[Config]("meta", func(v *Config) *any { return &v.Meta }),
+	qijson.Object[Config, Point]("origin", func(v *Config) *Point { return &v.Origin }, pointSchema),
+	qijson.Slice[Config, Point]("points", func(v *Config) *[]Point { return &v.Points }, qijson.NewCodec(qiDecodePoint, qiEncodePoint)),
+	qijson.Map[Config, Point]("ports", func(v *Config) *map[string]Point { return &v.Ports }, qijson.NewCodec(qiDecodePoint, qiEncodePoint)),
+	qijson.String[Config]("note", func(v *Config) *string { return &v.Note }).OmitEmpty(),
+	qijson.Field[Config]{Name: "timeout", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -165,12 +165,12 @@ var configSchema = marshal.Struct[Config](
 		v.Timeout = time.Duration(n)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteInt(int64(v.Timeout))
 		},
 		Empty: func(v *Config) bool { return v.Timeout == 0 },
 	},
-	marshal.Field[Config]{Name: "deadline", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Field[Config]{Name: "deadline", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -193,7 +193,7 @@ var configSchema = marshal.Struct[Config](
 		v.Deadline = &e
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			if v.Deadline == nil {
 				return w.WriteNull()
 			}
@@ -201,8 +201,8 @@ var configSchema = marshal.Struct[Config](
 		},
 		Empty: func(v *Config) bool { return v.Deadline == nil },
 	},
-	marshal.Slice[Config, time.Duration]("durations", func(v *Config) *[]time.Duration { return &v.Durations }, marshal.NewCodec(qiDecodeTimeDuration, qiEncodeTimeDuration)),
-	marshal.Field[Config]{Name: "label", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Slice[Config, time.Duration]("durations", func(v *Config) *[]time.Duration { return &v.Durations }, qijson.NewCodec(qiDecodeTimeDuration, qiEncodeTimeDuration)),
+	qijson.Field[Config]{Name: "label", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -217,13 +217,13 @@ var configSchema = marshal.Struct[Config](
 		v.Label = xtypes.Label(s)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteString(string(v.Label))
 		},
 		Empty: func(v *Config) bool { return v.Label == "" },
 	},
-	marshal.Map[Config, xtypes.Label]("labels", func(v *Config) *map[string]xtypes.Label { return &v.Labels }, marshal.NewCodec(qiDecodeXtypesLabel, qiEncodeXtypesLabel)),
-	marshal.Field[Config]{Name: "flag", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Map[Config, xtypes.Label]("labels", func(v *Config) *map[string]xtypes.Label { return &v.Labels }, qijson.NewCodec(qiDecodeXtypesLabel, qiEncodeXtypesLabel)),
+	qijson.Field[Config]{Name: "flag", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -238,12 +238,12 @@ var configSchema = marshal.Struct[Config](
 		v.Flag = xtypes.Flag(b)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteBool(bool(v.Flag))
 		},
 		Empty: func(v *Config) bool { return v.Flag == false },
 	},
-	marshal.Field[Config]{Name: "status", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Field[Config]{Name: "status", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -258,12 +258,12 @@ var configSchema = marshal.Struct[Config](
 		v.Status = Status(s)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteString(string(v.Status))
 		},
 		Empty: func(v *Config) bool { return v.Status == "" },
 	},
-	marshal.Field[Config]{Name: "prev", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Field[Config]{Name: "prev", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -283,7 +283,7 @@ var configSchema = marshal.Struct[Config](
 		v.Prev = &e
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			if v.Prev == nil {
 				return w.WriteNull()
 			}
@@ -291,8 +291,8 @@ var configSchema = marshal.Struct[Config](
 		},
 		Empty: func(v *Config) bool { return v.Prev == nil },
 	},
-	marshal.Slice[Config, Status]("statuses", func(v *Config) *[]Status { return &v.Statuses }, marshal.NewCodec(qiDecodeStatus, qiEncodeStatus)),
-	marshal.Field[Config]{Name: "mode", Decode: func(r *marshal.Reader, v *Config) error {
+	qijson.Slice[Config, Status]("statuses", func(v *Config) *[]Status { return &v.Statuses }, qijson.NewCodec(qiDecodeStatus, qiEncodeStatus)),
+	qijson.Field[Config]{Name: "mode", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -307,24 +307,24 @@ var configSchema = marshal.Struct[Config](
 		v.Mode = Mode(b)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Config) error {
+		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteBool(bool(v.Mode))
 		},
 		Empty: func(v *Config) bool { return v.Mode == false },
 	},
-	marshal.Map[Config, Mode]("modes", func(v *Config) *map[string]Mode { return &v.Modes }, marshal.NewCodec(qiDecodeMode, qiEncodeMode)),
+	qijson.Map[Config, Mode]("modes", func(v *Config) *map[string]Mode { return &v.Modes }, qijson.NewCodec(qiDecodeMode, qiEncodeMode)),
 )
 
-func (v *Config) DecodeJSON(r *marshal.Reader) error {
+func (v *Config) DecodeJSON(r *qijson.Reader) error {
 	return configSchema.Decode(r, v)
 }
 
-func (v *Config) EncodeJSON(w *marshal.Writer) error {
+func (v *Config) EncodeJSON(w *qijson.Writer) error {
 	return configSchema.Encode(w, v)
 }
 
-var pointSchema = marshal.Struct[Point](
-	marshal.Field[Point]{Name: "x", Decode: func(r *marshal.Reader, v *Point) error {
+var pointSchema = qijson.Struct[Point](
+	qijson.Field[Point]{Name: "x", Decode: func(r *qijson.Reader, v *Point) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -342,12 +342,12 @@ var pointSchema = marshal.Struct[Point](
 		v.X = int(n)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Point) error {
+		Encode: func(w *qijson.Writer, v *Point) error {
 			return w.WriteInt(int64(v.X))
 		},
 		Empty: func(v *Point) bool { return v.X == 0 },
 	},
-	marshal.Field[Point]{Name: "y", Decode: func(r *marshal.Reader, v *Point) error {
+	qijson.Field[Point]{Name: "y", Decode: func(r *qijson.Reader, v *Point) error {
 		k, err := r.Peek()
 		if err != nil {
 			return err
@@ -365,36 +365,36 @@ var pointSchema = marshal.Struct[Point](
 		v.Y = int(n)
 		return nil
 	},
-		Encode: func(w *marshal.Writer, v *Point) error {
+		Encode: func(w *qijson.Writer, v *Point) error {
 			return w.WriteInt(int64(v.Y))
 		},
 		Empty: func(v *Point) bool { return v.Y == 0 },
 	},
 )
 
-func (v *Point) DecodeJSON(r *marshal.Reader) error {
+func (v *Point) DecodeJSON(r *qijson.Reader) error {
 	return pointSchema.Decode(r, v)
 }
 
-func (v *Point) EncodeJSON(w *marshal.Writer) error {
+func (v *Point) EncodeJSON(w *qijson.Writer) error {
 	return pointSchema.Encode(w, v)
 }
 
-var numsSchema = marshal.Struct[Nums](
-	marshal.Slice[Nums, int8]("ints", func(v *Nums) *[]int8 { return &v.Ints }, marshal.NewCodec(qiDecodeInt8, qiEncodeInt8)),
-	marshal.Slice[Nums, uint32]("uints", func(v *Nums) *[]uint32 { return &v.Uints }, marshal.NewCodec(qiDecodeUint32, qiEncodeUint32)),
-	marshal.Slice[Nums, float32]("float", func(v *Nums) *[]float32 { return &v.Float }, marshal.NewCodec(qiDecodeFloat32, qiEncodeFloat32)),
+var numsSchema = qijson.Struct[Nums](
+	qijson.Slice[Nums, int8]("ints", func(v *Nums) *[]int8 { return &v.Ints }, qijson.NewCodec(qiDecodeInt8, qiEncodeInt8)),
+	qijson.Slice[Nums, uint32]("uints", func(v *Nums) *[]uint32 { return &v.Uints }, qijson.NewCodec(qiDecodeUint32, qiEncodeUint32)),
+	qijson.Slice[Nums, float32]("float", func(v *Nums) *[]float32 { return &v.Float }, qijson.NewCodec(qiDecodeFloat32, qiEncodeFloat32)),
 )
 
-func (v *Nums) DecodeJSON(r *marshal.Reader) error {
+func (v *Nums) DecodeJSON(r *qijson.Reader) error {
 	return numsSchema.Decode(r, v)
 }
 
-func (v *Nums) EncodeJSON(w *marshal.Writer) error {
+func (v *Nums) EncodeJSON(w *qijson.Writer) error {
 	return numsSchema.Encode(w, v)
 }
 
-func qiDecodeInt(r *marshal.Reader) (int, error) {
+func qiDecodeInt(r *qijson.Reader) (int, error) {
 	n, err := r.ReadInt()
 	if err != nil {
 		return 0, err
@@ -405,11 +405,11 @@ func qiDecodeInt(r *marshal.Reader) (int, error) {
 	return int(n), nil
 }
 
-func qiEncodeInt(w *marshal.Writer, v int) error {
+func qiEncodeInt(w *qijson.Writer, v int) error {
 	return w.WriteInt(int64(v))
 }
 
-func qiDecodeInt32(r *marshal.Reader) (int32, error) {
+func qiDecodeInt32(r *qijson.Reader) (int32, error) {
 	n, err := r.ReadInt()
 	if err != nil {
 		return 0, err
@@ -420,11 +420,11 @@ func qiDecodeInt32(r *marshal.Reader) (int32, error) {
 	return int32(n), nil
 }
 
-func qiEncodeInt32(w *marshal.Writer, v int32) error {
+func qiEncodeInt32(w *qijson.Writer, v int32) error {
 	return w.WriteInt(int64(v))
 }
 
-func qiDecodePoint(r *marshal.Reader) (Point, error) {
+func qiDecodePoint(r *qijson.Reader) (Point, error) {
 	var v Point
 	if err := pointSchema.Decode(r, &v); err != nil {
 		return v, err
@@ -432,11 +432,11 @@ func qiDecodePoint(r *marshal.Reader) (Point, error) {
 	return v, nil
 }
 
-func qiEncodePoint(w *marshal.Writer, v Point) error {
+func qiEncodePoint(w *qijson.Writer, v Point) error {
 	return pointSchema.Encode(w, &v)
 }
 
-func qiDecodeTimeDuration(r *marshal.Reader) (time.Duration, error) {
+func qiDecodeTimeDuration(r *qijson.Reader) (time.Duration, error) {
 	n, err := r.ReadInt()
 	if err != nil {
 		return 0, err
@@ -447,11 +447,11 @@ func qiDecodeTimeDuration(r *marshal.Reader) (time.Duration, error) {
 	return time.Duration(n), nil
 }
 
-func qiEncodeTimeDuration(w *marshal.Writer, v time.Duration) error {
+func qiEncodeTimeDuration(w *qijson.Writer, v time.Duration) error {
 	return w.WriteInt(int64(v))
 }
 
-func qiDecodeXtypesLabel(r *marshal.Reader) (xtypes.Label, error) {
+func qiDecodeXtypesLabel(r *qijson.Reader) (xtypes.Label, error) {
 	s, err := r.ReadString()
 	if err != nil {
 		return "", err
@@ -459,11 +459,11 @@ func qiDecodeXtypesLabel(r *marshal.Reader) (xtypes.Label, error) {
 	return xtypes.Label(s), nil
 }
 
-func qiEncodeXtypesLabel(w *marshal.Writer, v xtypes.Label) error {
+func qiEncodeXtypesLabel(w *qijson.Writer, v xtypes.Label) error {
 	return w.WriteString(string(v))
 }
 
-func qiDecodeStatus(r *marshal.Reader) (Status, error) {
+func qiDecodeStatus(r *qijson.Reader) (Status, error) {
 	s, err := r.ReadString()
 	if err != nil {
 		return "", err
@@ -471,11 +471,11 @@ func qiDecodeStatus(r *marshal.Reader) (Status, error) {
 	return Status(s), nil
 }
 
-func qiEncodeStatus(w *marshal.Writer, v Status) error {
+func qiEncodeStatus(w *qijson.Writer, v Status) error {
 	return w.WriteString(string(v))
 }
 
-func qiDecodeMode(r *marshal.Reader) (Mode, error) {
+func qiDecodeMode(r *qijson.Reader) (Mode, error) {
 	b, err := r.ReadBool()
 	if err != nil {
 		return false, err
@@ -483,11 +483,11 @@ func qiDecodeMode(r *marshal.Reader) (Mode, error) {
 	return Mode(b), nil
 }
 
-func qiEncodeMode(w *marshal.Writer, v Mode) error {
+func qiEncodeMode(w *qijson.Writer, v Mode) error {
 	return w.WriteBool(bool(v))
 }
 
-func qiDecodeInt8(r *marshal.Reader) (int8, error) {
+func qiDecodeInt8(r *qijson.Reader) (int8, error) {
 	n, err := r.ReadInt()
 	if err != nil {
 		return 0, err
@@ -498,11 +498,11 @@ func qiDecodeInt8(r *marshal.Reader) (int8, error) {
 	return int8(n), nil
 }
 
-func qiEncodeInt8(w *marshal.Writer, v int8) error {
+func qiEncodeInt8(w *qijson.Writer, v int8) error {
 	return w.WriteInt(int64(v))
 }
 
-func qiDecodeUint32(r *marshal.Reader) (uint32, error) {
+func qiDecodeUint32(r *qijson.Reader) (uint32, error) {
 	n, err := r.ReadInt()
 	if err != nil {
 		return 0, err
@@ -513,11 +513,11 @@ func qiDecodeUint32(r *marshal.Reader) (uint32, error) {
 	return uint32(n), nil
 }
 
-func qiEncodeUint32(w *marshal.Writer, v uint32) error {
+func qiEncodeUint32(w *qijson.Writer, v uint32) error {
 	return w.WriteUint(uint64(v))
 }
 
-func qiDecodeFloat32(r *marshal.Reader) (float32, error) {
+func qiDecodeFloat32(r *qijson.Reader) (float32, error) {
 	f, err := r.ReadFloat()
 	if err != nil {
 		return 0, err
@@ -528,15 +528,15 @@ func qiDecodeFloat32(r *marshal.Reader) (float32, error) {
 	return float32(f), nil
 }
 
-func qiEncodeFloat32(w *marshal.Writer, v float32) error {
+func qiEncodeFloat32(w *qijson.Writer, v float32) error {
 	return w.WriteFloat(float64(v))
 }
 
-func qiRangeError(r *marshal.Reader, want string) error {
-	return &marshal.Error{
+func qiRangeError(r *qijson.Reader, want string) error {
+	return &qijson.Error{
 		Path:   r.Path(),
 		Offset: r.Offset(),
-		Kind:   marshal.KindType,
-		Err:    &marshal.TypeError{Want: want, Got: "number out of range"},
+		Kind:   qijson.KindType,
+		Err:    &qijson.TypeError{Want: want, Got: "number out of range"},
 	}
 }

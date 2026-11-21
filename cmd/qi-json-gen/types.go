@@ -103,7 +103,7 @@ func (g *gen) crossScalarCodec(owner, fname, jname, goType string, basic *types.
 	return g.numericCodec(owner, fname, jname, goType, name, ptr), nil
 }
 
-// crossElemCodec returns a marshal.Codec expression for a cross-package element
+// crossElemCodec returns a qijson.Codec expression for a cross-package element
 // type, emitting paired decode and encode helpers.
 func (g *gen) crossElemCodec(sel *ast.SelectorExpr) (string, error) {
 	named, ok := g.namedOf(sel)
@@ -118,7 +118,7 @@ func (g *gen) crossElemCodec(sel *ast.SelectorExpr) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("marshal.NewCodec(%s, %s)", dec, enc), nil
+	return fmt.Sprintf("qijson.NewCodec(%s, %s)", dec, enc), nil
 }
 
 // crossElemDecoder emits, once, a function that decodes a cross-package named
@@ -164,7 +164,7 @@ func (g *gen) crossElemBody(hn, goType string, basic *types.Basic) (string, erro
 	}
 	g.needRange = true
 	var b strings.Builder
-	fmt.Fprintf(&b, "func %s(r *marshal.Reader) (%s, error) {\n", hn, goType)
+	fmt.Fprintf(&b, "func %s(r *qijson.Reader) (%s, error) {\n", hn, goType)
 	switch basicName {
 	case "float32", "float64":
 		if basicName == "float32" {
@@ -230,7 +230,7 @@ func (g *gen) crossElemEncodeBody(hn, goType string, basic *types.Basic) (string
 		return "", fmt.Errorf("unsupported cross-package type %s (underlying %s)", goType, basic.Name())
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "func %s(w *marshal.Writer, v %s) error {\n", hn, goType)
+	fmt.Fprintf(&b, "func %s(w *qijson.Writer, v %s) error {\n", hn, goType)
 	switch {
 	case basicName == "float32" || basicName == "float64":
 		b.WriteString("\treturn w.WriteFloat(float64(v))\n}\n")

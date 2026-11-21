@@ -1,4 +1,4 @@
-package marshal
+package qijson
 
 import (
 	"errors"
@@ -10,11 +10,11 @@ import (
 // reads exactly one JSON value from r. The usual way to implement it is to bind a
 // Schema and delegate:
 //
-//	var configSchema = marshal.Struct(
-//	    marshal.String[Config]("name", func(c *Config) *string { return &c.Name }),
+//	var configSchema = qijson.Struct(
+//	    qijson.String[Config]("name", func(c *Config) *string { return &c.Name }),
 //	)
 //
-//	func (c *Config) DecodeJSON(r *marshal.Reader) error {
+//	func (c *Config) DecodeJSON(r *qijson.Reader) error {
 //	    return configSchema.Decode(r, c)
 //	}
 type Decoder interface {
@@ -23,13 +23,13 @@ type Decoder interface {
 
 // errNilTarget reports UnmarshalInto called with a nil target pointer. It is a
 // programming error rather than a property of the input, so it is not an *Error.
-var errNilTarget = errors.New("marshal: nil target")
+var errNilTarget = errors.New("qijson: nil target")
 
 // Unmarshal decodes data into a new T. The pointer type *T must implement
 // Decoder, which the compiler enforces, so the type argument alone selects the
 // decoder:
 //
-//	cfg, err := marshal.Unmarshal[Config](data)
+//	cfg, err := qijson.Unmarshal[Config](data)
 //
 // The document must hold exactly one JSON value; trailing input is an error.
 func Unmarshal[T any, PT interface {
@@ -64,14 +64,14 @@ func UnmarshalInto[T any, PT interface {
 // argument:
 //
 //	var cfg Config
-//	if err := marshal.Decode(data, &cfg); err != nil { /* ... */ }
+//	if err := qijson.Decode(data, &cfg); err != nil { /* ... */ }
 //
 // v must implement Decoder, which a type does by defining DecodeJSON (usually by
 // delegating to a Schema). Decode works in place, merging into whatever v already
 // holds, and reports the same errors as UnmarshalInto: a syntax error, a JSON
 // type that does not match v, or trailing input after the single value.
 //
-// A nil interface is reported as errNilTarget. Because marshal may not use
+// A nil interface is reported as errNilTarget. Because qijson may not use
 // reflection, a typed-nil target (an interface holding a nil pointer) is not
 // detected here: its DecodeJSON is called with a nil receiver and must behave as
 // any method does when its receiver is nil.

@@ -1,4 +1,4 @@
-package marshal
+package qijson
 
 import (
 	"errors"
@@ -68,10 +68,10 @@ type Error struct {
 // Error implements the error interface.
 func (e *Error) Error() string {
 	if e == nil {
-		return "marshal: <nil>"
+		return "qijson: <nil>"
 	}
 	var b []byte
-	b = append(b, "marshal: "...)
+	b = append(b, "qijson: "...)
 	if e.Path != "" {
 		b = append(b, e.Path...)
 		b = append(b, ": "...)
@@ -109,14 +109,14 @@ type TypeError struct {
 // Error implements the error interface.
 func (e *TypeError) Error() string {
 	if e == nil {
-		return "marshal: type error"
+		return "qijson: type error"
 	}
 	return "expected " + e.Want + ", found " + e.Got
 }
 
 // errBadEscape reports a malformed escape sequence in a JSON string. The scanner
 // rejects these before the decoder sees them, so this guards the invariant.
-var errBadEscape = errors.New("marshal: invalid string escape")
+var errBadEscape = errors.New("qijson: invalid string escape")
 
 // errInvalidUTF8 reports a JSON string that is not valid UTF-8. The scanner is
 // syntax-only and accepts it; the decoder is stricter and rejects it as a

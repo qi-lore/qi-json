@@ -4,14 +4,14 @@ A from-scratch JSON library with three Go packages:
 
 - `scanner/` (import `qi-json/scanner`) — the single-pass syntax layer; exports
   `Valid` and the tokenizer (`Kind` plus a tokenizing type).
-- `marshal/` (import `qi-json/marshal`) — the reflection-free semantic layer (the
-  decoder and encoder). Not `encoding/json`-compatible; no `reflect`, no
+- `.` (import `qi-json`, package `qijson`) — the reflection-free semantic layer
+  (the decoder and encoder). Not `encoding/json`-compatible; no `reflect`, no
   `unsafe`.
 - `cmd/qi-json-gen` — the optional, stdlib-only code generator that emits
-  `marshal` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
-  tags. No `reflect`/`unsafe`; it targets only the exported `marshal` surface.
+  `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
+  tags. No `reflect`/`unsafe`; it targets only the exported `qijson` surface.
 
-The module root has no Go package. No third-party dependencies. `make` wraps the
+The module root is the `qijson` package. No third-party dependencies. `make` wraps the
 common tasks. `docs/task.md` is the syntax specification;
 `.opencode/plan/2026-11-21-json-decoder.md` is the decoder plan and task list and
 `.opencode/plan/2026-11-21-json-encoder.md` is the encoder plan; `docs/constitution.md`
@@ -42,7 +42,7 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 
 - `scanner.Valid(data []byte) bool` is the scanner's headline export — the same
   name and signature as `encoding/json.Valid`. The sanctioned public surface is
-  exactly the scanner tokenizer and the `marshal` decoder and encoder
+  exactly the scanner tokenizer and the `qijson` decoder and encoder
   (constitution Article VI); do not export anything else without a new
   amendment.
 - `scanner.validate(data []byte) (parseError, bool)` is unexported and returns
@@ -60,7 +60,7 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   delimiter after a completed value (see `docs/task.md` §6.1). The object-member
   scan is deliberately written twice so it stays inline; extracting it into a
   helper costs about 8% on object-heavy documents.
-- `marshal` is the semantic layer: a reflection-free decoder and encoder over
+- `qijson` is the semantic layer: a reflection-free decoder and encoder over
   `scanner`. It MUST NOT import `encoding/json` and MUST NOT use `reflect` or
   `unsafe`; struct binding is by compile-time accessor closures. Its API is
   deliberately not `encoding/json`-compatible. The non-generic `Decode(data, v
@@ -76,7 +76,7 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
   `go/parser`, `go/format`, and `go/types` via the source importer for
   cross-package named types; same-package named scalar types are resolved from
-  the AST). It emits code against the exported `marshal`
+  the AST). It emits code against the exported `qijson`
   surface only; the runtime is unchanged by it. It emits a `Schema` var plus both
   `DecodeJSON` and `EncodeJSON` for each target type. It MUST NOT import
   `encoding/json` and MUST NOT use `reflect` or `unsafe`.
@@ -122,8 +122,8 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
     design, tasks and handoff (resume here for codegen work).
   - `.opencode/plan/2026-11-21-post-decoder-backlog.md` — the running backlog of
     follow-up tasks (resume here for post-decoder work).
-  - `.opencode/plan/2026-11-21-package-rename.md` — relocate the `marshal`
-    package to the module root and rename it to `qijson` (decided, not started).
+  - `.opencode/plan/2026-11-21-package-rename.md` — relocated the semantic layer
+    to the module root and renamed it `qijson` (done 2026-11-21).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
     and verification log.
   - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research
