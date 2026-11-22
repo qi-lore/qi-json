@@ -7,8 +7,8 @@ the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fiel
 **D3**, the Go-version floor mismatch (§2.5), was the next task and is now
 **done (2026-11-22)**, shipping in **v0.2.1**, per
 `.opencode/plan/2026-11-22-go-version-floor.md`. All recorded gaps are closed;
-the code-quality refactoring **T-Q2** is done (2026-11-22) and the next task is
-**T-Q1**
+the code-quality refactoring **T-Q2** is done (2026-11-22), **T-Q1** is done
+(2026-11-22), and the next task is **T-Q3**
 (`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`).
 **Related**: `docs/constitution.md`, `README.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.

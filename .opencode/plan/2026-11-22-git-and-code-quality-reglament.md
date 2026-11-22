@@ -1,9 +1,9 @@
 # qi-json — Git and Code Quality Reglament (governance + audit)
 
 **Date**: 2026-11-22
-**Status**: governance added; audit recorded; **T-Q2 done** (2026-11-22);
-refactoring tasks T-Q1, T-Q3 and T-Q4 open — **the next task is T-Q1** (pin the
-error-wrapping policy).
+**Status**: governance added; audit recorded; **T-Q2 done** (2026-11-22) and
+**T-Q1 done** (2026-11-22); refactoring tasks T-Q3 and T-Q4 open — **the next
+task is T-Q3** (public-API documentation pass).
 **Related**: `docs/constitution.md` (§ Git and Review Discipline, § Rigorous Code
 Quality), `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
@@ -99,6 +99,8 @@ sentinel, that decision needs its own amendment.
 
 ### T-Q1 — pin the error-wrapping policy
 
+**Done (2026-11-22).** Results below.
+
 - Record the decision in `docs/constitution.md` / `doc.go`: the typed
   `*qijson.Error` *is* the contextual error (it carries path + offset), so it is
   returned unwrapped; the rule's "wrap with `%w`" applies where a layer adds new
@@ -109,6 +111,28 @@ sentinel, that decision needs its own amendment.
   `Marshal` and `Encode`; `errors.Is` through a nested `ObjectDecoder`.
 - **Acceptance**: a test proves the guarantees (`errors.Is`/`errors.As`) hold end
   to end, and the policy is written down where a contributor will find it.
+
+#### T-Q1 results
+
+- **Policy recorded**: `doc.go` gains an errors paragraph; `docs/constitution.md`
+  (v3.7.0, "Rigorous Code Quality") states that the typed `*qijson.Error` is the
+  context and is returned unwrapped, with `%w` reserved for a layer that adds new
+  context (a sentinel cause) and a boundary `%w` a deliberate behavior change;
+  `AGENTS.md` mirrors the one-line rule. No exported identifier changed.
+- **Tests**: new `error_policy_test.go` — `TestDecodeErrorPolicy` pins
+  `errors.As(*Error)` (and the `*TypeError` cause) through `Unmarshal`, `Decode`,
+  `Schema.Unmarshal` and `Schema.UnmarshalInto`, plus one exact error string
+  proving the `*Error` is not double-wrapped; `TestDecodeSyntaxErrorIsTyped` pins
+  a syntax failure; `TestEncodeErrorPolicy` pins `errors.Is` for the encode
+  sentinels (`errNonFinite`, `errIncomplete`, `errNilWriter`, `errNilTarget`)
+  through `Marshal`, `Encode` and `Schema.Marshal`; `TestErrorIsThroughObjectDecoder`
+  proves `errors.Is(err, errInvalidUTF8)` and `errors.As(*TypeError)` across a
+  nested `ObjectDecoder` delegation with the nested path.
+- **Note**: T-Q1 is documentation plus characterization — the guarantees already
+  held, so there was no behavior change to drive red-first; the tests pin the
+  existing contract (per Article II, only a behavior change needs a red test).
+- **Verification**: `make verify` green (0 lint issues); `go test -race ./...`
+  green.
 
 ### T-Q3 — public-API documentation pass (ownership, concurrency, lifecycle)
 
