@@ -6,23 +6,28 @@ accessor closures, optionally generated from struct tags.
 
 | Package | Import path | Role |
 |---|---|---|
-| `scanner` | `qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
-| `qijson` | `qi-json` | Semantic layer: the reflection-free decoder and encoder |
-| `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
+| `scanner` | `github.com/qi-lore/qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
+| `qijson` | `github.com/qi-lore/qi-json` | Public facade of the semantic layer: type aliases, constants and wrappers |
+| `internal/codec` | `github.com/qi-lore/qi-json/internal/codec` | Implementation of the semantic layer behind the facade (internal) |
+| `cmd/qi-json-gen` | `github.com/qi-lore/qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.2.3** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.3.0** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.2.3** (2026-11-22).
+Current release: **v0.3.0** (2026-11-22).
 
-v0.2.3 is a code-quality release with no library API change: it defines every
-library error sentinel once and makes it inspectable with `errors.Is` (task
-T-Q2), records and pins the error-wrapping policy in `docs/constitution.md`
-(v3.7.0) and `AGENTS.md` (task T-Q1), and documents ownership, concurrency and
-lifecycle on the public API (task T-Q3). See [CHANGELOG.md](CHANGELOG.md) for the
-change history; the git tags record the release series.
+v0.3.0 moves the semantic engine behind the `qijson` facade: the decoder and
+encoder now live in `internal/codec`, and the module root re-exports them through
+type aliases, constants and wrappers. The public API is unchanged — `qijson.Reader`
+*is* `codec.Reader` — so `errors.As`, generated `Field` literals and every call
+site keep working, while the engine's internals are no longer importable. The
+same release adopts the canonical module path `github.com/qi-lore/qi-json` and
+raises the Go floor to **1.24** for the facade's generic type aliases. Both of
+those are breaking for importers; see **Migrating from 0.2.x** below. See
+[CHANGELOG.md](CHANGELOG.md) for the change history; the git tags record the
+release series.
 
 ## Why another JSON library
 
@@ -43,18 +48,40 @@ change history; the git tags record the release series.
 
 ## Using it
 
-`qi-json` is a local module (its module path is `qi-json`), so point a `replace`
-directive at the checkout:
+The canonical module path is `github.com/qi-lore/qi-json`:
 
 ```
-require qi-json v0.0.0
-replace qi-json => ../qi-json
+go get github.com/qi-lore/qi-json
 ```
 
-The module requires **Go 1.23 or newer**. Its `go.mod` sets `go 1.23.0` (the
-language floor) and adds a `toolchain go1.27.3` line, which merely names the
-toolchain used to develop the project — a dependency's `toolchain` line is
+While working from a local checkout, point a `replace` directive at it instead:
+
+```
+require github.com/qi-lore/qi-json v0.0.0
+replace github.com/qi-lore/qi-json => ../qi-json
+```
+
+The module requires **Go 1.24 or newer**. Its `go.mod` sets `go 1.24.0` (the
+language floor, because the `qijson` facade re-exports generic types through
+generic type aliases) and adds a `toolchain go1.27.3` line, which merely names
+the toolchain used to develop the project — a dependency's `toolchain` line is
 ignored, so it does not raise the floor for a consumer.
+
+### Migrating from 0.2.x
+
+Three edits are required:
+
+1. **Rewrite the import path.** `qi-json` → `github.com/qi-lore/qi-json`, and
+   `qi-json/scanner` → `github.com/qi-lore/qi-json/scanner`. The package name is
+   still `qijson`, so no identifier changes.
+2. **Raise the `go` directive in your `go.mod` to 1.24.** The facade re-exports
+   generic types through generic type aliases.
+3. **Regenerate any `qi-json-gen` output.** The emitted import path changed with
+   the module path, so checked-in generated files still name the old path.
+
+Nothing else changes: `qijson.Reader` and `qijson.Writer` are the same types as
+before, so `errors.As`, generated `Field` literals and existing call sites
+compile unchanged once the imports are updated.
 
 ## Quick start
 
@@ -63,7 +90,7 @@ Map JSON members to struct fields with a `Schema`, then implement `DecodeJSON`:
 ```go
 package example
 
-import "qi-json"
+import "github.com/qi-lore/qi-json"
 
 type Config struct {
 	Name string
@@ -406,7 +433,8 @@ branch name, the target branch and the commit messages of each pull request.
 ## Repository layout
 
 ```
-.                        Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package qijson)
+.                        public facade: type aliases, constants and wrappers (package qijson) + the facade contract test
+internal/codec/          the engine: Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package codec)
 scanner/                 Valid, the tokenizer, benchmarks and differential tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
 docs/task.md             scanner specification

@@ -3,7 +3,7 @@
 package gentest
 
 import (
-	"qi-json"
+	"github.com/qi-lore/qi-json"
 )
 
 var strictSchema = qijson.Struct[Strict](

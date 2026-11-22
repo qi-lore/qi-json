@@ -1,5 +1,6 @@
 // Package qijson is the semantic layer of qi-json: a reflection-free JSON
-// decoder and encoder built on the syntax engine in qi-json/scanner.
+// decoder and encoder built on the syntax engine in
+// github.com/qi-lore/qi-json/scanner.
 //
 // The API is deliberately not compatible with encoding/json. Decoding and
 // encoding arbitrary targets without reflection needs a compile-time field

@@ -1,4 +1,4 @@
-package qijson
+package codec
 
 import (
 	"strings"

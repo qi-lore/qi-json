@@ -1,12 +1,17 @@
 # AGENTS.md — qi-json
 
-A from-scratch JSON library with three Go packages:
+A from-scratch JSON library with four Go packages:
 
-- `scanner/` (import `qi-json/scanner`) — the single-pass syntax layer; exports
-  `Valid` and the tokenizer (`Kind` plus a tokenizing type).
-- `.` (import `qi-json`, package `qijson`) — the reflection-free semantic layer
-  (the decoder and encoder). Not `encoding/json`-compatible; no `reflect`, no
-  `unsafe`.
+- `scanner/` (import `github.com/qi-lore/qi-json/scanner`) — the single-pass
+  syntax layer; exports `Valid` and the tokenizer (`Kind` plus a tokenizing
+  type).
+- `.` (import `github.com/qi-lore/qi-json`, package `qijson`) — the public facade
+  of the reflection-free semantic layer (the decoder and encoder): type aliases,
+  const re-exports and one-line wrapper functions. Not `encoding/json`-compatible;
+  no `reflect`, no `unsafe`.
+- `internal/codec/` — the semantic engine behind that facade. Internal, so
+  external code cannot import it and its internals may change without a
+  compatibility promise.
 - `cmd/qi-json-gen` — the optional, stdlib-only code generator that emits
   `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags. No `reflect`/`unsafe`; it targets only the exported `qijson` surface.
@@ -78,8 +83,9 @@ All Go code follows the Uber Go Style Guide
   error from a deeper layer. The typed `*qijson.Error` is itself the context
   (path + offset) and is returned unwrapped; use `%w` only where a layer adds new
   context (for example a sentinel cause).
-- Define a sentinel in the owning package (the `qijson` root or `scanner`) when a
-  caller must inspect it; there is no `core` package.
+- Define a sentinel in the package that owns the behavior (`internal/codec` for
+  the decoder and encoder, `scanner` for the syntax layer) and expose it through
+  the `qijson` facade only when a caller must inspect it.
 - Public APIs document ownership, concurrency safety, and lifecycle.
 - Goroutines need clear ownership and shutdown paths; no leaks.
 - Propagate context explicitly; blocking operations accept `context.Context`.
@@ -127,6 +133,12 @@ and context rules bind only when such code is added. Open gaps are tracked in
   qi-json-aware foreign type; Article VI, added 2026-11-22). Plans and tasks:
   `.opencode/plan/2026-11-21-json-decoder.md` and
   `.opencode/plan/2026-11-21-json-encoder.md`.
+- The `qijson` root is a facade: `internal/codec` holds the implementation and
+  `qijson.go` re-exports it through type aliases, constants and wrapper
+  functions. Keep the public contract (including ownership, concurrency and
+  lifecycle docs) on the facade; the engine's internals stay unexported. The
+  aliases are why the Go floor is 1.24. See
+  `.opencode/plan/2026-11-22-internal-codec-extraction.md`.
 - `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
   `go/parser`, `go/format`, and `go/types` via the source importer for
   cross-package named types; same-package named scalar types are resolved from
@@ -179,9 +191,18 @@ and context rules bind only when such code is added. Open gaps are tracked in
     Go-version floor mismatch, is **done** per
     `.opencode/plan/2026-11-22-go-version-floor.md`).
   - `.opencode/plan/2026-11-22-go-version-floor.md` — **done 2026-11-22**:
-    `go.mod` now reads `go 1.23.0` + `toolchain go1.27.3`, matching the
-    documented `Go >= 1.23` floor (a 1.23 consumer is no longer silently
-    upgraded or blocked). Guarded by `TestGoModGoDirectiveFloor`.
+    `go.mod` reads `go 1.24.0` + `toolchain go1.27.3`, matching the documented
+    `Go >= 1.24` floor (a 1.24 consumer is no longer silently upgraded or
+    blocked). Guarded by `TestGoModGoDirectiveFloor`. The floor moved from 1.23
+    to 1.24 with the facade's generic type aliases (see the internal-codec
+    extraction plan).
+  - `.opencode/plan/2026-11-22-internal-codec-extraction.md` — **done
+    2026-11-22, shipped in v0.3.0**: the semantic engine moved to `internal/codec`
+    and the module root became a thin facade of type aliases and wrappers; the Go
+    floor moved to 1.24 for generic type aliases, and the canonical module path
+    became `github.com/qi-lore/qi-json`. The scanner stays public at
+    `github.com/qi-lore/qi-json/scanner`; hiding it is deferred to a separate
+    breaking change.
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the
     gaps they expose (the foreign-struct-field gap was a release blocker, closed
     in v0.2.0).

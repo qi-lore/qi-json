@@ -1,9 +1,9 @@
-package qijson
+package codec
 
 import (
 	"errors"
 
-	"qi-json/scanner"
+	"github.com/qi-lore/qi-json/scanner"
 )
 
 // Decoder is implemented by types that decode themselves from JSON. A decoder

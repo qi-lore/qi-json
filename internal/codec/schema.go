@@ -1,4 +1,4 @@
-package qijson
+package codec
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"qi-json/scanner"
+	"github.com/qi-lore/qi-json/scanner"
 )
 
 // errNoFieldEncoder reports a Field whose Encode is nil, reached by
