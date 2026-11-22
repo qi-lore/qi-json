@@ -378,6 +378,33 @@ make generate  # regenerate the codegen fixture
 make cover     # coverage profile and per-function output
 ```
 
+## Contributing
+
+`main` is the production mainline and `dev` is the integration branch. Create a
+feature or task branch from the current `main` (after `git fetch` and a
+fast-forward update), name it per
+[Conventional Branch](https://conventionalbranch.org/), and open a pull request
+into `dev`. Only the `dev` → `main` pull request merges into `main`.
+
+Commit messages follow
+[Conventional Commits](https://www.conventionalcommits.org/) and carry a full
+body. A pull request that closes an issue starts its description with
+`Closes: #<number>` and states the problem and the solution. Confirm suggested
+labels with a maintainer before applying them.
+
+All Go code follows the
+[Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md)
+without exception, plus the repository's additional rules: wrap errors with
+`%w`, never return a bare error from a deeper layer, define a sentinel in the
+owning package where a caller must inspect it, document the ownership,
+concurrency safety and lifecycle of public APIs, and never panic in library
+code for a recoverable condition. The full rules are in
+`docs/constitution.md` ("Git and Review Discipline" and "Rigorous Code
+Quality").
+
+CI (`.github/workflows/ci.yml`) runs the verification sequence and checks the
+branch name, the target branch and the commit messages of each pull request.
+
 ## Repository layout
 
 ```

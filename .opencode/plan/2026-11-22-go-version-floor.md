@@ -93,11 +93,18 @@ Baseline reproduces `user-scenarios.md` §5.1 exactly (Apple M1, go1.27.3).
   `1.23.0` and the `toolchain` directive is `go1.27.3`; it was red against
   `go 1.27.3` and is green now. No new exported identifier; no new dependency.
 - **G3 — docs.** `docs/constitution.md` Additional Constraints now names the `go`
-  directive as the floor and the `toolchain` line as development-only (version
-  patched 3.4.0 → 3.4.1, a clarification); `README.md` ("Using it") states the
-  Go 1.23 requirement; `CHANGELOG.md` gains an `[Unreleased]` **Fixed** entry;
-  `AGENTS.md`, `user-scenarios.md` (§2.5, D3) and the backlog §9/§Status mark D3
-  done and index this plan.
+  directive as the floor and the `toolchain` line as development-only (a
+  clarification, no version bump: the branch was integrated with `dev`, which had
+  already raised the constitution to v3.5.0 with the Git and Review Discipline
+  rules); `README.md` ("Using it") states the Go 1.23 requirement;
+  `CHANGELOG.md` gains an `[Unreleased]` **Fixed** entry (kept alongside the
+  `dev` `Added` entry); `AGENTS.md`, `user-scenarios.md` (§2.5, D3) and the
+  backlog §9/§Status mark D3 done and index this plan.
+- **Workflow.** The task was a `bugfix/go-version-floor` branch cut from `main`,
+  targeting `dev` (Conventional Branch / Conventional Commits per the
+  constitution's Git and Review Discipline). `dev` had advanced (PR #1,
+  constitution v3.5.0), so `origin/dev` was merged in to resolve the overlap in
+  `CHANGELOG.md` and the constitution footer.
 - **G4 — verification.** `make verify` green (0 lint issues); `go test -race
   ./...` green; `GOTOOLCHAIN=go1.23.0 go test ./...` green on the real repository;
   `go generate ./...` is idempotent (no fixture drift). The §5 before/after table

@@ -118,10 +118,73 @@ results in the final summary.
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
 
+## Git and Review Discipline
+
+The repository uses a two-branch integration model. CI
+(`.github/workflows/ci.yml`) enforces these rules where it technically can.
+
+### Branching model
+
+- `main` is the production-ready mainline.
+- `dev` is the integration branch.
+- Feature and task branches MUST be created from the current `main`, after
+  `git fetch` and a fast-forward update.
+- Feature branches MUST target `dev`.
+- Only the `dev` → `main` pull request is allowed to merge into `main`.
+- Branch names MUST strictly follow Conventional Branch
+  (https://conventionalbranch.org/): a type (`feature`/`feat`, `bugfix`/`fix`,
+  `hotfix`, `release` or `chore`) or an AI-agent prefix (`ai`, `copilot`,
+  `cursor`, `claude`, `codex`), then a short kebab-case summary.
+
+### Commits
+
+- Commit messages MUST strictly follow Conventional Commits
+  (https://www.conventionalcommits.org/) and carry a full body: what changed,
+  why, and any non-obvious decision.
+
+### Pull requests
+
+- If the PR closes an issue, its description MUST start with
+  `Closes: #[issue-number]`.
+- The description MUST contain a concise problem statement and a solution
+  summary.
+- Suggested labels MUST be proposed and confirmed with the user before applying.
+- Feature PRs target `dev`; only the integration PR targets `main`.
+
+### CI enforcement
+
+CI MUST enforce the branch-name, target-branch and commit-message rules and the
+Verification Workflow below where technically possible. The workflow in
+`.github/workflows/ci.yml` runs the verification sequence and checks the source
+branch name, the target branch and the commit messages of each pull request.
+
+## Rigorous Code Quality
+
+All Go code MUST follow the Uber Go Style Guide
+(https://github.com/uber-go/guide/blob/master/style.md) without exception. In
+addition:
+
+- Errors MUST be wrapped with context using `fmt.Errorf("...: %w", err)`.
+- Bare errors MUST NOT be returned from deeper layers.
+- Sentinel errors MUST be defined in the package that owns the surface where
+  callers need to inspect them: the `qijson` module root or `scanner`. There is
+  no separate `core` package; this repository's surface is fixed by Article VI.
+- Public APIs MUST document ownership, concurrency safety, and lifecycle
+  expectations.
+- Goroutines MUST have clear ownership and shutdown paths. Leaks are defects.
+- Context propagation MUST be explicit. Blocking operations MUST accept
+  `context.Context`.
+- No panics in library code for recoverable error conditions.
+
+The library is synchronous today: it starts no goroutines and no exported
+operation blocks, so the goroutine and context rules bind only when such code is
+added. Where the current code does not yet meet a rule, the gap is a refactoring
+task tracked in `.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`.
+
 ## Governance
 
 This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.4.1 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.5.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
