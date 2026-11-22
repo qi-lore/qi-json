@@ -1,4 +1,4 @@
-package qijson
+package codec
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strconv"
 
-	"qi-json/scanner"
+	"github.com/qi-lore/qi-json/scanner"
 )
 
 // Sentinel errors for misuse of the container constructors. They are

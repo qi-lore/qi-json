@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The canonical module path is now `github.com/qi-lore/qi-json` (was `qi-json`).
+  Every import path, the generator's emitted imports, the checked-in fixtures
+  and the docs moved with it; the package name stays `qijson`. Importers must
+  update their import paths.
+- `qijson`: the semantic engine moved to `internal/codec` and the module root is
+  now a thin facade of type aliases, constant re-exports and one-line wrappers.
+  The public API is unchanged — `qijson.Reader` *is* `codec.Reader` — so
+  `errors.As`, generated `Field` literals and every call site keep working, while
+  the engine's internals are no longer importable. `unmarshal.go` became
+  `internal/codec/decode.go`, and the white-box tests moved next to the engine;
+  `api_test.go` pins the facade's surface from outside the package.
+- The module now requires **Go 1.24** (`go 1.24.0`): the facade re-exports the
+  generic `Schema`, `Field` and `Codec` through generic type aliases, which are a
+  Go 1.24 language feature.
+- `qi-json-gen`: the awareness check now accepts the facade's `Reader`/`Writer`
+  aliases as well as the engine types they resolve to, so generated output is
+  byte-identical.
+
 ## [0.2.3] - 2026-11-22
 
 ### Changed

@@ -3,7 +3,7 @@
 // package to decide how to decode it.
 package xtypes
 
-import "qi-json"
+import "github.com/qi-lore/qi-json"
 
 // Label is a named string decoded through a cross-package field.
 type Label string

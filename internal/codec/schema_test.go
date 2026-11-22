@@ -1,11 +1,11 @@
-package qijson
+package codec
 
 import (
 	"errors"
 	"fmt"
 	"testing"
 
-	"qi-json/scanner"
+	"github.com/qi-lore/qi-json/scanner"
 )
 
 func TestStructDecode(t *testing.T) {

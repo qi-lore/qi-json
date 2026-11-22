@@ -3,8 +3,8 @@
 package gentest
 
 import (
-	"qi-json"
-	"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+	"github.com/qi-lore/qi-json"
+	"github.com/qi-lore/qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
 )
 
 var overriddenSchema = qijson.Struct[Overridden](

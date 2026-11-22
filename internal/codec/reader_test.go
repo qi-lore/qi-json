@@ -1,4 +1,4 @@
-package qijson
+package codec
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"qi-json/scanner"
+	"github.com/qi-lore/qi-json/scanner"
 )
 
 // newTestReader returns a Reader positioned at the start of doc.
