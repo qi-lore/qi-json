@@ -1,13 +1,12 @@
 # qi-json — post-decoder backlog (historical design record)
 
 **Date**: 2026-11-21
-**Status**: historical. Every task in this document is complete; task state now
-lives in `docs/tasks.md`. This file is kept as a design record of the rationale
-behind each task.
 **Related**: `docs/constitution.md`, `AGENTS.md`, `docs/tasks.md`,
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
 `.opencode/plan/2026-11-22-internal-codec-extraction.md`.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

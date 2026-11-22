@@ -1,18 +1,17 @@
 # qi-json Encoder — plan and decisions
 
 **Date**: 2026-11-21
-**Status**: **done** — all §8 decisions signed off and the amendment approved
-(2026-11-21); implemented as T-E1…T-E7 with `make verify` and `-race` green and a
-round-trip fuzz target passing. See §9. **Locked decisions**:
-D3.5 **Option A** (`Codec[E]`, breaking the container constructors); D3.6
-**replace invalid UTF-8 with U+FFFD**; D3.4 **declaration order**; D3.7
-**support `omitempty` in v1** (an exception to the "non-goals" note — the user
-chose to support it now); D3.8 **plain errors**; amendment **approved as
-proposed**.
+**Locked decisions**: D3.5 **Option A** (`Codec[E]`, breaking the container
+constructors); D3.6 **replace invalid UTF-8 with U+FFFD**; D3.4 **declaration
+order**; D3.7 **support `omitempty` in v1** (an exception to the "non-goals" note
+— the user chose to support it now); D3.8 **plain errors**; amendment
+**approved as proposed**.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` (§6),
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`, `README.md`.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

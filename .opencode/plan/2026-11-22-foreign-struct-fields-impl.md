@@ -1,16 +1,17 @@
 # qi-json — implementation: foreign struct fields
 
 **Date**: 2026-11-22
-**Status**: **done (2026-11-22).** Implementation of the decisions in
-`.opencode/plan/2026-11-22-third-party-struct-fields.md` (§11). This plan is the
-TDD task list, the fixtures, the amendment text and the verification steps for
-closing the release blocker (`.opencode/plan/user-scenarios.md` §3.5, D1).
-T-F1…T-F6 are implemented and verified (see §9).
+**Scope**: implementation of the decisions in
+`.opencode/plan/2026-11-22-third-party-struct-fields.md` (§11) — the TDD task
+list, the fixtures, the amendment text and the verification steps for closing
+the release blocker (`.opencode/plan/user-scenarios.md` §3.5, D1).
 **Related**: `.opencode/plan/2026-11-22-third-party-struct-fields.md` (research;
 the source of truth for *why*), `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
 `.opencode/plan/2026-11-21-json-encoder.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

@@ -1,15 +1,6 @@
 # qi-json — user scenarios
 
 **Date**: 2026-11-22
-**Status**: recorded. The third-party struct-field gap was a **release blocker**,
-closed in **v0.2.0** (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`);
-the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fields.md`.
-**D3**, the Go-version floor mismatch (§2.5), was the next task and is now
-**done (2026-11-22)**, shipping in **v0.2.1**, per
-`.opencode/plan/2026-11-22-go-version-floor.md`. All recorded gaps are closed;
-the code-quality refactoring **T-Q2** is done (2026-11-22), **T-Q1** is done
-(2026-11-22), **T-Q3** is done (2026-11-22), and the next task is **T-Q4**
-(`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`).
 
 **Superseded in part by v0.3.0.** The semantic engine now lives behind the
 `qijson` facade in `internal/codec`, the module path is
@@ -20,6 +11,8 @@ be re-run with the new import path. See
 
 **Related**: `docs/constitution.md`, `README.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ## 1. Purpose
 

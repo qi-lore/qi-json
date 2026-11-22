@@ -1,6 +1,6 @@
 # JSON Scanner Implementation Plan — 2026-11-21
 
-## Status
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 The scanner was refactored after the first implementation: the public streaming
 API (`Scanner`, `Step`, `EOF`, `SyntaxError`) is gone. The code now lives in the

@@ -104,10 +104,10 @@ never renumber, never reuse a retired identifier.
 - [X] M004 - Git and Code Quality governance (constitution v3.5.0)
 - [X] M005 - Release flow governance (constitution v3.6.0)
 - [X] M006 - Retire `docs/task.md` and introduce the task registry (constitution v3.9.0)
+- [X] M007 - Normalize the plan files' headers to design records
 
 ## Planned
 
-Next up: **M007**, normalize the plan files' headers to design records.
+Next up: **P001**, protect `main` and `dev` with branch protection and the `verify` check.
 
-- [ ] M007 - Normalize the plan files' headers to design records: drop the status and backlog lines the Task Tracking rule forbids
 - [ ] P001 - Protect `main` and `dev` with branch protection and the `verify` check

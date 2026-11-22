@@ -1,12 +1,13 @@
 # Internal codec extraction
 
-**Status**: done (2026-11-22) — shipped in **v0.3.0**
 **Module path**: `github.com/qi-lore/qi-json` (moved from `qi-json` on
 2026-11-22; `qi-json/...` paths earlier in this plan are the pre-move names)
 **Branch**: `chore/extract-internal-codec` (from `main`, targets `dev`)
 **Related**: `docs/constitution.md` v3.7.0 (Article VI, Additional Constraints);
 `.opencode/plan/2026-11-21-package-rename.md`;
 `.opencode/plan/2026-11-22-go-version-floor.md`.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ## 1. Goal
 
