@@ -4,7 +4,11 @@
 **Status**: recorded. The third-party struct-field gap was a **release blocker**,
 closed in **v0.2.0** (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`);
 the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fields.md`.
-The **next task** is **D3**, the Go-version floor mismatch (§2.5).
+**D3**, the Go-version floor mismatch (§2.5), was the next task and is now
+**done (2026-11-22)**, shipping in **v0.2.1**, per
+`.opencode/plan/2026-11-22-go-version-floor.md`. All recorded gaps are closed;
+the next task is the code-quality refactoring **T-Q2**
+(`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`).
 **Related**: `docs/constitution.md`, `README.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
 
@@ -82,7 +86,10 @@ A throwaway copy set to `go 1.23.0` + `toolchain go1.27.3` built and passed
 Recorded as a **separate open issue** (D3): candidate fix is
 `go 1.23.0` + `toolchain go1.27.3` in `go.mod`, or correcting the documented
 floor. **Originally** not the next task; the struct-field blocker closed in
-v0.2.0, so **D3 is now the next task**.
+v0.2.0, so **D3 became the next task**, and it is now **done (2026-11-22)** —
+the candidate fix was applied (`go 1.23.0` + `toolchain go1.27.3`), so the
+enforced floor matches the documented one. See
+`.opencode/plan/2026-11-22-go-version-floor.md`.
 
 ---
 
@@ -205,7 +212,7 @@ this gap was closed in **v0.2.0** (see §3.6 and §4).
 **D1** — the third-party struct-field gap was a **release blocker**. Research
 (`.opencode/plan/2026-11-22-third-party-struct-fields.md`) led to the layered fix,
 and the implementation (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`)
-**closed the blocker in v0.2.0**. The next task is **D3** (§4).
+**closed the blocker in v0.2.0**. The next task was **D3** (§4), now **done**.
 
 ---
 
@@ -219,14 +226,14 @@ and the implementation (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md
   `unsafe`, no `encoding/json`; the code generator stays stdlib-only,
   deterministic and drift-guarded; the decoder and encoder stay symmetric; new
   exported identifiers need a constitution amendment.
-- **D3 (Go-version floor — next task).** `docs/constitution.md` documents a
-  `Go >= 1.23` floor but `go.mod` declares `go 1.27.3`. Candidate fix:
-  `go 1.23.0` + `toolchain go1.27.3`; or correct the documented floor to 1.27.3.
-  Separate from the struct work; **picked up next**, with a plan file to be
-  written first.
+- **D3 (Go-version floor — done 2026-11-22).** `docs/constitution.md` documented
+  a `Go >= 1.23` floor but `go.mod` declared `go 1.27.3`. **Fixed** with
+  `go 1.23.0` + `toolchain go1.27.3`, so the enforced floor matches the stated
+  one. Plan and results: `.opencode/plan/2026-11-22-go-version-floor.md`.
 - **D4 (baseline + handoff).** This session recorded the scenarios at the
   **v0.1.1** baseline and opened the research task; the struct work shipped in
-  **v0.2.0**, so the current baseline is now **v0.2.0**.
+  **v0.2.0** and the Go-floor fix in **v0.2.1**, so the current baseline is now
+  **v0.2.1**.
 
 ---
 

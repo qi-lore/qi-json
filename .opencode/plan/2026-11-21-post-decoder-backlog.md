@@ -2,8 +2,10 @@
 
 **Date**: 2026-11-21
 **Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done, the codegen
-named `string`/`bool` follow-up is done, and the package relocation + rename is
-done. No open follow-ups remain (§9).
+named `string`/`bool` follow-up is done, the package relocation + rename is
+done, and the last open item — the Go-version floor mismatch — is done and ships
+in **v0.2.1** (2026-11-22, `.opencode/plan/2026-11-22-go-version-floor.md`). No
+open follow-ups remain (§9).
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -241,9 +243,10 @@ the decoder or scanner. Results are recorded in each task's handoff.
 
 ## 9. Open follow-ups (T12+)
 
-Recorded so a later session can pick them up. One item is **open** (2026-11-22) and
-is the **next task** — the Go-version floor mismatch (D3 in
-`.opencode/plan/user-scenarios.md` §2.5 / §4); the rest are done.
+Recorded so a later session can pick them up. All items are done. The last one
+(2026-11-22), the Go-version floor mismatch (D3 in
+`.opencode/plan/user-scenarios.md` §2.5 / §4), was closed by
+`.opencode/plan/2026-11-22-go-version-floor.md`; the rest are done.
 
 - **Foreign struct fields — release blocker** — **done (2026-11-22), shipped in
   v0.2.0.** A struct field whose type is a struct from another package is now
@@ -253,12 +256,13 @@ is the **next task** — the Go-version floor mismatch (D3 in
   `.opencode/plan/2026-11-22-third-party-struct-fields.md`; implementation plan:
   `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`; user evidence:
   `.opencode/plan/user-scenarios.md` §3.
-- **Go-version floor mismatch (OPEN — next task).** `docs/constitution.md`
-  documents a `Go >= 1.23` floor but `go.mod` declares `go 1.27.3`, so a 1.23
-  consumer is silently upgraded or blocked. Candidate fix: `go 1.23.0` +
-  `toolchain go1.27.3`; or correct the documented floor. Evidence:
-  `.opencode/plan/user-scenarios.md` §2. This is **D3**, the next task; write a
-  short plan before changing `go.mod` or the constitution.
+- **Go-version floor mismatch — done (2026-11-22).** `docs/constitution.md`
+  documents a `Go >= 1.23` floor but `go.mod` declared `go 1.27.3`, so a 1.23
+  consumer was silently upgraded or blocked. **Fixed** with `go 1.23.0` +
+  `toolchain go1.27.3`, so the enforced floor matches the stated one; guarded by
+  `TestGoModGoDirectiveFloor`. Plan and results:
+  `.opencode/plan/2026-11-22-go-version-floor.md`. Evidence:
+  `.opencode/plan/user-scenarios.md` §2.
 - **Package relocation + rename** — **done (2026-11-21)**: the semantic layer
   moved from `marshal/` to the module root and is now `package qijson` at import
   path `qi-json` (`qi-json` is not a valid Go identifier, so the clause differs
