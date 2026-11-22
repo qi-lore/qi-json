@@ -32,8 +32,8 @@ release series.
 ## Why another JSON library
 
 - **Independent implementation.** The scanner and decoder are written from
-  scratch against `docs/task.md`. `encoding/json` is not imported anywhere in the
-  module, including tests and benchmarks.
+  scratch against the contract the tests pin. `encoding/json` is not imported
+  anywhere in the module, including tests and benchmarks.
 - **No reflection.** `qijson` decodes into concrete Go types through accessor
   closures. That keeps struct decoding predictable and allocation-tight — and it
   is why the API is deliberately **not** `encoding/json`-compatible.
@@ -437,12 +437,13 @@ branch name, the target branch and the commit messages of each pull request.
 internal/codec/          the engine: Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package codec)
 scanner/                 Valid, the tokenizer, benchmarks and differential tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
-docs/task.md             scanner specification
+docs/tasks.md            the task registry: single source of truth for task state
 docs/constitution.md     governing rules and the sanctioned public surface
-.opencode/plan/          design decisions, task lists and verification logs
+.opencode/plan/          design rationale and history (no task state)
 ```
 
 The decoder plan (`.opencode/plan/2026-11-21-json-decoder.md`) and the encoder
-plan (`.opencode/plan/2026-11-21-json-encoder.md`) are the handoff documents for
-the semantic layer; the codegen plan
-(`.opencode/plan/2026-11-21-json-codegen.md`) covers `qi-json-gen`.
+plan (`.opencode/plan/2026-11-21-json-encoder.md`) are the design records for the
+semantic layer; the codegen plan
+(`.opencode/plan/2026-11-21-json-codegen.md`) covers `qi-json-gen`. Task state
+lives in [docs/tasks.md](docs/tasks.md).

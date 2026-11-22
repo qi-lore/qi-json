@@ -7,12 +7,12 @@ contract; this document governs how changes are made.
 
 ### I. Spec First
 
-`docs/task.md` is the authoritative specification. The implementation follows
-its grammar, positions, scanners and invariants. Two strict grammar rules are
-deliberate and must be preserved: a `0` integer part may not be followed by a
-digit (`01` is invalid), and a number allows at most one fraction and one
-exponent (`1.2.3`, `1e1e2` are invalid). Rationale:
-`.opencode/plan/2026-11-21-scanner-rewrite.md`.
+The test suite is the authoritative specification. It pins the grammar, the
+exact error messages and the 1-based positions; the implementation follows the
+contract those tests enforce. Two strict grammar rules are deliberate and must be
+preserved: a `0` integer part may not be followed by a digit (`01` is invalid),
+and a number allows at most one fraction and one exponent (`1.2.3`, `1e1e2` are
+invalid). Rationale: `.opencode/plan/2026-11-21-scanner-rewrite.md`.
 
 ### II. Test-Driven Development (NON-NEGOTIABLE)
 
@@ -40,8 +40,9 @@ documents nesting at most `nestingInline` levels, guarded by
 `TestValidDoesNotAllocate`. Per-byte dispatch through function pointers, closures
 or a handler table is prohibited, and `goto` and statement labels are prohibited
 throughout the scanner. The hot path is a structured pair of loops (see
-`docs/task.md` §6.1); the object-member scanner is written twice on purpose so it
-stays inline, because a shared helper costs about 8% on object-heavy documents.
+`AGENTS.md`, "Contract details that are easy to break"); the object-member scanner
+is written twice on purpose so it stays inline, because a shared helper costs
+about 8% on object-heavy documents.
 Deeper documents may allocate the nesting stack once. Prefer the fastest correct
 implementation and support structural changes with benchmarks.
 
@@ -111,7 +112,21 @@ first failure, fix it, then restart the sequence from step 1:
 4. `golangci-lint run` — v2, default linters, no repo config
 
 A task is not complete until all four pass. Report the commands and their
-results in the final summary.
+results in the final summary. `make verify` runs steps 1–4 in order and stops at
+the first failure.
+
+Additional commands, used where the task touches the relevant code:
+
+```text
+go test -race ./...
+go test ./scanner -run '^TestInvalidDocuments$'      # one test or table
+go test -run=^$ -fuzz=FuzzValid -fuzztime=10s ./scanner   # -run=^$ is required
+go test -run=^$ -bench=. -benchmem ./scanner
+go generate ./...                                    # regenerate generator fixtures
+```
+
+Performance is a feature: `BenchmarkValid*` MUST NOT regress, and the `Valid`
+success path MUST stay allocation-free (`TestValidDoesNotAllocate`).
 
 ## Additional Constraints
 
@@ -176,8 +191,8 @@ in order:
    - promote the `CHANGELOG.md` `[Unreleased]` entry to `[X.Y.Z] - YYYY-MM-DD`
      and reopen an empty `[Unreleased]` section above it;
    - update the `README.md` version block;
-   - do the housekeeping the release implies (mark finished items, point the
-     next task, refresh baseline references in the plans);
+   - do the housekeeping the release implies (mark finished items in
+     `docs/tasks.md`, refresh baseline references in the plans);
    - commit as `chore(release): vX.Y.Z` with a full body and run the
      Verification Workflow.
 3. **Open the `dev` → `main` pull request** — the only pull request allowed to
@@ -194,6 +209,20 @@ CI MUST enforce the branch-name, target-branch and commit-message rules and the
 Verification Workflow below where technically possible. The workflow in
 `.github/workflows/ci.yml` runs the verification sequence and checks the source
 branch name, the target branch and the commit messages of each pull request.
+
+## Task Tracking
+
+`docs/tasks.md` is the single source of truth for task state.
+
+- Tasks MUST be recorded only in `docs/tasks.md`.
+- Tasks MUST NOT be recorded in files under `.opencode/plan/` or in `AGENTS.md`.
+- `docs/tasks.md` MUST be updated before every commit.
+- Files under `.opencode/plan/` remain design rationale and history. They MUST
+  NOT carry task status or a backlog, and a plan file is not an authority on
+  what is done or what is left.
+- Every task line uses the fixed format `[X] <PREFIX><NNN> - <SHORT_DESCRIPTION>`
+  for completed work and `[ ] <PREFIX><NNN> - <SHORT_DESCRIPTION>` for planned
+  work. Identifiers are stable: never renumber and never reuse a retired one.
 
 ## Rigorous Code Quality
 
@@ -223,12 +252,12 @@ addition:
 The library is synchronous today: it starts no goroutines and no exported
 operation blocks, so the goroutine and context rules bind only when such code is
 added. Where the current code does not yet meet a rule, the gap is a refactoring
-task tracked in `.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`.
+task tracked in `docs/tasks.md`.
 
 ## Governance
 
 This constitution supersedes ad-hoc workflow preferences. Amendments update this
-file and `AGENTS.md` together. If code and tests disagree, resolve the
-discrepancy against `docs/task.md`, then update both.
+file and `AGENTS.md` together. If code and tests disagree, the tests are the
+contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.8.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.9.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22

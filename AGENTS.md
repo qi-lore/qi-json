@@ -17,10 +17,9 @@ A from-scratch JSON library with four Go packages:
   tags. No `reflect`/`unsafe`; it targets only the exported `qijson` surface.
 
 The module root is the `qijson` package. No third-party dependencies. `make` wraps the
-common tasks. `docs/task.md` is the syntax specification;
-`.opencode/plan/2026-11-21-json-decoder.md` is the decoder plan and task list and
-`.opencode/plan/2026-11-21-json-encoder.md` is the encoder plan; `docs/constitution.md`
-governs changes.
+common tasks. `docs/tasks.md` is the single source of truth for task state;
+`docs/constitution.md` governs changes. Plan files under `.opencode/plan/` hold
+design rationale and history only.
 
 ## Required verification (in this order)
 
@@ -66,13 +65,22 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - Prepare the release on `dev` (never on a feature branch): promote the
   `CHANGELOG.md` `[Unreleased]` entry to `[X.Y.Z] - YYYY-MM-DD` and reopen an
   empty `[Unreleased]`; update the `README.md` version block; do the housekeeping
-  (mark done items, point the next task, refresh baseline references); commit as
-  `chore(release): vX.Y.Z` with a full body; run `make verify`.
+  (mark done items in `docs/tasks.md`, refresh baseline references in the plans);
+  commit as `chore(release): vX.Y.Z` with a full body; run `make verify`.
 - Open the `dev` → `main` pull request (the only PR allowed into `main`) and let
   CI pass.
 - Merge into `main`, then tag the merge commit: `git tag vX.Y.Z <merge-sha>` and
   push the tag.
 - Keep `dev` — do not delete the integration branch.
+
+## Task tracking
+
+- `docs/tasks.md` is the single source of truth for task state: one line per task,
+  `- [X] <PREFIX><NNN> - <SHORT_DESCRIPTION>` when done and `- [ ] …` when
+  planned. Prefixes group by area; the file's legend lists them.
+- Tasks MUST be recorded only in `docs/tasks.md`. Do not record task status or a
+  backlog in `.opencode/plan/` files or in `AGENTS.md`.
+- `docs/tasks.md` MUST be updated before every commit.
 
 ## Code quality
 
@@ -93,7 +101,7 @@ All Go code follows the Uber Go Style Guide
 
 The library is synchronous (no goroutines, no blocking calls), so the goroutine
 and context rules bind only when such code is added. Open gaps are tracked in
-`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`.
+`docs/tasks.md`.
 
 ## API and naming
 
@@ -114,9 +122,9 @@ and context rules bind only when such code is added. Open gaps are tracked in
   `step` or `finish`.
 - The scanner uses no `goto` and no statement labels. `run` is two nested loops:
   an outer loop that scans one value, and an inner loop that consumes the
-  delimiter after a completed value (see `docs/task.md` §6.1). The object-member
-  scan is deliberately written twice so it stays inline; extracting it into a
-  helper costs about 8% on object-heavy documents.
+  delimiter after a completed value (see "Contract details that are easy to
+  break" below). The object-member scan is deliberately written twice so it stays
+  inline; extracting it into a helper costs about 8% on object-heavy documents.
 - `qijson` is the semantic layer: a reflection-free decoder and encoder over
   `scanner`. It MUST NOT import `encoding/json` and MUST NOT use `reflect` or
   `unsafe`; struct binding is by compile-time accessor closures. Its API is
@@ -149,7 +157,7 @@ and context rules bind only when such code is added. Open gaps are tracked in
   Generation must be deterministic (sort all emitted collections) so the drift
   guard passes. Plan: `.opencode/plan/2026-11-21-json-codegen.md`.
 - Never use `encoding/json`, including in tests or benchmarks (hard requirement
-  in `docs/task.md`); tests are hand-built tables.
+  in the constitution, Article III); tests are hand-built tables.
 
 ## Contract details that are easy to break
 
@@ -180,51 +188,26 @@ and context rules bind only when such code is added. Open gaps are tracked in
 ## Context
 
 - Governing rules: `docs/constitution.md`.
-- Specs and plans:
-  - `docs/task.md` — scanner specification.
-  - `.opencode/plan/2026-11-21-json-decoder.md` — decoder decisions, tasks and
-    handoff (resume here for decoder work).
-  - `.opencode/plan/2026-11-21-json-codegen.md` — the `cmd/qi-json-gen` codegen
-    design, tasks and handoff (resume here for codegen work).
-  - `.opencode/plan/2026-11-21-post-decoder-backlog.md` — the running backlog of
-    follow-up tasks (resume here for post-decoder work; its last open item, the
-    Go-version floor mismatch, is **done** per
-    `.opencode/plan/2026-11-22-go-version-floor.md`).
-  - `.opencode/plan/2026-11-22-go-version-floor.md` — **done 2026-11-22**:
-    `go.mod` reads `go 1.24.0` + `toolchain go1.27.3`, matching the documented
-    `Go >= 1.24` floor (a 1.24 consumer is no longer silently upgraded or
-    blocked). Guarded by `TestGoModGoDirectiveFloor`. The floor moved from 1.23
-    to 1.24 with the facade's generic type aliases (see the internal-codec
-    extraction plan).
-  - `.opencode/plan/2026-11-22-internal-codec-extraction.md` — **done
-    2026-11-22, shipped in v0.3.0**: the semantic engine moved to `internal/codec`
-    and the module root became a thin facade of type aliases and wrappers; the Go
-    floor moved to 1.24 for generic type aliases, and the canonical module path
-    became `github.com/qi-lore/qi-json`. The scanner stays public at
-    `github.com/qi-lore/qi-json/scanner`; hiding it is deferred to a separate
-    breaking change.
-  - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the
-    gaps they expose (the foreign-struct-field gap was a release blocker, closed
-    in v0.2.0).
-  - `.opencode/plan/2026-11-22-third-party-struct-fields.md` — research for
-    struct fields whose type is a struct from another package (**done
-    2026-11-22**; decision is **F**: A + B + C, with D as the escape hatch; E
-    rejected).
-  - `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md` — **done
-    2026-11-22**: implemented that decision (TDD tasks T-F1…T-F6; Article VI
-    amendment v3.4.0 for the delegation constructor C).
-  - `.opencode/plan/2026-11-22-git-and-code-quality-reglament.md` — the **Git
-    and Review Discipline** and **Rigorous Code Quality** rules added to the
-    constitution (v3.5.0) and `AGENTS.md`, plus the audit and the refactoring
-    tasks T-Q1…T-Q4 they imply (resume here for code-quality work).
-  - `.opencode/plan/2026-11-22-release-flow.md` — **done 2026-11-22**: the
-    **Release flow** section added to the constitution (v3.6.0) and mirrored in
-    `AGENTS.md` (choose the version, prepare on `dev`, the `dev` → `main` pull
-    request, tag the merge commit, keep `dev`).
-  - `.opencode/plan/2026-11-21-package-rename.md` — relocated the semantic layer
-    to the module root and renamed it `qijson` (done 2026-11-21).
-  - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
-    and verification log.
-  - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research
-    (see the decoder plan for what is superseded).
+- Task state: `docs/tasks.md` — the single source of truth for what is done and
+  what is planned. Do not look for task status in the plan files.
+- Design records (rationale and history only):
+  - `.opencode/plan/2026-11-21-json-decoder.md` — decoder design decisions.
+  - `.opencode/plan/2026-11-21-json-encoder.md` — encoder design decisions.
+  - `.opencode/plan/2026-11-21-json-codegen.md` — the `cmd/qi-json-gen` design.
+  - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale.
+  - `.opencode/plan/2026-11-21-package-rename.md` — the relocation and rename.
+  - `.opencode/plan/2026-11-22-internal-codec-extraction.md` — the `internal/codec`
+    extraction and the canonical module path.
+  - `.opencode/plan/2026-11-22-third-party-struct-fields.md` and
+    `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md` — foreign struct
+    fields: research and implementation.
+  - `.opencode/plan/2026-11-22-git-and-code-quality-reglament.md` — the governance
+    amendment and its audit.
+  - `.opencode/plan/2026-11-22-release-flow.md` — the release-flow governance.
+  - `.opencode/plan/2026-11-22-go-version-floor.md` — the Go-floor fix.
+  - `.opencode/plan/2026-11-22-tasks-registry.md` — this registry's design.
+  - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs.
+  - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research.
   - `.opencode/plan/2026-11-21-json-scanner.md` — superseded state machine.
+  - `.opencode/plan/2026-11-21-post-decoder-backlog.md` — historical backlog,
+    superseded by `docs/tasks.md`.

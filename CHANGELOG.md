@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: `docs/task.md` is retired and `docs/tasks.md` becomes the single
+  source of truth for task state. The scanner specification's surviving content
+  moved into the constitution (the extra verification commands and the
+  performance invariant) and into the tests that already pin the contract; the
+  constitution gains a **Task Tracking** section (v3.9.0) that records tasks only
+  in `docs/tasks.md`, forbids task state in `.opencode/plan/` files and
+  `AGENTS.md`, and requires `docs/tasks.md` to be updated before every commit.
+  No code or public API change.
+
 ## [0.3.0] - 2026-11-22
 
 ### Changed
