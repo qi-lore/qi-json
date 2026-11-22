@@ -13,7 +13,7 @@ experience. Your preferred language is Go.
 
 ## 3. Core principles
 
-- Use Go >= 1.23.0 with no external dependencies.
+- Use Go >= 1.24.0 with no external dependencies.
 - NEVER use `encoding/json`. Our goal is to write our own implementation —
   ideally a faster one.
 - When choosing solutions, ALWAYS consider performance. If one implementation

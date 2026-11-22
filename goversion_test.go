@@ -8,14 +8,17 @@ import (
 
 // TestGoModGoDirectiveFloor pins the module's declared Go language floor to the
 // version the documentation promises. Both docs/constitution.md (Additional
-// Constraints) and docs/task.md §3 state a Go >= 1.23 floor. Since Go 1.21 a
-// dependency's go directive is a hard minimum, so a go directive above the
-// documented floor silently upgrades or hard-blocks a consumer on that floor
-// (see .opencode/plan/2026-11-22-go-version-floor.md). Update this test only
+// Constraints) and docs/task.md §3 state a Go >= 1.24 floor: the root package is
+// a facade of generic type aliases (Schema, Field, Codec), and generic type
+// aliases are a Go 1.24 language feature. Since Go 1.21 a dependency's go
+// directive is a hard minimum, so a go directive above the documented floor
+// silently upgrades or hard-blocks a consumer on that floor (see
+// .opencode/plan/2026-11-22-go-version-floor.md and
+// .opencode/plan/2026-11-22-internal-codec-extraction.md). Update this test only
 // when the documented floor deliberately moves.
 func TestGoModGoDirectiveFloor(t *testing.T) {
 	const (
-		wantGo        = "1.23.0"
+		wantGo        = "1.24.0"
 		wantToolchain = "go1.27.3"
 	)
 

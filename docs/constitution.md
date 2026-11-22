@@ -91,6 +91,15 @@ repo-specific (`validator`, `container`/`containerObject`/`containerArray`,
 `parseError`, `skipSpace`, `scan*`); do not copy `encoding/json` identifiers such
 as `Scanner`, `SyntaxError`, `scanBegin*`, or `stateBegin*`.
 
+The implementation of the `qijson` decoder and encoder lives in `internal/codec`
+(added 2026-11-22; rationale:
+`.opencode/plan/2026-11-22-internal-codec-extraction.md`). It is an internal
+package, not a public surface: the module root is a thin facade of type aliases
+and wrappers, so external code cannot import the engine and its internals may
+change without a compatibility promise. The facade MUST re-export the entire
+public contract, including the ownership, concurrency and lifecycle
+documentation the public types and functions require.
+
 ## Verification Workflow (NON-NEGOTIABLE)
 
 Every task MUST finish by running these commands in this order. Stop at the
@@ -106,12 +115,15 @@ results in the final summary.
 
 ## Additional Constraints
 
-- Go >= 1.23: the `go.mod` `go` directive is the language floor
-  (`go 1.23.0`); its `toolchain` line (`go1.27.3`) names the toolchain used to
-  develop the project and is ignored by consumers.
-- Three packages under module `qi-json` (the module root is a package):
-  - `.` (module root) — `qijson`, the reflection-free semantic layer (decode
-    and encode);
+- Go >= 1.24: the `go.mod` `go` directive is the language floor
+  (`go 1.24.0`), required because the facade re-exports generic types through
+  generic type aliases; its `toolchain` line (`go1.27.3`) names the toolchain
+  used to develop the project and is ignored by consumers.
+- Four packages under module `qi-json` (the module root is a package):
+  - `.` (module root) — `qijson`, the public facade of the reflection-free
+    semantic layer (decode and encode);
+  - `internal/codec/` — the semantic engine behind that facade; internal, not a
+    public surface;
   - `scanner/` — `Valid` and the tokenizer over the single-pass scanner
     (`valid.go`, `scan.go`, `token.go`, `doc.go`);
   - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
@@ -218,4 +230,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.7.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.8.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22

@@ -138,15 +138,43 @@ func qijsonMethod(fn *types.Func, want string) bool {
 	if !ok {
 		return false
 	}
-	named, ok := ptr.Elem().(*types.Named)
+	if !isQijsonType(ptr.Elem(), want) {
+		return false
+	}
+	return types.Identical(sig.Results().At(0).Type(), types.Universe.Lookup("error").Type())
+}
+
+// The public facade package and the engine it re-exports. A method written as
+// DecodeJSON(*qijson.Reader) type-checks either as an alias to the engine type
+// or as the engine type itself, depending on how the toolchain materializes
+// aliases (GODEBUG=gotypesalias), so both identities are accepted.
+const (
+	qijsonPath       = "qi-json"
+	qijsonEnginePath = "qi-json/internal/codec"
+)
+
+// isQijsonType reports whether t is the public qijson type named want (Reader
+// or Writer), either as the facade alias or as the engine type it resolves to.
+func isQijsonType(t types.Type, want string) bool {
+	if a, ok := t.(*types.Alias); ok {
+		obj := a.Obj()
+		if obj.Pkg() != nil && obj.Pkg().Path() == qijsonPath && obj.Name() == want {
+			return true
+		}
+	}
+	named, ok := types.Unalias(t).(*types.Named)
 	if !ok {
 		return false
 	}
 	obj := named.Obj()
-	if obj.Pkg() == nil || obj.Pkg().Name() != "qijson" || obj.Name() != want {
+	if obj.Pkg() == nil || obj.Name() != want {
 		return false
 	}
-	return types.Identical(sig.Results().At(0).Type(), types.Universe.Lookup("error").Type())
+	switch obj.Pkg().Path() {
+	case qijsonPath, qijsonEnginePath:
+		return true
+	}
+	return false
 }
 
 // crossNamedCodec builds a codec for a cross-package named type whose underlying

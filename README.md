@@ -7,7 +7,8 @@ accessor closures, optionally generated from struct tags.
 | Package | Import path | Role |
 |---|---|---|
 | `scanner` | `qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
-| `qijson` | `qi-json` | Semantic layer: the reflection-free decoder and encoder |
+| `qijson` | `qi-json` | Public facade of the semantic layer: type aliases, constants and wrappers |
+| `internal/codec` | `qi-json/internal/codec` | Implementation of the semantic layer behind the facade (internal) |
 | `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
 Released as **v0.2.3** (2026-11-22). The decoder and encoder are complete and
@@ -51,9 +52,10 @@ require qi-json v0.0.0
 replace qi-json => ../qi-json
 ```
 
-The module requires **Go 1.23 or newer**. Its `go.mod` sets `go 1.23.0` (the
-language floor) and adds a `toolchain go1.27.3` line, which merely names the
-toolchain used to develop the project — a dependency's `toolchain` line is
+The module requires **Go 1.24 or newer**. Its `go.mod` sets `go 1.24.0` (the
+language floor, because the `qijson` facade re-exports generic types through
+generic type aliases) and adds a `toolchain go1.27.3` line, which merely names
+the toolchain used to develop the project — a dependency's `toolchain` line is
 ignored, so it does not raise the floor for a consumer.
 
 ## Quick start
@@ -406,7 +408,8 @@ branch name, the target branch and the commit messages of each pull request.
 ## Repository layout
 
 ```
-.                        Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package qijson)
+.                        public facade: type aliases, constants and wrappers (package qijson) + the facade contract test
+internal/codec/          the engine: Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package codec)
 scanner/                 Valid, the tokenizer, benchmarks and differential tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
 docs/task.md             scanner specification

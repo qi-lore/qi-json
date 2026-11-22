@@ -1,6 +1,6 @@
 # Internal codec extraction
 
-**Status**: approved (2026-11-22) — decisions settled, implementation not started
+**Status**: done (2026-11-22) — implemented on `chore/extract-internal-codec`
 **Branch**: `chore/extract-internal-codec` (from `main`, targets `dev`)
 **Related**: `docs/constitution.md` v3.7.0 (Article VI, Additional Constraints);
 `.opencode/plan/2026-11-21-package-rename.md`;
@@ -202,3 +202,23 @@ goal at no consumer cost.
   `qijson.Kind` (and decide whether `Valid` is re-exported or dropped), rewrite
   the generator to emit `qijson.KindNull`, regenerate fixtures, and ship a
   migration note. Deliberate breaking change; its own branch and release.
+
+## 12. Verification log (2026-11-22)
+
+- `go test ./... -count=1` — pass (`qijson`, `internal/codec`, `scanner`, the
+  generator and its gentest fixture).
+- `gofmt -l .` — empty.
+- `go vet ./...` — pass.
+- `golangci-lint run` — 0 issues.
+- `go test -race ./... -count=1` — pass.
+- `go generate ./...` — no change to any `zz_qi_json_gen*.go` fixture.
+- `go doc -all .` — every exported function and constant is identical to the
+  baseline; the types are now aliases, so their method declarations live on the
+  `internal/codec` declarations (the expected §5.3 tradeoff). The facade docs
+  list each aliased type's methods so `go doc qijson` stays navigable.
+- Benchmarks (`-benchtime=300ms`) — within noise, allocations identical.
+
+One unplanned fix: `cmd/qi-json-gen` identified `qijson.Reader`/`Writer` by
+package name, which aliases break. `qijsonMethod` now accepts the facade alias
+and the engine type by import path (`qi-json` and `qi-json/internal/codec`), so
+generated output is byte-identical.
