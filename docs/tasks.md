@@ -105,6 +105,9 @@ never renumber, never reuse a retired identifier.
 
 ## Planned
 
+Next up: **S005**, the scanner consolidation.
+
 - [ ] S005 - Scanner consolidation: move to `internal/scanner` and publish `qijson.Kind`
 - [ ] Q004 - Uber Go Style Guide review pass
+- [ ] M007 - Normalize the plan files' headers to design records: drop the status and backlog lines the Task Tracking rule forbids
 - [ ] P001 - Protect `main` and `dev` with branch protection and the `verify` check

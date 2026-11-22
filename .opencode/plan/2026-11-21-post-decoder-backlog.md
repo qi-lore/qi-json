@@ -1,19 +1,13 @@
-# qi-json — post-decoder backlog (T11+)
+# qi-json — post-decoder backlog (historical design record)
 
 **Date**: 2026-11-21
-**Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done, the codegen
-named `string`/`bool` follow-up is done, the package relocation + rename is
-done, and the last open item — the Go-version floor mismatch — is done and ships
-in **v0.2.1** (2026-11-22, `.opencode/plan/2026-11-22-go-version-floor.md`). No
-open follow-ups remain (§9).
-**Next task**: the deferred scanner consolidation — move `scanner/` behind
-`internal/`, publish `qijson.Kind`, and ship it as its own breaking release. It
-is the only item in §11 of
-`.opencode/plan/2026-11-22-internal-codec-extraction.md`; v0.3.0 landed the
-`internal/codec` extraction and the canonical module path without it.
-**Related**: `docs/constitution.md`, `AGENTS.md`,
-`.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
-`.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
+**Status**: historical. Every task in this document is complete; task state now
+lives in `docs/tasks.md`. This file is kept as a design record of the rationale
+behind each task.
+**Related**: `docs/constitution.md`, `AGENTS.md`, `docs/tasks.md`,
+`.opencode/plan/2026-11-21-json-decoder.md`,
+`.opencode/plan/2026-11-21-json-codegen.md`,
+`.opencode/plan/2026-11-22-internal-codec-extraction.md`.
 
 ---
 
