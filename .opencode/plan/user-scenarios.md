@@ -232,8 +232,8 @@ and the implementation (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md
   one. Plan and results: `.opencode/plan/2026-11-22-go-version-floor.md`.
 - **D4 (baseline + handoff).** This session recorded the scenarios at the
   **v0.1.1** baseline and opened the research task; the struct work shipped in
-  **v0.2.0** and the Go-floor fix in **v0.2.1**, so the current baseline is now
-  **v0.2.1**.
+  **v0.2.0**, the Go-floor fix in **v0.2.1** and the release-flow documentation
+  in **v0.2.2**, so the current baseline is now **v0.2.2**.
 
 ---
 
