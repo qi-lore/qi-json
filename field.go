@@ -10,6 +10,25 @@ import (
 	"qi-json/scanner"
 )
 
+// Sentinel errors for misuse of the container constructors. They are
+// programming errors rather than properties of the input, so they are plain
+// errors rather than *qijson.Error. Each is defined once so a caller can
+// inspect it with errors.Is.
+var (
+	// errNilElementDecoder reports a Slice, Map or Array field built with a
+	// Codec whose Decode is nil.
+	errNilElementDecoder = errors.New("qijson: nil element decoder")
+
+	// errNilElementEncoder reports a Slice, Map or Array field built with a
+	// Codec whose Encode is nil.
+	errNilElementEncoder = errors.New("qijson: nil element encoder")
+
+	// errUnsupportedDynamicType reports a value in an any field whose dynamic
+	// type encodeAny does not know how to write, since qijson may not use
+	// reflection to discover one.
+	errUnsupportedDynamicType = errors.New("unsupported dynamic type")
+)
+
 // Field describes how to decode and encode one JSON object member into a field
 // of T. Name is the JSON member name the field matches; Decode reads the member
 // value from the Reader and stores it into v, and Encode writes it back to a
@@ -284,7 +303,7 @@ func Slice[T, E any](name string, field func(*T) *[]E, elem Codec[E]) Field[T] {
 				return r.ReadNull()
 			}
 			if elem.Decode == nil {
-				return errors.New("qijson: nil element decoder")
+				return errNilElementDecoder
 			}
 
 			out := make([]E, 0)
@@ -308,7 +327,7 @@ func Slice[T, E any](name string, field func(*T) *[]E, elem Codec[E]) Field[T] {
 				return w.WriteNull()
 			}
 			if elem.Encode == nil {
-				return errors.New("qijson: nil element encoder")
+				return errNilElementEncoder
 			}
 			if err := w.BeginArray(); err != nil {
 				return err
@@ -341,7 +360,7 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem Codec[V]) Fie
 				return r.ReadNull()
 			}
 			if elem.Decode == nil {
-				return errors.New("qijson: nil element decoder")
+				return errNilElementDecoder
 			}
 
 			m := make(map[string]V)
@@ -365,7 +384,7 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem Codec[V]) Fie
 				return w.WriteNull()
 			}
 			if elem.Encode == nil {
-				return errors.New("qijson: nil element encoder")
+				return errNilElementEncoder
 			}
 			if err := w.BeginObject(); err != nil {
 				return err
@@ -402,7 +421,7 @@ func Array[T, E any](name string, field func(*T) []E, elem Codec[E]) Field[T] {
 				return r.ReadNull()
 			}
 			if elem.Decode == nil {
-				return errors.New("qijson: nil element decoder")
+				return errNilElementDecoder
 			}
 
 			view := field(v)
@@ -429,7 +448,7 @@ func Array[T, E any](name string, field func(*T) []E, elem Codec[E]) Field[T] {
 		},
 		Encode: func(w *Writer, v *T) error {
 			if elem.Encode == nil {
-				return errors.New("qijson: nil element encoder")
+				return errNilElementEncoder
 			}
 			view := field(v)
 			if err := w.BeginArray(); err != nil {
@@ -610,7 +629,7 @@ func encodeAny(w *Writer, v any) error {
 	case Encoder:
 		return x.EncodeJSON(w)
 	default:
-		return w.fail(fmt.Errorf("qijson: cannot encode %T as JSON", v))
+		return w.fail(fmt.Errorf("qijson: cannot encode %T as JSON: %w", v, errUnsupportedDynamicType))
 	}
 }
 

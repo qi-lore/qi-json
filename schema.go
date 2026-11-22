@@ -2,12 +2,18 @@ package qijson
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
 	"qi-json/scanner"
 )
+
+// errNoFieldEncoder reports a Field whose Encode is nil, reached by
+// Schema.Encode. It is a programming error rather than a property of the input,
+// so it is a plain error rather than a *qijson.Error.
+var errNoFieldEncoder = errors.New("no encoder")
 
 // Schema decodes JSON objects into values of T. Build one with Struct; the zero
 // value is not usable.
@@ -95,7 +101,7 @@ func (s *Schema[T]) Encode(w *Writer, v *T) error {
 			continue
 		}
 		if f.Encode == nil {
-			return fmt.Errorf("qijson: field %q has no encoder", f.Name)
+			return fmt.Errorf("qijson: field %q: %w", f.Name, errNoFieldEncoder)
 		}
 		if err := w.Key(f.Name); err != nil {
 			return err
