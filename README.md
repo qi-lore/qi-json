@@ -10,21 +10,22 @@ accessor closures, optionally generated from struct tags.
 | `qijson` | `qi-json` | Semantic layer: the reflection-free decoder and encoder |
 | `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.2.0** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.2.1** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.2.0** (2026-11-22).
+Current release: **v0.2.1** (2026-11-22).
 
-v0.2.0 adds support for struct fields whose type is a struct from another
-package, closing the release blocker: the generator delegates to a qi-json-aware
-foreign type, synthesizes a schema for a plain foreign struct, and accepts a
-`-foreign=pkg.T=ident` escape hatch, backed by the
-`ObjectDecoder`/`ObjectDecoderPtr`/`DecoderCodec` delegation constructors in
-`qijson`. Being pre-1.0, the exported API may still change in a minor release.
-See [CHANGELOG.md](CHANGELOG.md) for the change history; the git tags record the
-release series.
+v0.2.1 is a maintenance release with no library API change. It adds the project
+governance — the **Git and Review Discipline** and **Rigorous Code Quality**
+sections of `docs/constitution.md` (v3.5.0), mirrored in `AGENTS.md` and
+`README.md` — and the CI workflow that runs the verification sequence and checks
+the branch, target-branch and commit-message rules. It also fixes the module's Go
+floor: `go.mod` now declares `go 1.23.0` (with a `toolchain go1.27.3` line)
+instead of `go 1.27.3`, so the enforced floor matches the documented
+**Go >= 1.23** requirement. See [CHANGELOG.md](CHANGELOG.md) for the change
+history; the git tags record the release series.
 
 ## Why another JSON library
 

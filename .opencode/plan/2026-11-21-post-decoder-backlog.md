@@ -3,9 +3,9 @@
 **Date**: 2026-11-21
 **Status**: plan agreed; tasks 4, 2, 1 and 3 (the encoder) done, the codegen
 named `string`/`bool` follow-up is done, the package relocation + rename is
-done, and the last open item — the Go-version floor mismatch — is done
-(2026-11-22, `.opencode/plan/2026-11-22-go-version-floor.md`). No open
-follow-ups remain (§9).
+done, and the last open item — the Go-version floor mismatch — is done and ships
+in **v0.2.1** (2026-11-22, `.opencode/plan/2026-11-22-go-version-floor.md`). No
+open follow-ups remain (§9).
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.

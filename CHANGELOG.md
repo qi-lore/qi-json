@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-22
+
 ### Added
 
 - Governance: `docs/constitution.md` gains two sections (v3.5.0) — **Git and
