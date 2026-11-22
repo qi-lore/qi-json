@@ -328,7 +328,7 @@ var configSchema = qijson.Struct[Config](
 			v.Maybe = nil
 			return nil
 		}
-		e := new(xtypes.Thing)
+		e := &xtypes.Thing{}
 		if err := xtypesThingSchema.Decode(r, e); err != nil {
 			return err
 		}

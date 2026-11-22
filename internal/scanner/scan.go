@@ -34,6 +34,9 @@ type parseError struct {
 	problem string
 }
 
+// parseError implements error as part of its contract.
+var _ error = parseError{}
+
 // Error implements the error interface.
 func (e parseError) Error() string { return e.problem }
 

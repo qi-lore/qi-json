@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Code style: an Uber Go Style Guide review pass over the library and the
+  generator. The generator now writes a foreign-struct pointer with `&T{}`
+  instead of `new(T)`, so regenerated `qi-json-gen` output differs on that one
+  line; a `Writer` frame that set `object: false` now relies on the zero value;
+  and the generator pre-sizes a few slices and maps and flattens an `else if`
+  that followed a returning branch. Compile-time assertions that `*Error`,
+  `*TypeError` and the scanner's `parseError` implement `error` were added. The
+  runtime behavior, error messages and public API are unchanged. The guide's
+  rule that unexported top-level vars and consts be prefixed with `_` is a
+  recorded, deliberate deviation: the descriptive names are kept.
+
 ## [0.4.0] - 2026-11-22
 
 ### Changed

@@ -94,7 +94,7 @@ func (g *gen) renderForeign(buf *bytes.Buffer) error {
 // exported fields, skipping unexported ones (which sets the approximate note).
 func (g *gen) renderForeignSchema(buf *bytes.Buffer, ft *foreignType) error {
 	fmt.Fprintf(buf, "var %s = qijson.Struct[%s](\n", foreignSchemaVar(ft.goType), ft.goType)
-	used := map[string]bool{}
+	used := make(map[string]bool, ft.strct.NumFields())
 	for i := 0; i < ft.strct.NumFields(); i++ {
 		v := ft.strct.Field(i)
 		if !v.Exported() {
@@ -208,10 +208,12 @@ func (g *gen) namedFieldCodec(owner, fname, jname string, t *types.Named) (strin
 		return g.numericCodec(owner, fname, jname, goType, name, false), nil
 	case *types.Struct:
 		g.addImport(pkg.Path(), pkg.Name())
-		if dec, enc := g.decoderEncoder(t); dec && enc {
+		dec, enc := g.decoderEncoder(t)
+		if dec && enc {
 			return fmt.Sprintf("qijson.ObjectDecoder[%s, %s](%q, func(v *%s) *%s { return &v.%s })",
 				owner, goType, jname, owner, goType, fname), nil
-		} else if dec != enc {
+		}
+		if dec != enc {
 			return "", fmt.Errorf("%s.%s: cross-package type %s implements only one of DecodeJSON/EncodeJSON; both are required for a symmetric binding", owner, fname, goType)
 		}
 		g.addForeign(t)
@@ -266,10 +268,12 @@ func (g *gen) foreignStarCodec(owner, fname, jname string, t *types.Pointer) (st
 			}
 		case *types.Struct:
 			g.addImport(pkg.Path(), pkg.Name())
-			if dec, enc := g.decoderEncoder(et); dec && enc {
+			dec, enc := g.decoderEncoder(et)
+			if dec && enc {
 				return fmt.Sprintf("qijson.ObjectDecoderPtr[%s, %s](%q, func(v *%s) **%s { return &v.%s })",
 					owner, goType, jname, owner, goType, fname), nil
-			} else if dec != enc {
+			}
+			if dec != enc {
 				return "", fmt.Errorf("%s.%s: cross-package type %s implements only one of DecodeJSON/EncodeJSON; both are required for a symmetric binding", owner, fname, goType)
 			}
 			g.addForeign(et)
@@ -288,7 +292,7 @@ func (g *gen) schemaPtrCodec(owner, fname, jname, goType, schema string) string 
 	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
 	b.WriteString("\tif k == qijson.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
 	fmt.Fprintf(&b, "\t\tv.%s = nil\n\t\treturn nil\n\t}\n", fname)
-	fmt.Fprintf(&b, "\te := new(%s)\n\tif err := %s.Decode(r, e); err != nil {\n\t\treturn err\n\t}\n", goType, schema)
+	fmt.Fprintf(&b, "\te := &%s{}\n\tif err := %s.Decode(r, e); err != nil {\n\t\treturn err\n\t}\n", goType, schema)
 	fmt.Fprintf(&b, "\tv.%s = e\n\treturn nil\n\t},\n", fname)
 	fmt.Fprintf(&b, "\tEncode: func(w *qijson.Writer, v *%s) error {\n", owner)
 	fmt.Fprintf(&b, "\t\tif v.%s == nil {\n\t\t\treturn w.WriteNull()\n\t\t}\n", fname)
@@ -379,9 +383,11 @@ func (g *gen) foreignElem(t types.Type) (name, codec string, err error) {
 			return goType, fmt.Sprintf("qijson.NewCodec(%s, %s)", g.numericHelper(goType, bn), g.numericEncodeHelper(goType, bn)), nil
 		case *types.Struct:
 			g.addImport(pkg.Path(), pkg.Name())
-			if dec, enc := g.decoderEncoder(tt); dec && enc {
+			dec, enc := g.decoderEncoder(tt)
+			if dec && enc {
 				return goType, fmt.Sprintf("qijson.DecoderCodec[%s, *%s]()", goType, goType), nil
-			} else if dec != enc {
+			}
+			if dec != enc {
 				return "", "", fmt.Errorf("cross-package element type %s implements only one of DecodeJSON/EncodeJSON; both are required for a symmetric binding", goType)
 			}
 			g.addForeign(tt)

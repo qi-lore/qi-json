@@ -247,7 +247,7 @@ func (g *gen) selectTargets(types []string) error {
 			return fmt.Errorf("no -type given and no //%s marker found", marker)
 		}
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool, len(types))
 	for _, name := range types {
 		if seen[name] {
 			continue
@@ -343,7 +343,7 @@ func (g *gen) renderType(buf *bytes.Buffer, name string) error {
 	schemaVar := schemaVarName(name)
 
 	fmt.Fprintf(buf, "var %s = qijson.Struct[%s](\n", schemaVar, name)
-	used := map[string]bool{}
+	used := make(map[string]bool, len(st.Fields.List))
 	for _, field := range st.Fields.List {
 		codecs, err := g.fieldCodecs(name, field)
 		if err != nil {
@@ -388,7 +388,7 @@ func (g *gen) fieldCodecs(owner string, field *ast.Field) ([]codec, error) {
 		return nil, fmt.Errorf("%s: a json tag on a multi-name field is not supported", owner)
 	}
 
-	var out []codec
+	out := make([]codec, 0, len(field.Names))
 	for _, ident := range field.Names {
 		if !ast.IsExported(ident.Name) || skip {
 			continue
