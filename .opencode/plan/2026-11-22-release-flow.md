@@ -1,11 +1,11 @@
 # qi-json — release flow (document the release process)
 
 **Date**: 2026-11-22
-**Status**: done. The **Release flow** section is added to `docs/constitution.md`
-(v3.6.0) and mirrored in `AGENTS.md`.
 **Related**: `docs/constitution.md` (§ Git and Review Discipline, § Release
 flow), `AGENTS.md` (§ Release flow), `CHANGELOG.md`,
 `.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

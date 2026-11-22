@@ -1,10 +1,10 @@
 # qi-json — relocate and rename the public API package
 
 **Date**: 2026-11-21 (decision updated 2026-11-21)
-**Status**: **done (2026-11-21).** The semantic layer now lives at the module
-root as package `qijson` (`qi-json`); constitution amended to 3.3.0. See §7.
 **Related**: `AGENTS.md`, `docs/constitution.md` (Article VI), `doc.go`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

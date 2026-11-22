@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime behavior, error messages and public API are unchanged. The guide's
   rule that unexported top-level vars and consts be prefixed with `_` is a
   recorded, deliberate deviation: the descriptive names are kept.
+- Documentation: the `.opencode/plan/` design records no longer carry task state.
+  Each plan file's header drops the `**Status**` line (and the scanner plan's
+  `## Status` section), which stated which tasks were done or next and pointed at
+  the following task. Design content that had lived in those lines (the encoder's
+  locked decisions, the Go-floor supersession note) is kept under neutral labels,
+  and every header now carries the line "This file is a design record. Task state
+  lives in `docs/tasks.md`." No code or public API change.
 
 ## [0.4.0] - 2026-11-22
 

@@ -5,6 +5,8 @@
 Quality), `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
 
+This file is a design record. Task state lives in `docs/tasks.md`.
+
 ---
 
 ## 1. Context

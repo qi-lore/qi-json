@@ -1,8 +1,11 @@
 # Scanner rewrite: drop the state machine, keep the contract
 
 Date: 2026-11-21
-Status: approved by the user ("state machine is a redundant entity if we have a
-faster implementation. rewrite specs, and then rewrite code")
+
+Decision: the user approved the rewrite — "state machine is a redundant entity if
+we have a faster implementation. rewrite specs, and then rewrite code".
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ## 1. Why
 

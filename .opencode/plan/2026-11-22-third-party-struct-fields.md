@@ -1,15 +1,17 @@
 # qi-json — research: struct fields whose type is a struct from another package
 
 **Date**: 2026-11-22
-**Status**: **research complete (2026-11-22).** §9 answers §4's questions, §10
-scores §5's candidates against §3's constraints, and §11 records the
-recommendation. Documentation only (no code); the follow-up implementation plan
-is `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`. This is a release
+**Scope**: §9 answers §4's questions, §10 scores §5's candidates against §3's
+constraints, and §11 records the recommendation. Documentation only (no code);
+the follow-up implementation plan is
+`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`. This is a release
 blocker (`user-scenarios.md` §3.5, D1).
 **Related**: `.opencode/plan/user-scenarios.md` §3, `docs/constitution.md`
 (Article VI), `.opencode/plan/2026-11-21-json-codegen.md`,
 `.opencode/plan/2026-11-21-json-encoder.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 
