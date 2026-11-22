@@ -5,8 +5,7 @@
 // The API is deliberately not compatible with encoding/json. Decoding and
 // encoding arbitrary targets without reflection needs a compile-time field
 // mapping, so struct binding uses accessor closures (Field[T]) rather than
-// reflect or unsafe. See .opencode/plan/2026-11-21-json-decoder.md and
-// .opencode/plan/2026-11-21-json-encoder.md for the design and task lists.
+// reflect or unsafe.
 //
 // A Reader decodes typed values from a document, tracking the JSON path so that
 // errors point at the offending member. A Schema[T] binds JSON object members to
@@ -66,7 +65,9 @@
 // invalid-UTF-8 cause). A misuse of the API (a nil target, a nil Codec
 // direction, a Field without an encoder, a non-finite number) is instead a plain
 // sentinel error, defined once in this package and reachable with errors.Is.
-// See the constitution's "Rigorous Code Quality" section for the wrapping rule.
+// The wrapping rule is: a layer adds context with %w only when it has new
+// context to add; the *Error already carries the path and offset, so it is
+// returned unwrapped.
 //
 // A field or element whose type is a struct from another package can be bound
 // without hand-written closures. If the foreign type implements Decoder and

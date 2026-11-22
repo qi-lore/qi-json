@@ -11,29 +11,33 @@ accessor closures, optionally generated from struct tags.
 | `internal/codec` | `github.com/qi-lore/qi-json/internal/codec` | Implementation of the semantic layer behind the facade (internal) |
 | `cmd/qi-json-gen` | `github.com/qi-lore/qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.3.0** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.3.1** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.3.0** (2026-11-22).
+Current release: **v0.3.1** (2026-11-22).
 
-v0.3.0 moves the semantic engine behind the `qijson` facade: the decoder and
-encoder now live in `internal/codec`, and the module root re-exports them through
-type aliases, constants and wrappers. The public API is unchanged — `qijson.Reader`
-*is* `codec.Reader` — so `errors.As`, generated `Field` literals and every call
-site keep working, while the engine's internals are no longer importable. The
-same release adopts the canonical module path `github.com/qi-lore/qi-json` and
-raises the Go floor to **1.24** for the facade's generic type aliases. Both of
-those are breaking for importers; see **Migrating from 0.2.x** below. See
-[CHANGELOG.md](CHANGELOG.md) for the change history; the git tags record the
-release series.
+v0.3.1 is a documentation release: `docs/task.md` is retired and `docs/tasks.md`
+becomes the single source of truth for task state, and error messages and exported
+doc comments no longer cite project documents. No code or public API changes.
+
+The previous release, v0.3.0, moved the semantic engine behind the `qijson`
+facade: the decoder and encoder now live in `internal/codec`, and the module root
+re-exports them through type aliases, constants and wrappers. The public API is
+unchanged — `qijson.Reader` *is* `codec.Reader` — so `errors.As`, generated
+`Field` literals and every call site keep working, while the engine's internals
+are no longer importable. That release also adopted the canonical module path
+`github.com/qi-lore/qi-json` and raised the Go floor to **1.24** for the facade's
+generic type aliases. Both of those are breaking for importers; see **Migrating
+from 0.2.x** below. See [CHANGELOG.md](CHANGELOG.md) for the change history; the
+git tags record the release series.
 
 ## Why another JSON library
 
 - **Independent implementation.** The scanner and decoder are written from
-  scratch against `docs/task.md`. `encoding/json` is not imported anywhere in the
-  module, including tests and benchmarks.
+  scratch against the contract the tests pin. `encoding/json` is not imported
+  anywhere in the module, including tests and benchmarks.
 - **No reflection.** `qijson` decodes into concrete Go types through accessor
   closures. That keeps struct decoding predictable and allocation-tight — and it
   is why the API is deliberately **not** `encoding/json`-compatible.
@@ -437,12 +441,13 @@ branch name, the target branch and the commit messages of each pull request.
 internal/codec/          the engine: Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package codec)
 scanner/                 Valid, the tokenizer, benchmarks and differential tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
-docs/task.md             scanner specification
+docs/tasks.md            the task registry: single source of truth for task state
 docs/constitution.md     governing rules and the sanctioned public surface
-.opencode/plan/          design decisions, task lists and verification logs
+.opencode/plan/          design rationale and history (no task state)
 ```
 
 The decoder plan (`.opencode/plan/2026-11-21-json-decoder.md`) and the encoder
-plan (`.opencode/plan/2026-11-21-json-encoder.md`) are the handoff documents for
-the semantic layer; the codegen plan
-(`.opencode/plan/2026-11-21-json-codegen.md`) covers `qi-json-gen`.
+plan (`.opencode/plan/2026-11-21-json-encoder.md`) are the design records for the
+semantic layer; the codegen plan
+(`.opencode/plan/2026-11-21-json-codegen.md`) covers `qi-json-gen`. Task state
+lives in [docs/tasks.md](docs/tasks.md).

@@ -6,12 +6,11 @@ import (
 	"testing"
 )
 
-// The error-wrapping policy (see doc.go and the constitution's "Rigorous Code
-// Quality" section) is: a decode failure is a typed *Error that carries the JSON
-// path and offset and is returned unwrapped, so its cause stays reachable with
-// errors.As and errors.Is; a programming error is an inspectable sentinel. These
-// tests pin that guarantee end to end, through every public entry point and
-// across a nested ObjectDecoder delegation.
+// The error-wrapping policy (see doc.go) is: a decode failure is a typed *Error
+// that carries the JSON path and offset and is returned unwrapped, so its cause
+// stays reachable with errors.As and errors.Is; a programming error is an
+// inspectable sentinel. These tests pin that guarantee end to end, through every
+// public entry point and across a nested ObjectDecoder delegation.
 
 // assertDecodeError asserts that err is a *Error with the given kind and path,
 // returned directly rather than wrapped in a message the caller cannot inspect.
