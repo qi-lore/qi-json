@@ -9,17 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Distribution for the optional `cmd/qi-json-gen` generator. `.goreleaser.yaml`
-  and a tag-triggered `.github/workflows/release.yml` build prebuilt archives
-  (linux, macOS and Windows; amd64 and arm64) with a `checksums.txt`, and publish
-  a Homebrew cask to `qi-lore/homebrew-tap` (creating the tap repository if it
-  does not exist), so the command can be installed
-  without the repository. The README gains an **Installing the generator**
-  section covering `go run`, the Go 1.24 `tool` directive, `go install` and
-  `brew`, and the stale `qi-json/cmd/qi-json-gen` module path in the codegen
-  examples is corrected. No module, runtime or generated-output change;
-  `go.mod` gains no dependency. The release flow in `docs/constitution.md` and
-  `AGENTS.md` is amended (v3.12.0).
+- Documentation for installing the optional `cmd/qi-json-gen` generator: the
+  README gains an **Installing the generator** section covering `go run`, the
+  Go 1.24 `tool` directive and `go install`, and the stale
+  `qi-json/cmd/qi-json-gen` module path in the codegen examples is corrected. No
+  module, runtime or generated-output change; `go.mod` gains no dependency.
 
 ### Changed
 

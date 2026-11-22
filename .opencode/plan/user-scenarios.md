@@ -317,23 +317,22 @@ the command available, and `go get` of the module does not build it.
 ### 6.3 The gap
 
 A module cannot install a command by being imported. The generator must be
-obtained as a *tool*: run from the module graph, recorded in `go.mod`, installed
-into `$GOBIN`, or downloaded as a prebuilt binary. The minimal-step answer depends
-on whether the user wants a bare command on `PATH` or is happy for `go generate`
-to run it, and on whether a Go toolchain is present at all.
+obtained as a *tool*: run from the module graph, recorded in `go.mod`, or
+installed into `$GOBIN`. The minimal-step answer depends on whether the user
+wants a bare command on `PATH` or is happy for `go generate` to run it.
 
 ### 6.4 Decision
 
-Four delivery paths are documented in the README (**Installing the generator**),
-and a release now publishes prebuilt binaries and a Homebrew cask:
+Three delivery paths are documented in the README (**Installing the generator**):
 
 - `//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen …` — no
   install; the version is locked to the imported module (recommended default);
 - `go get -tool github.com/qi-lore/qi-json/cmd/qi-json-gen` + `go tool
   qi-json-gen` — recorded in `go.mod` (Go 1.24+);
 - `go install github.com/qi-lore/qi-json/cmd/qi-json-gen@vX.Y.Z` — a bare command
-  in `$(go env GOBIN)` on `PATH`;
-- `brew install qi-lore/tap/qi-json-gen` — a released binary, no Go toolchain.
+  in `$(go env GOBIN)` on `PATH`.
 
-Full options, decisions and risks:
+Prebuilt release binaries and a Homebrew tap were evaluated and dropped: a user of
+the library is a Go developer, so `go install` is the install path, and no tap,
+secret or release pipeline is needed. Full options, decisions and the reversal:
 `.opencode/plan/2026-11-22-generator-distribution.md`.

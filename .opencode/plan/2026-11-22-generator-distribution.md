@@ -7,6 +7,12 @@
 
 This file is a design record. Task state lives in `docs/tasks.md`.
 
+> **Superseded (2026-11-22).** The prebuilt-binary and Homebrew-tap distribution
+> (option D and decisions D2–D6 below) was removed before any release, in favor
+> of `go install` (plus `go run` and the Go 1.24 `tool` directive). A user of the
+> library is a Go developer, so there is no release pipeline, tap repository or
+> extra secret. See task G011. The analysis below is kept as history.
+
 ---
 
 ## 1. Why

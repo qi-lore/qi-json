@@ -33,9 +33,6 @@ notes/
 coverage.out
 coverage.html
 
-# goreleaser
-/dist/
-
 # thrash
 .DS_Store
 .idea

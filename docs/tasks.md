@@ -66,8 +66,9 @@ never renumber, never reuse a retired identifier.
 - [X] G006 - Cross-package named scalar types
 - [X] G007 - `-strict` flag
 - [X] G008 - Same-package named `string`/`bool` types
-- [X] G009 - Document the `qi-json-gen` install paths (go run / tool / go install / brew)
-- [X] G010 - Publish `qi-json-gen` release binaries and a Homebrew tap
+- [X] G009 - Document the `qi-json-gen` install paths (go run / tool / go install)
+- [X] G010 - Publish `qi-json-gen` release binaries and a Homebrew tap (withdrawn in G011)
+- [X] G011 - Remove the release-binary and Homebrew distribution; `go install` is the install path
 
 ### Foreign struct fields
 

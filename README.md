@@ -347,7 +347,7 @@ numbers above `2^63-1` in `uint64` fields.
 
 ### Installing the generator
 
-The generator is optional — the library works without it. There are four ways to
+The generator is optional — the library works without it. There are three ways to
 get it, from "nothing to install" to "a bare command on your `PATH`":
 
 ```
@@ -362,10 +362,6 @@ go tool qi-json-gen -type=Config
 # 3. Install a bare command on PATH (match your imported version).
 go install github.com/qi-lore/qi-json/cmd/qi-json-gen@v0.4.0
 qi-json-gen -type=Config
-
-# 4. Homebrew (macOS/Linux), no Go toolchain needed.
-brew install qi-lore/tap/qi-json-gen
-qi-json-gen -type=Config
 ```
 
 Options 1 and 2 keep the generator version locked to the `qi-json` version in
@@ -373,8 +369,7 @@ your `go.mod`, which is the version generated code targets, so they are the
 recommended default. Option 3 puts the binary in `$(go env GOBIN)` or
 `$(go env GOPATH)/bin`; make sure that directory is on `PATH`, and prefer an
 explicit `@vX.Y.Z` over `@latest` so the generator matches the library you
-import. Option 4 installs a released binary from the tap, which is refreshed on
-every release.
+import.
 
 ### Invoking the generator
 
@@ -463,7 +458,6 @@ make fuzz      # 10s FuzzValid on the scanner
 make bench     # benchmarks with memory stats
 make generate  # regenerate the codegen fixture
 make cover     # coverage profile and per-function output
-make release-check  # validate the GoReleaser config (needs goreleaser)
 ```
 
 ## Contributing
@@ -500,7 +494,6 @@ branch name, the target branch and the commit messages of each pull request.
 internal/codec/          the engine: Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package codec)
 scanner/                 Valid, the tokenizer, benchmarks and differential tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
-.goreleaser.yaml         release build for the qi-json-gen binaries (see .github/workflows/release.yml)
 docs/tasks.md            the task registry: single source of truth for task state
 docs/constitution.md     governing rules and the sanctioned public surface
 .opencode/plan/          design rationale and history (no task state)
