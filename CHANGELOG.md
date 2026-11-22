@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exported identifier changed; the only visible effect is two programming-error
   messages that now read `qijson: cannot encode <T> as JSON: unsupported dynamic
   type` and `qijson: field "x": no encoder`.
+- Documented the error-wrapping policy (code-quality task T-Q1) in `doc.go` and
+  the constitution (v3.7.0), mirrored in `AGENTS.md`: a decode failure is a typed
+  `*qijson.Error` carrying the JSON path and offset, returned unwrapped, so
+  `errors.As` reaches it and `errors.Is` reaches its cause; a programming error
+  is an inspectable sentinel. New `error_policy_test.go` pins the guarantee end to
+  end across every entry point and through a nested `ObjectDecoder` delegation.
+  No behavior change.
 
 ## [0.2.2] - 2026-11-22
 

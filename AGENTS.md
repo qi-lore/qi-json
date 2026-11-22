@@ -75,7 +75,9 @@ All Go code follows the Uber Go Style Guide
 (https://github.com/uber-go/guide/blob/master/style.md) without exception, plus:
 
 - Wrap errors with context: `fmt.Errorf("...: %w", err)`; never return a bare
-  error from a deeper layer.
+  error from a deeper layer. The typed `*qijson.Error` is itself the context
+  (path + offset) and is returned unwrapped; use `%w` only where a layer adds new
+  context (for example a sentinel cause).
 - Define a sentinel in the owning package (the `qijson` root or `scanner`) when a
   caller must inspect it; there is no `core` package.
 - Public APIs document ownership, concurrency safety, and lifecycle.
