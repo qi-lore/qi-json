@@ -10,6 +10,14 @@ the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fiel
 the code-quality refactoring **T-Q2** is done (2026-11-22), **T-Q1** is done
 (2026-11-22), **T-Q3** is done (2026-11-22), and the next task is **T-Q4**
 (`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`).
+
+**Superseded in part by v0.3.0.** The semantic engine now lives behind the
+`qijson` facade in `internal/codec`, the module path is
+`github.com/qi-lore/qi-json`, and the Go floor is **1.24**, so §2 (a `go 1.23.0`
+consumer) no longer describes the supported configuration and §5's commands must
+be re-run with the new import path. See
+`.opencode/plan/2026-11-22-internal-codec-extraction.md`.
+
 **Related**: `docs/constitution.md`, `README.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
 
@@ -27,6 +35,10 @@ the library does back.
 ---
 
 ## 2. Scenario 1 — a `go 1.23.0` consumer imports the library
+
+> **Closed in v0.3.0.** The Go floor is now **1.24**, so a `go 1.23.0` consumer
+> is rejected by design rather than silently upgraded. The walkthrough below is
+> kept as the record of why the floor was pinned and why it later moved.
 
 ### 2.1 Question
 
@@ -230,12 +242,15 @@ and the implementation (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md
 - **D3 (Go-version floor — done 2026-11-22).** `docs/constitution.md` documented
   a `Go >= 1.23` floor but `go.mod` declared `go 1.27.3`. **Fixed** with
   `go 1.23.0` + `toolchain go1.27.3`, so the enforced floor matches the stated
-  one. Plan and results: `.opencode/plan/2026-11-22-go-version-floor.md`.
+  one. Plan and results: `.opencode/plan/2026-11-22-go-version-floor.md`. The
+  floor later moved to **1.24** with the facade's generic type aliases (v0.3.0),
+  so this fix's `go 1.23.0` is historical.
 - **D4 (baseline + handoff).** This session recorded the scenarios at the
   **v0.1.1** baseline and opened the research task; the struct work shipped in
   **v0.2.0**, the Go-floor fix in **v0.2.1**, the release-flow documentation in
-  **v0.2.2**, and the code-quality work (T-Q1…T-Q3) in **v0.2.3**, so the current
-  baseline is now **v0.2.3**.
+  **v0.2.2**, the code-quality work (T-Q1…T-Q3) in **v0.2.3**, and the
+  `internal/codec` extraction with the canonical module path in **v0.3.0**, so
+  the current baseline is now **v0.3.0**.
 
 ---
 

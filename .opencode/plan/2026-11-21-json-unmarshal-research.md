@@ -52,7 +52,7 @@ still stands.
 
 | Constraint | Source | Impact on this design |
 |---|---|---|
-| Go ≥ 1.23, toolchain go1.27.3 | `docs/task.md` §3, `go.mod` | Generics, `errors.As`, `slices`/`maps` available. |
+| Go ≥ 1.23, toolchain go1.27.3 | `docs/task.md` §3, `go.mod` | Generics, `errors.As`, `slices`/`maps` available. *Now ≥ 1.24 (v0.3.0).* |
 | Zero external dependencies | `docs/task.md` §3 | No easyjson/jsoniter/goccy. Code generation must be our own. |
 | Never use `encoding/json` | `docs/task.md` §3, constitution III | No reflection fallback via stdlib; no "compat" shim. |
 | Fastest correct implementation | `docs/task.md` §3 | Benchmarks must justify every layer. |

@@ -19,7 +19,8 @@ internally (`machine.step`, `machine.finish`); `Valid` wraps it for callers.
 
 ## Constraints
 
-- Go >= 1.23 (toolchain: go1.27.3), zero external dependencies.
+- Go >= 1.23 (toolchain: go1.27.3), zero external dependencies. *The floor is
+  now 1.24 (v0.3.0); this plan records the scanner work at its original floor.*
 - Never use `encoding/json`, including in tests and benchmarks.
 - Follow uber-go/guide; clean, readable, fault-tolerant code.
 - TDD: failing tests first, then minimal implementation, then refactor.

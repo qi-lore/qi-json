@@ -6,6 +6,11 @@ named `string`/`bool` follow-up is done, the package relocation + rename is
 done, and the last open item — the Go-version floor mismatch — is done and ships
 in **v0.2.1** (2026-11-22, `.opencode/plan/2026-11-22-go-version-floor.md`). No
 open follow-ups remain (§9).
+**Next task**: the deferred scanner consolidation — move `scanner/` behind
+`internal/`, publish `qijson.Kind`, and ship it as its own breaking release. It
+is the only item in §11 of
+`.opencode/plan/2026-11-22-internal-codec-extraction.md`; v0.3.0 landed the
+`internal/codec` extraction and the canonical module path without it.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-decoder.md` (§6 open questions, §8 next),
 `.opencode/plan/2026-11-21-json-codegen.md` (§8 not-done), `README.md`.
@@ -262,13 +267,16 @@ Recorded so a later session can pick them up. All items are done. The last one
   `toolchain go1.27.3`, so the enforced floor matches the stated one; guarded by
   `TestGoModGoDirectiveFloor`. Plan and results:
   `.opencode/plan/2026-11-22-go-version-floor.md`. Evidence:
-  `.opencode/plan/user-scenarios.md` §2.
+  `.opencode/plan/user-scenarios.md` §2. The floor later moved to **1.24** with
+  the facade's generic type aliases (v0.3.0).
 - **Package relocation + rename** — **done (2026-11-21)**: the semantic layer
   moved from `marshal/` to the module root and is now `package qijson` at import
   path `qi-json` (`qi-json` is not a valid Go identifier, so the clause differs
   from the path); `scanner` stays a subpackage and `Codec[E]` kept its name.
   Constitution amended to 3.3.0 (Article VI and Additional Constraints).
-  Plan and results: `.opencode/plan/2026-11-21-package-rename.md`.
+  Plan and results: `.opencode/plan/2026-11-21-package-rename.md`. The import
+  path later became `github.com/qi-lore/qi-json` and the engine moved behind the
+  facade into `internal/codec` (v0.3.0).
 - **Codegen named `string`/`bool` types** — **done (2026-11-21)**: a
   same-package named type whose underlying type is `string` or `bool` is now
   generated (field, pointer, slice/map element), matching the cross-package path.

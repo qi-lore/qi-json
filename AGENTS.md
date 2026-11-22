@@ -197,9 +197,10 @@ and context rules bind only when such code is added. Open gaps are tracked in
     to 1.24 with the facade's generic type aliases (see the internal-codec
     extraction plan).
   - `.opencode/plan/2026-11-22-internal-codec-extraction.md` — **done
-    2026-11-22**: the semantic engine moved to `internal/codec` and the module
-    root became a thin facade of type aliases and wrappers; the Go floor moved
-    to 1.24 for generic type aliases. The scanner stays public at
+    2026-11-22, shipped in v0.3.0**: the semantic engine moved to `internal/codec`
+    and the module root became a thin facade of type aliases and wrappers; the Go
+    floor moved to 1.24 for generic type aliases, and the canonical module path
+    became `github.com/qi-lore/qi-json`. The scanner stays public at
     `github.com/qi-lore/qi-json/scanner`; hiding it is deferred to a separate
     breaking change.
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the

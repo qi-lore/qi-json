@@ -1,6 +1,6 @@
 # Internal codec extraction
 
-**Status**: done (2026-11-22) — implemented on `chore/extract-internal-codec`
+**Status**: done (2026-11-22) — shipped in **v0.3.0**
 **Module path**: `github.com/qi-lore/qi-json` (moved from `qi-json` on
 2026-11-22; `qi-json/...` paths earlier in this plan are the pre-move names)
 **Branch**: `chore/extract-internal-codec` (from `main`, targets `dev`)

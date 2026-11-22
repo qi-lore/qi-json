@@ -468,9 +468,10 @@ scanner/
   *_test.go  // tests and benchmarks
 ```
 
-The semantic layer itself (the reflection-free decoder and encoder, package
-`qijson`) lives at the module root and is specified by its own plans; this
-document specifies the syntax validator only.
+The semantic layer itself (the reflection-free decoder and encoder) is the
+`qijson` package at the module root: a facade of type aliases, constants and
+wrappers over the engine in `internal/codec`. It is specified by its own plans;
+this document specifies the syntax validator only.
 
 ## 12. Verification
 
