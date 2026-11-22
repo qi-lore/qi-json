@@ -13,7 +13,7 @@ BENCH_TIME    ?= 1s
 COVER_PROFILE ?= cover.out
 
 .DEFAULT_GOAL := help
-.PHONY: help verify test race generate fmt fmt-check vet lint fuzz bench cover release-check clean
+.PHONY: help verify test race generate fmt fmt-check vet lint fuzz bench cover clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -61,10 +61,6 @@ bench: ## Run benchmarks for BENCH_TIME (default 1s), with memory stats
 cover: ## Write a coverage profile and print per-function coverage
 	$(GO) test $(PKG) -count=1 -coverprofile=$(COVER_PROFILE)
 	$(GO) tool cover -func=$(COVER_PROFILE)
-
-release-check: ## Validate the GoReleaser config (requires goreleaser)
-	@command -v goreleaser >/dev/null || { echo "goreleaser is not installed"; exit 1; }
-	goreleaser check
 
 clean: ## Remove generated artifacts
 	rm -f $(COVER_PROFILE)

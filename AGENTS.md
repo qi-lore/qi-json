@@ -42,7 +42,6 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - `go test -run=^$ -bench=. -benchmem ./internal/scanner` — benchmarks
 - `go generate ./...` — regenerate `cmd/qi-json-gen` fixtures — no other package
   emits generated code
-- `make release-check` — validate the GoReleaser config (requires `goreleaser`)
 
 ## Git and review discipline
 
@@ -74,10 +73,10 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - Merge into `main`, then tag the merge commit: `git tag vX.Y.Z <merge-sha>` and
   push the tag.
 - Keep `dev` — do not delete the integration branch.
-- The tag triggers `.github/workflows/release.yml`, which publishes the
-  `qi-json-gen` binaries and the Homebrew cask from `.goreleaser.yaml`. This is
-  additive: the module is unchanged. See `docs/constitution.md` ("Release
-  artifacts"). Validate the config locally with `make release-check`.
+- The tag publishes the tagged module; a consumer installs the optional
+  `qi-json-gen` generator with
+  `go install github.com/qi-lore/qi-json/cmd/qi-json-gen@vX.Y.Z` (see the README's
+  "Installing the generator"). There are no prebuilt release artifacts.
 
 ## Task tracking
 
