@@ -1,7 +1,8 @@
 # qi-json — Git and Code Quality Reglament (governance + audit)
 
 **Date**: 2026-11-22
-**Status**: governance added; audit recorded; refactoring tasks T-Q1…T-Q4 open.
+**Status**: governance added; audit recorded; **T-Q2 done** (2026-11-22);
+refactoring tasks T-Q1, T-Q3 and T-Q4 open.
 **Related**: `docs/constitution.md` (§ Git and Review Discipline, § Rigorous Code
 Quality), `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
@@ -45,7 +46,7 @@ module is unchanged. This plan records:
 |---|---|---|
 | Uber Go Style Guide | ✅ (light review pending) | All exported identifiers are documented; error strings lowercase after the `qijson:` prefix; no `goto`/labels in the library. A dedicated style pass is T-Q4. |
 | Errors wrapped with `%w`; no bare errors from deeper layers | ⚠️ | Public errors are the typed `*qijson.Error` (path + offset) returned unwrapped through `Decoder`/`Encoder`, and the `Writer` sentinels bubble up through `Schema.Encode`/`Marshal`/`Encode` unwrapped. See T-Q1 for the policy decision and the inspectability test. |
-| Sentinel errors in the owning package | ⚠️ | `errNilTarget` (`unmarshal.go:26`), `errNilWriter` (`encode.go:22`), the seven `writer.go` sentinels and `errBadEscape`/`errInvalidUTF8` (`errors.go`) already live in `qijson`. But `field.go:287/311/344/368/405/432` recreate `errors.New("qijson: nil element decoder"/"encoder")` on every call (not inspectable, not a sentinel), and `schema.go:98` / `field.go:613` build inline `fmt.Errorf` errors. See T-Q2. |
+| Sentinel errors in the owning package | ✅ | `errNilTarget` (`unmarshal.go:26`), `errNilWriter` (`encode.go:22`), the seven `writer.go` sentinels, `errBadEscape`/`errInvalidUTF8` (`errors.go`) and the element-constructor guards live in `qijson`. T-Q2 (done) defined `errNilElementDecoder`/`errNilElementEncoder`/`errUnsupportedDynamicType` (`field.go`) and `errNoFieldEncoder` (`schema.go`) once each and routes them through `fmt.Errorf("...: %w", ...)`, so no `errors.New` remains inside a function body. |
 | Public APIs document ownership, concurrency, lifecycle | ⚠️ | `Reader`, `Writer`, `Tokenizer`, `Valid` already document concurrency and no-copy/aliasing. Gaps: `Schema[T]` (mutating `RejectUnknown`/`RejectDuplicate` vs. concurrent use), `Field[T]`, `Codec[E]`/`NewCodec`, `Error`/`TypeError`/`ErrorKind`, and the ownership/lifetime of `data` in `Decode`/`Unmarshal*` and of the bytes returned by `Marshal`/`Writer.Bytes`. See T-Q3. |
 | Goroutines: ownership and shutdown; no leaks | ✅ N/A | The library starts no goroutines (grep for `go func`/`sync.` is empty). |
 | Context propagation; blocking ops accept `context.Context` | ✅ N/A | No exported operation blocks; all work is over in-memory `[]byte`. |
@@ -60,6 +61,8 @@ sentinel, that decision needs its own amendment.
 
 ### T-Q2 — make every library sentinel inspectable (start here)
 
+**Done (2026-11-22).** Results below.
+
 - Define unexported package sentinels for the element-constructor guards:
   `errNilElementDecoder`, `errNilElementEncoder`, and replace the inline
   `errors.New` calls at `field.go:287/311/344/368/405/432`.
@@ -69,6 +72,29 @@ sentinel, that decision needs its own amendment.
 - Tests: `errors.Is` on each guard path (in-package tests).
 - **Acceptance**: no `errors.New` inside a function body in the library; every
   returned sentinel is defined once and is `errors.Is`-testable.
+
+#### T-Q2 results
+
+- **Shipped**: `field.go` defines `errNilElementDecoder`, `errNilElementEncoder`
+  and `errUnsupportedDynamicType` once each (a commented `var` block); the six
+  inline `errors.New` calls in `Slice`/`Map`/`Array` now return the sentinels,
+  and `encodeAny` wraps the dynamic-type one:
+  `fmt.Errorf("qijson: cannot encode %T as JSON: %w", v, errUnsupportedDynamicType)`.
+  `schema.go` defines `errNoFieldEncoder` and wraps it:
+  `fmt.Errorf("qijson: field %q: %w", f.Name, errNoFieldEncoder)` (the message
+  reads `qijson: field "x": no encoder` — the colon form the rule prescribes).
+- **Decision** (the plan's "or document why": both are promoted, not one-offs):
+  a `nil` `Codec` direction and a `Field` without an `Encode` are reachable by
+  hand-building a container/codec, so both are now inspectable. The only
+  non-sentinel library error left is the `*qijson.Error` path error, which is
+  itself the context (T-Q1).
+- **Tests**: new `sentinel_test.go` — `TestDecodeNilElementDecoder` (Slice, Map,
+  Array; nil containers still decode), `TestEncodeFieldWithoutEncoder`,
+  `TestEncodeAnyUnsupportedDynamicType`; `TestEncodeNilElementEncoder` upgraded
+  from `err != nil` to `errors.Is(err, errNilElementEncoder)` for the slice, map
+  and array paths.
+- **Verification**: `make verify` green (0 lint issues); `go test -race ./...`
+  green. No exported identifier added, so no Article VI amendment.
 
 ### T-Q1 — pin the error-wrapping policy
 

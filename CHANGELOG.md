@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `qijson`: every library sentinel is now defined once and inspectable with
+  `errors.Is` (code-quality task T-Q2). The element-constructor guards
+  (`errNilElementDecoder`, `errNilElementEncoder`) plus `errUnsupportedDynamicType`
+  (`field.go`) and `errNoFieldEncoder` (`schema.go`) replace the `errors.New`
+  calls that were made inside function bodies and are wrapped with `%w`. No
+  exported identifier changed; the only visible effect is two programming-error
+  messages that now read `qijson: cannot encode <T> as JSON: unsupported dynamic
+  type` and `qijson: field "x": no encoder`.
+
 ## [0.2.2] - 2026-11-22
 
 ### Added
