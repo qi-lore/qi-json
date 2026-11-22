@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Governance: `docs/constitution.md` gains a **Release flow** section (v3.6.0),
+  mirrored in `AGENTS.md`: how a release is cut — choose the version, prepare it
+  on `dev` (changelog promotion and README version block), open the `dev` →
+  `main` pull request, merge, tag the merge commit on `main`, and keep `dev`.
+
 ## [0.2.1] - 2026-11-22
 
 ### Added

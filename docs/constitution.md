@@ -151,6 +151,30 @@ The repository uses a two-branch integration model. CI
 - Suggested labels MUST be proposed and confirmed with the user before applying.
 - Feature PRs target `dev`; only the integration PR targets `main`.
 
+### Release flow
+
+`dev` accumulates integrated work; a release promotes it to `main`. The steps,
+in order:
+
+1. **Choose the version.** Semantic Versioning; the module is pre-1.0, so a
+   backward-compatible fix or documentation change is a **patch** and a new or
+   changed capability is a **minor**.
+2. **Prepare the release on `dev`** (never on a feature branch):
+   - promote the `CHANGELOG.md` `[Unreleased]` entry to `[X.Y.Z] - YYYY-MM-DD`
+     and reopen an empty `[Unreleased]` section above it;
+   - update the `README.md` version block;
+   - do the housekeeping the release implies (mark finished items, point the
+     next task, refresh baseline references in the plans);
+   - commit as `chore(release): vX.Y.Z` with a full body and run the
+     Verification Workflow.
+3. **Open the `dev` → `main` pull request** — the only pull request allowed to
+   merge into `main` — and let CI pass.
+4. **Merge into `main`.**
+5. **Tag the merge commit on `main`** with `vX.Y.Z` and push the tag; the tag
+   marks the released commit (the merge commit, not the preparation commit).
+6. **Keep `dev`.** The integration branch is permanent; do not delete it after
+   the merge.
+
 ### CI enforcement
 
 CI MUST enforce the branch-name, target-branch and commit-message rules and the
@@ -187,4 +211,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.5.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.6.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
