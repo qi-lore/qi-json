@@ -8,7 +8,7 @@ the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fiel
 **done (2026-11-22)**, shipping in **v0.2.1**, per
 `.opencode/plan/2026-11-22-go-version-floor.md`. All recorded gaps are closed;
 the code-quality refactoring **T-Q2** is done (2026-11-22), **T-Q1** is done
-(2026-11-22), and the next task is **T-Q3**
+(2026-11-22), **T-Q3** is done (2026-11-22), and the next task is **T-Q4**
 (`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`).
 **Related**: `docs/constitution.md`, `README.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.

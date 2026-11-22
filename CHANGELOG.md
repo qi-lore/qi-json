@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is an inspectable sentinel. New `error_policy_test.go` pins the guarantee end to
   end across every entry point and through a nested `ObjectDecoder` delegation.
   No behavior change.
+- Documented ownership, concurrency and lifecycle on the public API (code-quality
+  task T-Q3): `Schema` is immutable once built (the reject setters mutate it and
+  must not race with use), `Field`/`Codec`/`NewCodec` are plain closures,
+  `*Error`/`*TypeError` are immutable, `Writer` is not safe for concurrent use
+  and `Bytes` aliases its buffer, the entry points do not retain `data` and the
+  `[]byte` from `Marshal` is caller-owned, and `scanner.NewTokenizer` documents
+  that it aliases `data`. Comments only; no behavior change.
 
 ## [0.2.2] - 2026-11-22
 
