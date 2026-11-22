@@ -157,6 +157,10 @@ success path MUST stay allocation-free (`TestValidDoesNotAllocate`).
     single-pass scanner (`valid.go`, `scan.go`, `token.go`, `doc.go`); internal,
     not a public surface;
   - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
+- Release configuration: `.goreleaser.yaml` and
+  `.github/workflows/release.yml` build and publish the `cmd/qi-json-gen`
+  binaries described under "Release flow" ("Release artifacts"). They are release
+  tooling, not part of the module: `go.mod` gains no dependency.
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
 
@@ -216,6 +220,18 @@ in order:
    marks the released commit (the merge commit, not the preparation commit).
 6. **Keep `dev`.** The integration branch is permanent; do not delete it after
    the merge.
+
+**Release artifacts.** In addition to the tagged module, a release publishes the
+optional `cmd/qi-json-gen` generator as prebuilt binaries, so a caller can
+install the command without the repository. GoReleaser (`.goreleaser.yaml`, run by
+`.github/workflows/release.yml` on the `vX.Y.Z` tag from step 5) builds archives
+for linux, macOS and Windows on amd64 and arm64, attaches them and
+`checksums.txt` to the GitHub release, and pushes a Homebrew cask to the
+`qi-lore/homebrew-tap` tap, creating that repository if it does not exist. A
+repository secret `HOMEBREW_TAP_GITHUB_TOKEN` with write access to the tap is
+required. `go install` and a `go.mod` `tool` directive remain the version-pinned
+paths a consumer uses; the release is additive and changes no module or runtime
+behavior.
 
 ### CI enforcement
 
@@ -278,4 +294,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.11.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.12.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
