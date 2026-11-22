@@ -106,7 +106,9 @@ results in the final summary.
 
 ## Additional Constraints
 
-- Go >= 1.23 (toolchain in `go.mod`: 1.27.3).
+- Go >= 1.23: the `go.mod` `go` directive is the language floor
+  (`go 1.23.0`); its `toolchain` line (`go1.27.3`) names the toolchain used to
+  develop the project and is ignored by consumers.
 - Three packages under module `qi-json` (the module root is a package):
   - `.` (module root) — `qijson`, the reflection-free semantic layer (decode
     and encode);
