@@ -6,6 +6,8 @@
 `.opencode/plan/2026-11-21-json-scanner.md`;
 `.opencode/plan/2026-11-21-scanner-rewrite.md`.
 
+This file is a design record. Task state lives in `docs/tasks.md`.
+
 ## 1. Goal
 
 There is one public import path for the module — `github.com/qi-lore/qi-json` —

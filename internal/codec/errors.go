@@ -67,6 +67,10 @@ type Error struct {
 	Err error
 }
 
+// *Error implements error as part of its contract; this fails to compile if it
+// ever stops doing so.
+var _ error = (*Error)(nil)
+
 // Error implements the error interface.
 func (e *Error) Error() string {
 	if e == nil {
@@ -108,6 +112,9 @@ type TypeError struct {
 	// "number 1.5 is not an integer".
 	Got string
 }
+
+// *TypeError implements error as part of its contract.
+var _ error = (*TypeError)(nil)
 
 // Error implements the error interface.
 func (e *TypeError) Error() string {

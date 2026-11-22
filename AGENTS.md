@@ -73,6 +73,10 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - Merge into `main`, then tag the merge commit: `git tag vX.Y.Z <merge-sha>` and
   push the tag.
 - Keep `dev` — do not delete the integration branch.
+- The tag publishes the tagged module; a consumer installs the optional
+  `qi-json-gen` generator with
+  `go install github.com/qi-lore/qi-json/cmd/qi-json-gen@vX.Y.Z` (see the README's
+  "Installing the generator"). There are no prebuilt release artifacts.
 
 ## Task tracking
 

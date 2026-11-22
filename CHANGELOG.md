@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-22
+
+### Added
+
+- Documentation for installing the optional `cmd/qi-json-gen` generator: the
+  README gains an **Installing the generator** section covering `go run`, the
+  Go 1.24 `tool` directive and `go install`, and the stale
+  `qi-json/cmd/qi-json-gen` module path in the codegen examples is corrected. No
+  module, runtime or generated-output change; `go.mod` gains no dependency.
+
+### Changed
+
+- Code style: an Uber Go Style Guide review pass over the library and the
+  generator. The generator now writes a foreign-struct pointer with `&T{}`
+  instead of `new(T)`, so regenerated `qi-json-gen` output differs on that one
+  line; a `Writer` frame that set `object: false` now relies on the zero value;
+  and the generator pre-sizes a few slices and maps and flattens an `else if`
+  that followed a returning branch. Compile-time assertions that `*Error`,
+  `*TypeError` and the scanner's `parseError` implement `error` were added. The
+  runtime behavior, error messages and public API are unchanged. The guide's
+  rule that unexported top-level vars and consts be prefixed with `_` is a
+  recorded, deliberate deviation: the descriptive names are kept.
+- Documentation: the `.opencode/plan/` design records no longer carry task state.
+  Each plan file's header drops the `**Status**` line (and the scanner plan's
+  `## Status` section), which stated which tasks were done or next and pointed at
+  the following task. Design content that had lived in those lines (the encoder's
+  locked decisions, the Go-floor supersession note) is kept under neutral labels,
+  and every header now carries the line "This file is a design record. Task state
+  lives in `docs/tasks.md`." No code or public API change.
+
 ## [0.4.0] - 2026-11-22
 
 ### Changed

@@ -1,15 +1,6 @@
 # qi-json — user scenarios
 
 **Date**: 2026-11-22
-**Status**: recorded. The third-party struct-field gap was a **release blocker**,
-closed in **v0.2.0** (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md`);
-the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fields.md`.
-**D3**, the Go-version floor mismatch (§2.5), was the next task and is now
-**done (2026-11-22)**, shipping in **v0.2.1**, per
-`.opencode/plan/2026-11-22-go-version-floor.md`. All recorded gaps are closed;
-the code-quality refactoring **T-Q2** is done (2026-11-22), **T-Q1** is done
-(2026-11-22), **T-Q3** is done (2026-11-22), and the next task is **T-Q4**
-(`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`).
 
 **Superseded in part by v0.3.0.** The semantic engine now lives behind the
 `qijson` facade in `internal/codec`, the module path is
@@ -19,7 +10,10 @@ be re-run with the new import path. See
 `.opencode/plan/2026-11-22-internal-codec-extraction.md`.
 
 **Related**: `docs/constitution.md`, `README.md`,
-`.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+`.opencode/plan/2026-11-21-post-decoder-backlog.md` §9,
+`.opencode/plan/2026-11-22-generator-distribution.md` (Scenario 3).
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ## 1. Purpose
 
@@ -302,3 +296,43 @@ With a hand-written `Schema` + `DecodeJSON`, both print `{Field1:x Field2:7}`.
 | hand-written schema, exported fields only | decodes: `A={X:1 Y:hi} B={Name:n Count:9 secret:}` |
 | binding an unexported foreign field | `v.secret undefined (cannot refer to unexported field secret)` |
 | `qijson.Int` on an `int` field | `cannot use func(v *LocalStruct) *int … as func(*LocalStruct) *int64 value` |
+
+---
+
+## 6. Scenario 3 — the code generator on `PATH`
+
+### 6.1 Question
+
+> "I imported `qi-json` into my project. Now I want the `qi-json-gen` command to
+> live in my `PATH`."
+
+### 6.2 What happens
+
+Nothing out of the box: there is no install instruction anywhere in the
+repository, and the README only showed `go run <module>/cmd/qi-json-gen` — with a
+stale module path (`qi-json/cmd/qi-json-gen`) from before the module rename.
+Because `cmd/qi-json-gen` is a `main` package, importing the library does not make
+the command available, and `go get` of the module does not build it.
+
+### 6.3 The gap
+
+A module cannot install a command by being imported. The generator must be
+obtained as a *tool*: run from the module graph, recorded in `go.mod`, or
+installed into `$GOBIN`. The minimal-step answer depends on whether the user
+wants a bare command on `PATH` or is happy for `go generate` to run it.
+
+### 6.4 Decision
+
+Three delivery paths are documented in the README (**Installing the generator**):
+
+- `//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen …` — no
+  install; the version is locked to the imported module (recommended default);
+- `go get -tool github.com/qi-lore/qi-json/cmd/qi-json-gen` + `go tool
+  qi-json-gen` — recorded in `go.mod` (Go 1.24+);
+- `go install github.com/qi-lore/qi-json/cmd/qi-json-gen@vX.Y.Z` — a bare command
+  in `$(go env GOBIN)` on `PATH`.
+
+Prebuilt release binaries and a Homebrew tap were evaluated and dropped: a user of
+the library is a Go developer, so `go install` is the install path, and no tap,
+secret or release pipeline is needed. Full options, decisions and the reversal:
+`.opencode/plan/2026-11-22-generator-distribution.md`.

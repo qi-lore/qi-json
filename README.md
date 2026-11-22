@@ -11,30 +11,38 @@ accessor closures, optionally generated from struct tags.
 | `internal/scanner` | `github.com/qi-lore/qi-json/internal/scanner` | Single-pass syntax engine behind the facade (internal) |
 | `cmd/qi-json-gen` | `github.com/qi-lore/qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.4.0** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.4.1** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.4.0** (2026-11-22).
+Current release: **v0.4.1** (2026-11-22).
 
-v0.4.0 consolidates the syntax layer behind the facade: the `scanner` subpackage
-is gone, the syntax engine lives in `internal/scanner`, and `qijson` re-exports
-its whole surface — `Valid`, the `Kind` type with its seven constants, and the
-tokenizing `Tokenizer` with `NewTokenizer`. There is now a single public import
-path, `github.com/qi-lore/qi-json`. Names, signatures and behavior are unchanged
-(`qijson.Kind` *is* the type `Reader.Peek` returns), so the change is an
-import-path and qualifier rewrite; it is nonetheless breaking for anyone who
-imported `github.com/qi-lore/qi-json/scanner`. See **Migrating from 0.3.x** below.
+v0.4.1 is a documentation release: the README gains an **Installing the
+generator** section covering `go run`, the Go 1.24 `tool` directive and
+`go install`, and the stale `qi-json/cmd/qi-json-gen` module path in the codegen
+examples is corrected. It also folds in an internal Uber Go Style Guide review
+pass; no public API, error message or runtime behavior changed, and `go.mod`
+gains no dependency.
 
-The previous release, v0.3.1, was a documentation release (`docs/tasks.md` became
+The previous release, v0.4.0, consolidated the syntax layer behind the facade:
+the `scanner` subpackage is gone, the syntax engine lives in `internal/scanner`,
+and `qijson` re-exports its whole surface — `Valid`, the `Kind` type with its
+seven constants, and the tokenizing `Tokenizer` with `NewTokenizer`. There is now
+a single public import path, `github.com/qi-lore/qi-json`. Names, signatures and
+behavior are unchanged (`qijson.Kind` *is* the type `Reader.Peek` returns), so
+the change is an import-path and qualifier rewrite; it is nonetheless breaking
+for anyone who imported `github.com/qi-lore/qi-json/scanner`. See **Migrating
+from 0.3.x** below.
+
+The release before it, v0.3.1, was a documentation release (`docs/tasks.md` became
 the single source of truth for task state; error messages and doc comments no
-longer cite project documents). The release before it, v0.3.0, moved the semantic
-engine behind the `qijson` facade into `internal/codec`, adopted the canonical
-module path `github.com/qi-lore/qi-json`, and raised the Go floor to **1.24** for
-the facade's generic type aliases — both breaking for importers; see **Migrating
-from 0.2.x**. See [CHANGELOG.md](CHANGELOG.md) for the change history; the git
-tags record the release series.
+longer cite project documents). The release before that, v0.3.0, moved the
+semantic engine behind the `qijson` facade into `internal/codec`, adopted the
+canonical module path `github.com/qi-lore/qi-json`, and raised the Go floor to
+**1.24** for the facade's generic type aliases — both breaking for importers; see
+**Migrating from 0.2.x**. See [CHANGELOG.md](CHANGELOG.md) for the change history;
+the git tags record the release series.
 
 ## Why another JSON library
 
@@ -297,7 +305,7 @@ if errors.As(err, &e) {
 Instead of writing the closures by hand, tag the struct and run the generator:
 
 ```go
-//go:generate go run qi-json/cmd/qi-json-gen -type=Config
+//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=Config
 
 type Config struct {
 	Name string   `json:"name"`
@@ -345,11 +353,37 @@ type, a foreign type implementing only one of `DecodeJSON`/`EncodeJSON`,
 same-package pointer-to-struct fields, embedded fields, non-string map keys, and
 numbers above `2^63-1` in `uint64` fields.
 
-Run it directly as:
+### Installing the generator
+
+The generator is optional — the library works without it. There are three ways to
+get it, from "nothing to install" to "a bare command on your `PATH`":
 
 ```
-go run qi-json/cmd/qi-json-gen -type=Config[,Other...] [-foreign=pkg.T=ident] [-strict] [-o file] [dir]
-go run qi-json/cmd/qi-json-gen [dir]   # every type marked //qi-json:generate
+# 1. No install: uses the qi-json version already in your go.mod.
+//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=Config
+go generate ./...
+
+# 2. Pin it as a module tool (Go 1.24+): recorded in go.mod, run with `go tool`.
+go get -tool github.com/qi-lore/qi-json/cmd/qi-json-gen
+go tool qi-json-gen -type=Config
+
+# 3. Install a bare command on PATH (match your imported version).
+go install github.com/qi-lore/qi-json/cmd/qi-json-gen@v0.4.1
+qi-json-gen -type=Config
+```
+
+Options 1 and 2 keep the generator version locked to the `qi-json` version in
+your `go.mod`, which is the version generated code targets, so they are the
+recommended default. Option 3 puts the binary in `$(go env GOBIN)` or
+`$(go env GOPATH)/bin`; make sure that directory is on `PATH`, and prefer an
+explicit `@vX.Y.Z` over `@latest` so the generator matches the library you
+import.
+
+### Invoking the generator
+
+```
+qi-json-gen -type=Config[,Other...] [-foreign=pkg.T=ident] [-strict] [-o file] [dir]
+qi-json-gen [dir]   # every type marked //qi-json:generate
 ```
 
 With `-strict`, every generated schema chains `RejectUnknown` and

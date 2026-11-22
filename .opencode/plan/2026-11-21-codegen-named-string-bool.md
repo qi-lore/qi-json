@@ -1,11 +1,12 @@
 # qi-json — codegen for same-package named `string`/`bool` types
 
 **Date**: 2026-11-21
-**Status**: in progress (TDD).
 **Related**: `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-json-codegen.md` §8 (candidate),
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9,
 `.opencode/plan/2026-11-21-json-encoder.md` §10 (the narrowed README claim).
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

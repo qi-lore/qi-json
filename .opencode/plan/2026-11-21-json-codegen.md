@@ -1,11 +1,11 @@
 # qi-json T8 — optional codegen (`cmd/qi-json-gen`)
 
 **Date**: 2026-11-21
-**Status**: done — T8a–T8e implemented and verified; the tool, its tests and the
-fixture are in `cmd/qi-json-gen`.
 **Related**: `docs/constitution.md`, `AGENTS.md`,
-`.opencode/plan/2026-11-21-json-decoder.md` (T8), 
+`.opencode/plan/2026-11-21-json-decoder.md` (T8),
 `.opencode/plan/2026-11-21-json-unmarshal-research.md` §5 A1, §8 Phase 8.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

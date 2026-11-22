@@ -66,6 +66,9 @@ never renumber, never reuse a retired identifier.
 - [X] G006 - Cross-package named scalar types
 - [X] G007 - `-strict` flag
 - [X] G008 - Same-package named `string`/`bool` types
+- [X] G009 - Document the `qi-json-gen` install paths (go run / tool / go install)
+- [X] G010 - Publish `qi-json-gen` release binaries and a Homebrew tap (withdrawn in G011)
+- [X] G011 - Remove the release-binary and Homebrew distribution; `go install` is the install path
 
 ### Foreign struct fields
 
@@ -93,6 +96,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q001 - Pin the error-wrapping policy
 - [X] Q002 - Make every library sentinel inspectable
 - [X] Q003 - Document ownership, concurrency and lifecycle
+- [X] Q004 - Uber Go Style Guide review pass
 - [X] Q005 - Keep error messages and doc comments free of project-document references
 
 ### Module, packaging and governance
@@ -103,11 +107,10 @@ never renumber, never reuse a retired identifier.
 - [X] M004 - Git and Code Quality governance (constitution v3.5.0)
 - [X] M005 - Release flow governance (constitution v3.6.0)
 - [X] M006 - Retire `docs/task.md` and introduce the task registry (constitution v3.9.0)
+- [X] M007 - Normalize the plan files' headers to design records
 
 ## Planned
 
-Next up: **Q004**, the Uber Go Style Guide review pass.
+Next up: **P001**, protect `main` and `dev` with branch protection and the `verify` check.
 
-- [ ] Q004 - Uber Go Style Guide review pass
-- [ ] M007 - Normalize the plan files' headers to design records: drop the status and backlog lines the Task Tracking rule forbids
 - [ ] P001 - Protect `main` and `dev` with branch protection and the `verify` check

@@ -1,13 +1,15 @@
 # qi-json — align the Go-version floor (go.mod `go` directive vs documented 1.23)
 
 **Date**: 2026-11-22
-**Status**: done (2026-11-22); shipped in v0.2.1. **Superseded in part:** the
-floor later moved from 1.23 to **1.24** with the facade's generic type aliases
-(v0.3.0, `.opencode/plan/2026-11-22-internal-codec-extraction.md`), so the
-`go 1.23.0` discussed below is the historical fix, not the current floor.
+**Superseded in part**: the floor later moved from 1.23 to **1.24** with the
+facade's generic type aliases (v0.3.0,
+`.opencode/plan/2026-11-22-internal-codec-extraction.md`), so the `go 1.23.0`
+discussed below is the historical fix, not the current floor.
 **Related**: `docs/constitution.md` (Additional Constraints), `docs/task.md` §3,
 `AGENTS.md`, `.opencode/plan/user-scenarios.md` §2 / D3,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

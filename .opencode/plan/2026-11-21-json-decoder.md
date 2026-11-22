@@ -1,11 +1,11 @@
 # qi-json Decoder — decisions, tasks, and handoff
 
 **Date**: 2026-11-21
-**Status**: decisions agreed; T0–T10 done (including T9 documentation); fuzz,
-differential testing and the bulk fast paths are green.
 **Supersedes (in part)**: `.opencode/plan/2026-11-21-json-unmarshal-research.md`.
 **Related**: `docs/task.md`, `docs/constitution.md`, `AGENTS.md`,
 `.opencode/plan/2026-11-21-scanner-rewrite.md`.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 

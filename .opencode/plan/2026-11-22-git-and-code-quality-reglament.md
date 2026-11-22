@@ -1,12 +1,11 @@
 # qi-json — Git and Code Quality Reglament (governance + audit)
 
 **Date**: 2026-11-22
-**Status**: governance added; audit recorded; **T-Q2, T-Q1 and T-Q3 done**
-(2026-11-22); refactoring task T-Q4 open — **the next task is T-Q4** (Uber Go
-Style Guide review pass).
 **Related**: `docs/constitution.md` (§ Git and Review Discipline, § Rigorous Code
 Quality), `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+
+This file is a design record. Task state lives in `docs/tasks.md`.
 
 ---
 
@@ -184,6 +183,8 @@ sentinel, that decision needs its own amendment.
 
 ### T-Q4 — Uber Go Style Guide review pass
 
+**Done (2026-11-22).** Results below.
+
 - Walk the three packages against the guide (naming, comment style, error
   handling, slice/map pre-sizing, early returns, `context` placement). Record
   findings and fix the real ones; this is expected to be small.
@@ -191,6 +192,60 @@ sentinel, that decision needs its own amendment.
   cannot be upheld by review alone; adding `wrapcheck`/`revive` would need an
   `AGENTS.md`/constitution change and is its own decision.
 - **Acceptance**: findings recorded in this plan; fixes verified.
+
+#### T-Q4 results
+
+A line-by-line walk of the library and the generator against the guide (naming,
+comment style, error handling, slice/map pre-sizing, early returns, interface
+compliance). The code was already close to the guide; the real deviations and
+their fixes:
+
+- **Omit zero-value struct fields** (`internal/codec/writer.go`): `BeginArray`
+  pushed `writerFrame{object: false}`; the explicit zero field is dropped
+  (`writerFrame{}`), per the guide's "Omit Zero Value Fields in Structs".
+- **Prefer `&T{}` over `new(T)`** (`cmd/qi-json-gen/foreign.go`): the synthesized
+  schema for a pointer to a foreign struct emitted `e := new(T)`; it now emits
+  `e := &T{}`. The checked-in fixture (`zz_qi_json_gen.go`) was regenerated with
+  `go generate ./...`, so the drift guard stays green. The `new(S)` in
+  `codec.ObjectDecoderPtr` stays: `S` is an unconstrained type parameter, where
+  `&S{}` is not legal.
+- **Verify interface compliance** (`internal/codec/errors.go`,
+  `internal/scanner/scan.go`): added compile-time assertions
+  `var _ error = (*Error)(nil)`, `var _ error = (*TypeError)(nil)` and
+  `var _ error = parseError{}`, so a dropped `error` method fails the build.
+- **Reduce nesting** (`cmd/qi-json-gen/foreign.go`): three
+  `if cond { return … } else if !cond { return err }` blocks became two flat
+  `if`s after the first branch returns.
+- **Prefer specifying container capacity** (`cmd/qi-json-gen/gen.go`,
+  `foreign.go`): `seen`, the two `used` member-name sets and the per-field
+  `[]codec` are now pre-sized from a known length.
+
+Reviewed and deliberately left as they are:
+
+- **Prefix Unexported Globals with `_`** — the one guide rule not applied.
+  Renaming `nestingInline`, `spaceTable`, `stringStop`, `compsInline`,
+  `hexDigits`, `marker`, `defaultOutput`, `rangeHelper`, `qijsonPath` and
+  `qijsonEnginePath` would also force the generator to emit `_`-prefixed schema
+  vars and rename the checked-in generated and hand-written fixtures. The
+  maintainer chose to keep the descriptive names; recorded here as an accepted
+  deviation.
+- **Error-string capitalization** — messages such as `qijson: nil Writer` and
+  `qijson: Key called outside an object` capitalize exported API names
+  (`Writer`, `Key`, `Begin`, `End`). The Uber guide does not require lowercase
+  error strings (that guidance is Go Code Review Comments), and the strings are
+  pinned by tests; unchanged.
+- **Enum zero values** — `KindNull` and `KindSyntax` are the zero value of their
+  enums, which the guide permits when the zero value is the meaningful default.
+- **Line length** — the only lines over the 99-column soft limit are embedded
+  source templates in the generator, and the guide allows exceeding the soft
+  limit.
+- **Sorting idiom** — `cmd/qi-json-gen` uses `sort`, `internal/codec` uses
+  `slices`; each package is internally consistent, which the guide's
+  package-level "Be Consistent" rule asks for.
+
+**Verification**: `make verify` green (tests, `gofmt`, `go vet`, `golangci-lint`
+0 issues) and `go test -race ./...` green. No exported identifier changed, so no
+Article VI amendment.
 
 ## 5. Not code — repository settings
 
