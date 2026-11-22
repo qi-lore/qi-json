@@ -149,8 +149,8 @@ func qijsonMethod(fn *types.Func, want string) bool {
 // or as the engine type itself, depending on how the toolchain materializes
 // aliases (GODEBUG=gotypesalias), so both identities are accepted.
 const (
-	qijsonPath       = "qi-json"
-	qijsonEnginePath = "qi-json/internal/codec"
+	qijsonPath       = "github.com/qi-lore/qi-json"
+	qijsonEnginePath = qijsonPath + "/internal/codec"
 )
 
 // isQijsonType reports whether t is the public qijson type named want (Reader

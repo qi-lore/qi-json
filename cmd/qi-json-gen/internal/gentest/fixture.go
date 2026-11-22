@@ -7,13 +7,13 @@ package gentest
 import (
 	"time"
 
-	"qi-json"
-	"qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
+	"github.com/qi-lore/qi-json"
+	"github.com/qi-lore/qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
 )
 
-//go:generate go run qi-json/cmd/qi-json-gen -type=Config,Point,Nums
-//go:generate go run qi-json/cmd/qi-json-gen -type=Overridden -foreign=xtypes.Inner=overriddenInnerSchema -o zz_qi_json_gen_foreign.go
-//go:generate go run qi-json/cmd/qi-json-gen -strict -type=Strict -o zz_qi_json_gen_strict.go
+//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=Config,Point,Nums
+//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=Overridden -foreign=xtypes.Inner=overriddenInnerSchema -o zz_qi_json_gen_foreign.go
+//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -strict -type=Strict -o zz_qi_json_gen_strict.go
 
 // Config exercises every field family the generator supports.
 type Config struct {

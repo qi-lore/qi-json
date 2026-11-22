@@ -1,6 +1,8 @@
 # Internal codec extraction
 
 **Status**: done (2026-11-22) — implemented on `chore/extract-internal-codec`
+**Module path**: `github.com/qi-lore/qi-json` (moved from `qi-json` on
+2026-11-22; `qi-json/...` paths earlier in this plan are the pre-move names)
 **Branch**: `chore/extract-internal-codec` (from `main`, targets `dev`)
 **Related**: `docs/constitution.md` v3.7.0 (Article VI, Additional Constraints);
 `.opencode/plan/2026-11-21-package-rename.md`;
@@ -222,3 +224,9 @@ One unplanned fix: `cmd/qi-json-gen` identified `qijson.Reader`/`Writer` by
 package name, which aliases break. `qijsonMethod` now accepts the facade alias
 and the engine type by import path (`qi-json` and `qi-json/internal/codec`), so
 generated output is byte-identical.
+
+The canonical module path later moved to `github.com/qi-lore/qi-json` in a
+follow-up commit. Every import, the generator's emitted imports, the fixtures,
+the tests and the docs moved together; `TestGoModModulePath` pins the new path,
+and `go test`, `gofmt`, `go vet`, `golangci-lint`, `-race` and an idempotent
+`go generate` all pass on it.

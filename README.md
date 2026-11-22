@@ -6,10 +6,10 @@ accessor closures, optionally generated from struct tags.
 
 | Package | Import path | Role |
 |---|---|---|
-| `scanner` | `qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
-| `qijson` | `qi-json` | Public facade of the semantic layer: type aliases, constants and wrappers |
-| `internal/codec` | `qi-json/internal/codec` | Implementation of the semantic layer behind the facade (internal) |
-| `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
+| `scanner` | `github.com/qi-lore/qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
+| `qijson` | `github.com/qi-lore/qi-json` | Public facade of the semantic layer: type aliases, constants and wrappers |
+| `internal/codec` | `github.com/qi-lore/qi-json/internal/codec` | Implementation of the semantic layer behind the facade (internal) |
+| `cmd/qi-json-gen` | `github.com/qi-lore/qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
 Released as **v0.2.3** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
@@ -44,12 +44,17 @@ change history; the git tags record the release series.
 
 ## Using it
 
-`qi-json` is a local module (its module path is `qi-json`), so point a `replace`
-directive at the checkout:
+The canonical module path is `github.com/qi-lore/qi-json`:
 
 ```
-require qi-json v0.0.0
-replace qi-json => ../qi-json
+go get github.com/qi-lore/qi-json
+```
+
+While working from a local checkout, point a `replace` directive at it instead:
+
+```
+require github.com/qi-lore/qi-json v0.0.0
+replace github.com/qi-lore/qi-json => ../qi-json
 ```
 
 The module requires **Go 1.24 or newer**. Its `go.mod` sets `go 1.24.0` (the
@@ -65,7 +70,7 @@ Map JSON members to struct fields with a `Schema`, then implement `DecodeJSON`:
 ```go
 package example
 
-import "qi-json"
+import "github.com/qi-lore/qi-json"
 
 type Config struct {
 	Name string

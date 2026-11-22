@@ -2,12 +2,13 @@
 
 A from-scratch JSON library with four Go packages:
 
-- `scanner/` (import `qi-json/scanner`) — the single-pass syntax layer; exports
-  `Valid` and the tokenizer (`Kind` plus a tokenizing type).
-- `.` (import `qi-json`, package `qijson`) — the public facade of the
-  reflection-free semantic layer (the decoder and encoder): type aliases, const
-  re-exports and one-line wrapper functions. Not `encoding/json`-compatible; no
-  `reflect`, no `unsafe`.
+- `scanner/` (import `github.com/qi-lore/qi-json/scanner`) — the single-pass
+  syntax layer; exports `Valid` and the tokenizer (`Kind` plus a tokenizing
+  type).
+- `.` (import `github.com/qi-lore/qi-json`, package `qijson`) — the public facade
+  of the reflection-free semantic layer (the decoder and encoder): type aliases,
+  const re-exports and one-line wrapper functions. Not `encoding/json`-compatible;
+  no `reflect`, no `unsafe`.
 - `internal/codec/` — the semantic engine behind that facade. Internal, so
   external code cannot import it and its internals may change without a
   compatibility promise.
@@ -199,7 +200,8 @@ and context rules bind only when such code is added. Open gaps are tracked in
     2026-11-22**: the semantic engine moved to `internal/codec` and the module
     root became a thin facade of type aliases and wrappers; the Go floor moved
     to 1.24 for generic type aliases. The scanner stays public at
-    `qi-json/scanner`; hiding it is deferred to a separate breaking change.
+    `github.com/qi-lore/qi-json/scanner`; hiding it is deferred to a separate
+    breaking change.
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs and the
     gaps they expose (the foreign-struct-field gap was a release blocker, closed
     in v0.2.0).

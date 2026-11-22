@@ -1,4 +1,4 @@
-module qi-json
+module github.com/qi-lore/qi-json
 
 go 1.24.0
 

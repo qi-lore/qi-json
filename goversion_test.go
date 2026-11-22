@@ -33,6 +33,18 @@ func TestGoModGoDirectiveFloor(t *testing.T) {
 	}
 }
 
+// TestGoModModulePath pins the canonical module path. The module path is part of
+// every import — the facade, the engine, the scanner, the generator and every
+// consumer — so an accidental edit breaks all of them at once. Keep it in step
+// with README.md and the constitution's Additional Constraints.
+func TestGoModModulePath(t *testing.T) {
+	const want = "github.com/qi-lore/qi-json"
+
+	if got := readGoModDirectives(t)["module"]; got != want {
+		t.Errorf("go.mod module = %q, want %q", got, want)
+	}
+}
+
 // readGoModDirectives returns the single-line directives of the module's go.mod,
 // keyed by directive name (for example "go", "toolchain", "module"). It is a
 // stdlib-only, minimal reader: directives in this scaffold are single-line

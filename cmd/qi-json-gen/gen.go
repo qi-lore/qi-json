@@ -314,10 +314,11 @@ func (g *gen) render() ([]byte, error) {
 // writeImports writes the import block, sorted by path.
 func (g *gen) writeImports(buf *bytes.Buffer) {
 	lines := map[string]string{ // import path -> import line
-		"qi-json": `"qi-json"`,
+		qijsonPath: fmt.Sprintf("%q", qijsonPath),
 	}
 	if g.needScanner {
-		lines["qi-json/scanner"] = `"qi-json/scanner"`
+		scannerPath := qijsonPath + "/scanner"
+		lines[scannerPath] = fmt.Sprintf("%q", scannerPath)
 	}
 	if g.needMath {
 		lines["math"] = `"math"`

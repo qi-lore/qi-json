@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"qi-json"
-	"qi-json/internal/codec"
+	"github.com/qi-lore/qi-json"
+	"github.com/qi-lore/qi-json/internal/codec"
 )
 
 // The facade must re-export the engine types identically, so external code sees

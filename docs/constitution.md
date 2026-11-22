@@ -119,7 +119,8 @@ results in the final summary.
   (`go 1.24.0`), required because the facade re-exports generic types through
   generic type aliases; its `toolchain` line (`go1.27.3`) names the toolchain
   used to develop the project and is ignored by consumers.
-- Four packages under module `qi-json` (the module root is a package):
+- Four packages under module `github.com/qi-lore/qi-json` (the module root is a
+  package):
   - `.` (module root) — `qijson`, the public facade of the reflection-free
     semantic layer (decode and encode);
   - `internal/codec/` — the semantic engine behind that facade; internal, not a

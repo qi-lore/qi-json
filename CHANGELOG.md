@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The canonical module path is now `github.com/qi-lore/qi-json` (was `qi-json`).
+  Every import path, the generator's emitted imports, the checked-in fixtures
+  and the docs moved with it; the package name stays `qijson`. Importers must
+  update their import paths.
 - `qijson`: the semantic engine moved to `internal/codec` and the module root is
   now a thin facade of type aliases, constant re-exports and one-line wrappers.
   The public API is unchanged — `qijson.Reader` *is* `codec.Reader` — so
