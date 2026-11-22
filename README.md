@@ -10,19 +10,19 @@ accessor closures, optionally generated from struct tags.
 | `qijson` | `qi-json` | Semantic layer: the reflection-free decoder and encoder |
 | `cmd/qi-json-gen` | `qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.2.2** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.2.3** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.2.2** (2026-11-22).
+Current release: **v0.2.3** (2026-11-22).
 
-v0.2.2 is a documentation release with no library API change: it documents the
-**release flow** in `docs/constitution.md` (v3.6.0) and `AGENTS.md` — how a
-release is cut, from choosing the version and preparing it on `dev`, through the
-`dev` → `main` pull request, to tagging the merge commit on `main` and keeping
-`dev` as the integration branch. See [CHANGELOG.md](CHANGELOG.md) for the change
-history; the git tags record the release series.
+v0.2.3 is a code-quality release with no library API change: it defines every
+library error sentinel once and makes it inspectable with `errors.Is` (task
+T-Q2), records and pins the error-wrapping policy in `docs/constitution.md`
+(v3.7.0) and `AGENTS.md` (task T-Q1), and documents ownership, concurrency and
+lifecycle on the public API (task T-Q3). See [CHANGELOG.md](CHANGELOG.md) for the
+change history; the git tags record the release series.
 
 ## Why another JSON library
 
