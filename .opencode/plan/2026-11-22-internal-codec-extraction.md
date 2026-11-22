@@ -1,6 +1,6 @@
 # Internal codec extraction
 
-**Status**: proposed — awaiting approval (2026-11-22)
+**Status**: proposed — `internal/codec` settled; the scanner's fate is open (§7)
 **Branch**: `chore/extract-internal-codec` (from `main`, targets `dev`)
 **Related**: `docs/constitution.md` v3.7.0 (Article VI, Additional Constraints);
 `.opencode/plan/2026-11-21-package-rename.md`;
@@ -9,13 +9,14 @@
 ## 1. Goal
 
 Move every implementation file of the `qijson` semantic layer into a new
-`internal/codec` package, and leave the module root as a thin, documented facade
+`internal/codec` package and leave the module root as a thin, documented facade
 that re-exports the same public API. External importers keep using `qi-json`
-exactly as before; the engine becomes invisible so its internals can change
-without a compatibility promise.
+exactly as before; the semantic engine becomes invisible so its internals can
+change without a compatibility promise.
 
-**Non-goals**: no scanner change, no generator change, no behavior change, no
-error-string/position change, no new public identifiers, no performance change.
+**Non-goals**: no behavior change, no error-string/position change, no
+performance change, no new public identifiers (except the deliberate scanner
+consolidation if §7.B is chosen).
 
 ## 2. Measured starting point
 
@@ -33,166 +34,194 @@ error-string/position change, no new public identifiers, no performance change.
   `errMultipleRoots`, `errNonFinite`, `errIncomplete`.
 - Baseline verification is green (`go test ./... -count=1`, `gofmt -l .`,
   `go vet ./...`, `golangci-lint run` → 0 issues).
+- `scanner` exports: `Valid`, `Kind` (uint8) with 7 constants
+  (`KindNull`, `KindBool`, `KindString`, `KindNumber`, `KindObject`,
+  `KindArray`, `KindEnd`) and `Kind.String()`, and `Tokenizer` with 14 methods.
+- `qijson.Reader.Peek()` returns `scanner.Kind`, so the scanner's kind type is
+  already part of the public `qijson` signature.
+- `cmd/qi-json-gen` emits `import "qi-json/scanner"` and `scanner.KindNull` in
+  17 places (null checks for pointer and named scalar fields); `gen_test.go`
+  asserts that emitted text.
 
-## 3. Target layout
+## 3. Settled decisions
+
+- **D1 — Alias facade, Go floor 1.24.** `qijson.go` is type aliases, const
+  re-exports and one-line wrapper functions. `go.mod` moves to `go 1.24.0`
+  because `Schema[T]`, `Field[T]` and `Codec[E]` are generic and generic type
+  aliases are a Go 1.24 language feature. `TestGoModGoDirectiveFloor`,
+  the constitution, `AGENTS.md`, `README.md` and `CHANGELOG.md` move with it.
+- **D2 — Sentinels stay unexported.** The facade returns whatever `codec`
+  returns; the white-box tests move into `codec` and keep asserting the same
+  sentinels. No new public `Err*` identifiers.
+- **D3 — File names.** `unmarshal.go` → `decode.go` (the plan's requested
+  symmetry); `errors.go` keeps its idiomatic plural name.
+
+## 4. Target layout
 
 ```text
 qi-json/
 ├── go.mod
-├── doc.go                 # package narrative (unchanged content, one added sentence)
+├── doc.go                 # package narrative
 ├── qijson.go              # facade: aliases, consts, wrapper funcs
 ├── internal/
-│   └── codec/             # package codec — the engine
-│       ├── doc.go         # internal package comment
-│       ├── decode.go      # was unmarshal.go (Decoder, Unmarshal, UnmarshalInto, Decode)
-│       ├── encode.go      # Encoder, Marshal, Encode, Codec, NewCodec
-│       ├── errors.go      # Error, ErrorKind, TypeError, sentinels
-│       ├── field.go       # Field[T] and the constructors
-│       ├── reader.go      # Reader
-│       ├── schema.go      # Schema[T], Struct
-│       └── writer.go      # Writer, NewWriter
-├── scanner/               # unchanged, stays public at the module root
+│   └── codec/             # package codec — the semantic engine
+│       ├── doc.go
+│       ├── decode.go      # was unmarshal.go
+│       ├── encode.go
+│       ├── errors.go
+│       ├── field.go
+│       ├── reader.go
+│       ├── schema.go
+│       └── writer.go
+├── scanner/               # §7.A: unchanged, public
+│   └── (or internal/scanner/ under §7.B)
 └── cmd/
-    └── qi-json-gen/       # unchanged
+    └── qi-json-gen/
 ```
-
-`scanner/` stays at the module root: `scanner.Valid` is the sanctioned headline
-export (Article VI) and generated code imports `qi-json/scanner`. Hiding it
-under `internal/` would be a breaking change.
-
-## 4. Invariants (the acceptance bar)
-
-1. The public surface is identical: same identifiers, same signatures, same
-   method sets. Guarded by a `go doc -all .` diff against a pre-change snapshot
-   and by a new facade contract test.
-2. Error strings, error types, `errors.As`/`errors.Is` behavior and byte
-   offsets are unchanged.
-3. No `encoding/json`, no `reflect`, no `unsafe`; no third-party dependency.
-4. `scanner/` is untouched; its tests and benchmarks are untouched.
-5. `go generate ./...` produces a byte-identical `cmd/qi-json-gen` fixture set
-   (drift guard).
-6. Benchmarks stay within noise (aliases and trivial wrappers inline).
 
 ## 5. Findings that shape the plan
 
-### 5.1 Generic type aliases need the Go 1.24 language version
+### 5.1 Generic type aliases need Go 1.24
 
-`Schema[T]`, `Field[T]` and `Codec[E]` are generic types, so a *pure* alias
-facade needs generic type aliases, which are a Go 1.24 language feature. The
-development toolchain (`go1.27.3`) accepts them even with `go 1.23.0` in
-`go.mod` (verified), but a consumer compiling with a real Go 1.23 toolchain
-cannot parse them. The module would then claim a floor it does not meet — the
-exact silent-upgrade trap that `.opencode/plan/2026-11-22-go-version-floor.md`
-closed and `TestGoModGoDirectiveFloor` guards.
-
-Consequence: a pure alias facade and a 1.23 floor are mutually exclusive.
-See §7 for the three options.
+The development toolchain (`go1.27.3`) accepts generic aliases even with
+`go 1.23.0` in `go.mod` (verified), but a real Go 1.23 compiler cannot parse
+them. Keeping `go 1.23.0` while using them would repeat the silent-upgrade trap
+that `.opencode/plan/2026-11-22-go-version-floor.md` closed. Hence D1.
 
 ### 5.2 The test suite is white-box
 
 9 of 15 root test files assert against unexported identifiers, so they cannot
-stay in the root package once the engine moves. Plan: move them next to the
-code as `package codec` (the executable contract follows the implementation),
-keep `goversion_test.go` at the root (it reads `go.mod`), and add a new root
-contract test that exercises the facade through its public API only.
+stay at the root once the engine moves. They move next to the code as
+`package codec`; `goversion_test.go` stays at the root (it reads `go.mod`); a
+new root contract test exercises the facade through its public API only.
 
 ### 5.3 `go doc` does not follow aliases for method sets
 
-Verified on go1.27.3: for `type Alias = Box`, `go doc pkg.Alias` prints the alias
-line and the alias's own doc comment but **not** `Box`'s methods. With a
-facade-only package, `go doc qijson.Reader` would therefore no longer list
-`ReadString`, `Object`, `Array`, ... Mitigation: put the full public doc
-comments on the facade aliases (the constitution requires ownership/concurrency/
-lifecycle docs), keep the narrative in `doc.go`, and verify pkg.go.dev
-rendering. Option 7.B preserves method listings at the cost of ~40 forwarding
-methods.
+Verified on go1.27.3: for `type Alias = Box`, `go doc pkg.Alias` prints the
+alias and the alias's own doc comment but not `Box`'s methods. With an
+all-alias facade, `go doc qijson.Reader` stops listing `ReadString`, `Object`,
+... Mitigation: put the full public doc comments on the facade aliases (the
+constitution requires ownership/concurrency/lifecycle docs), keep the narrative
+in `doc.go`, and check pkg.go.dev rendering.
 
 ### 5.4 The constitution requires an amendment
 
-The constitution's Additional Constraints list exactly three packages and say
-new packages/exported identifiers require an amendment. This change adds a
-fourth package (and, under Option 7.A, moves the Go floor). Plan: amend Article
-VI / Additional Constraints, bump the constitution to v3.8.0, and update
-`AGENTS.md` in the same commit.
+Adding `internal/codec` (and, under §7.B, moving the scanner) changes the
+package list and the sanctioned surface. Article VI and Additional Constraints
+are amended, the version bumps to v3.8.0, and `AGENTS.md` is updated in the
+same commit.
 
-### 5.5 Sentinels stay unexported
+### 5.5 The generator's only scanner dependency is the null check
 
-No export is needed: the facade wrappers return whatever `codec` returns, and
-the white-box tests move into `codec` where they keep asserting the same
-sentinels. Exporting `Err*` would be a new public API (an amendment) and is out
-of scope unless requested.
+`gen.go` emits `scanner.KindNull` for pointer and named-scalar fields and adds
+the `qi-json/scanner` import when it does. Nothing else in generated code names
+the scanner.
 
-### 5.6 The generator is unaffected
+## 6. Public surface checklist (`qijson`)
 
-`cmd/qi-json-gen` only emits *text* that references the public `qijson` names
-(`qijson.Struct`, `qijson.Field[T]{...}`, `qijson.Reader`, `qijson.Writer`,
-`qijson.ObjectDecoder`, `qijson.DecoderCodec`, `qijson.NewCodec`,
-`qijson.KindType`, ...). Aliases and wrappers keep every one of them
-resolvable, including the `Field[T]` composite literal. The generator itself
-imports only `qijson` and `qi-json/scanner`.
-
-## 6. Public surface checklist
-
-Every item below must remain resolvable from `qi-json` with the same type.
+Every item below must remain resolvable from `qi-json` with the same type,
+except for the deliberate scanner change in §7.
 
 - **Types**: `Error`, `TypeError`, `ErrorKind`, `Reader`, `Writer`, `Schema[T]`,
   `Field[T]`, `Codec[E]`, `Decoder`, `Encoder`.
 - **Constants**: `KindSyntax`, `KindType`, `KindUnknownField`,
-  `KindDuplicateField`, `KindDepth` (typed `ErrorKind`).
-- **Methods** (preserved through aliases): `Error.Error/Unwrap`;
-  `TypeError.Error`; `ErrorKind.String`; `Reader.Peek/ReadNull/ReadBool/
-  ReadString/ReadInt/ReadFloat/Object/Array/Skip/Path/Offset`;
-  `Writer.Reset/Bytes/Err/WriteNull/WriteBool/WriteString/WriteInt/WriteUint/
-  WriteFloat/WriteRaw/BeginObject/EndObject/BeginArray/EndArray/Key`;
-  `Schema.Decode/Encode/Marshal/Unmarshal/UnmarshalInto/RejectUnknown/
-  RejectDuplicate`; `Field.OmitEmpty`.
+  `KindDuplicateField`, `KindDepth`.
+- **Methods**: `Error.Error/Unwrap`; `TypeError.Error`; `ErrorKind.String`;
+  `Reader.Peek/ReadNull/ReadBool/ReadString/ReadInt/ReadFloat/Object/Array/
+  Skip/Path/Offset`; `Writer.Reset/Bytes/Err/WriteNull/WriteBool/WriteString/
+  WriteInt/WriteUint/WriteFloat/WriteRaw/BeginObject/EndObject/BeginArray/
+  EndArray/Key`; `Schema.Decode/Encode/Marshal/Unmarshal/UnmarshalInto/
+  RejectUnknown/RejectDuplicate`; `Field.OmitEmpty`.
 - **Functions**: `NewWriter`, `NewCodec`, `Struct`, `Unmarshal`,
   `UnmarshalInto`, `Decode`, `Marshal`, `Encode`, `String`, `StringPtr`, `Int`,
   `IntPtr`, `Float`, `FloatPtr`, `Bool`, `BoolPtr`, `Object`, `ObjectDecoder`,
   `ObjectDecoderPtr`, `DecoderCodec`, `Slice`, `Map`, `Array`, `Any`, `Raw`.
 
-## 7. Decisions required (blocking)
+## 7. Open decision: keep the scanner public or hide it
 
-### 7.A Pure alias facade, floor raised to Go 1.24 — **recommended**
+### 7.A Leave `scanner/` public at `qi-json/scanner`
 
-`qijson.go` is type aliases + const re-exports + one-line wrapper functions.
-Types are identical across the boundary (`errors.As` and composite literals keep
-working), the facade is ~150 lines, and there is no divergence risk.
+Only `internal/codec` is added. `qijson` keeps `Reader.Peek() (scanner.Kind,
+error)`, so no `qijson.Kind` is needed.
 
-Cost: `go.mod` moves to `go 1.24.0`, `TestGoModGoDirectiveFloor` and the
-documented floor move with it (constitution amendment + CHANGELOG note), and
-per-type method lists disappear from `go doc qijson.X` (§5.3).
+### 7.B Move it to `qi-json/internal/scanner`
 
-### 7.B Explicit wrapper types, floor stays at Go 1.23
+`Valid`, `Kind` + 7 constants, `Kind.String` and `Tokenizer` + 14 methods leave
+the public API. Follow-on work is forced:
 
-Root declares real types (`type Reader struct{ inner *codec.Reader }`, ~40
-forwarding methods, `Schema[T]`/`Field[T]`/`Codec[E]` wrappers with conversions
-to the codec equivalents). Keeps the floor and keeps `go doc` method listings.
+- `qijson.Kind` must exist because `Reader.Peek` returns it and generated code
+  compares `KindNull` — either an alias to the internal type (leaks
+  `internal/scanner.Kind` into the public signature and docs) or a distinct
+  public type that mirrors the 7 constants (cleaner, more churn, coupling).
+- `Valid` either disappears (a product regression; `encoding/json.Valid` has no
+  equivalent here) or is re-exported as `qijson.Valid` (validation stays public,
+  so the tokenizer is only partially hidden).
+- The generator must drop `qi-json/scanner`, emit `qijson.KindNull`, regenerate
+  every fixture and update the `gen_test.go` goldens. Every already-generated
+  file in a consumer repository imports `qi-json/scanner` and stops compiling
+  until it is regenerated.
+- Tests, fuzz and benchmarks move to `./internal/scanner`; `Makefile`'s
+  `SCANNER`, `AGENTS.md`, `README.md`, `docs/task.md` and Article VI all change.
 
-Cost: substantially more facade code, two definitions of each public type, and a
-standing divergence risk — which weakens the "thin facade" goal.
+### Comparison
 
-### 7.C Mixed: aliases where legal, wrappers for generic types, floor stays 1.23
+| Dimension | A. Keep public | B. Hide |
+|---|---|---|
+| Public API | unchanged | removes `Valid`, `Kind` + 7 consts, `Tokenizer` + 14 methods |
+| SemVer | non-breaking | breaking (pre-1.0: minor, plus a migration note) |
+| Consumers using `Valid` | unaffected | break, unless `qijson.Valid` is re-exported |
+| Consumers using `Tokenizer` | unaffected | break, with no replacement |
+| Already-generated consumer files | unaffected | fail to compile until regenerated |
+| Generator source | unchanged | drop scanner import, emit `qijson.KindNull`, new goldens |
+| `qijson.Kind` | not needed | required (alias leaks internal type; distinct type mirrors consts) |
+| Hiding achieved | semantic engine hidden; syntax layer stays public by design | syntax + semantic hidden, but `Peek` still exposes the kind taxonomy |
+| Article VI | add `internal/codec` | rewrite the scanner bullet and the package list |
+| Docs / tooling churn | one sentence | `task.md`, `README`, `AGENTS`, `Makefile`, `CHANGELOG`, migration note |
+| Effort | low | high |
+| Risk | low | medium-high (public break + generator churn) |
+| Reversibility | trivial | hard |
 
-Keeps the floor but still loses method listings for the aliased non-generic
-types, and is the most complex of the three. Not recommended.
+### Non-obvious findings
 
-## 8. Task list
+1. **Hiding the scanner does not fully hide the tokenizer.** `Reader.Peek` is a
+   public method returning a kind. Either `qijson.Kind` is published (the kind
+   taxonomy stays public) or `Peek` changes (another break). The hide buys the
+   `Valid` and `Tokenizer` surfaces, not the kind model.
+2. **The sharpest cost is consumer regeneration.** Generated files name
+   `qi-json/scanner`; after B they do not compile until regenerated. That is a
+   real upgrade tax on every codegen user, unrelated to the codec refactor.
+3. **`scanner` is already a thin public surface.** Its internals (`validator`,
+   `parseError`, `scan*`) are unexported and spec'd in `docs/task.md`. Hiding it
+   adds little internal freedom; hiding `codec` adds a lot.
+4. **Bundling B into this refactor mixes a structural move with a breaking
+   API change.** A non-breaking `internal/codec` extraction stays reviewable and
+   bisectable; the scanner consolidation deserves its own release, changelog
+   entry and migration note.
+
+### Recommendation
+
+Do **A** now, and treat **B** as a separate, deliberate breaking change if a
+single-public-package API is the goal. A delivers the refactor's actual goal
+(hide the semantic engine) with no consumer breakage, no generator churn and a
+small review surface; B's hiding is partial and its cost lands on every consumer
+with generated code.
+
+## 8. Task list (A; B adds the bracketed items)
 
 - **T-R1** Amend the constitution (Article VI + Additional Constraints: fourth
-  package, and the floor under 7.A) and `AGENTS.md`; bump to v3.8.0.
-- **T-R2** Snapshot the baseline outside the repo: `go doc -all .`,
-  `go test -run=^$ -bench=. -benchmem ./...`, and the verification results.
+  package; Go floor 1.24) and `AGENTS.md`; bump to v3.8.0.
+- **T-R2** Snapshot `go doc -all .`, `go doc -all ./scanner` and benchmarks
+  outside the repo as the baseline.
 - **T-R3** Create `internal/codec/doc.go`; move `errors.go`, `reader.go`,
   `writer.go`, `field.go`, `schema.go`, `encode.go`, and `unmarshal.go` →
-  `decode.go`; change the package clause; keep every exported name; keep the
+  `decode.go`; change the package clause; keep every exported name and the
   sentinels unexported; delete the originals from the root.
-- **T-R4** Write the root `qijson.go` facade (aliases, consts, wrapper funcs)
-  per the chosen option; leave `doc.go` as the package narrative and add one
-  sentence pointing at `internal/codec`.
+- **T-R4** Write the root `qijson.go` facade (aliases, consts, wrapper funcs);
+  keep `doc.go` as the narrative and add one sentence pointing at
+  `internal/codec`.
 - **T-R5** Move the white-box tests to `internal/codec` as `package codec`;
   rename `unmarshal_test.go` → `decode_test.go`; keep `goversion_test.go` at the
-  root (updating `wantGo` only under 7.A).
+  root (`wantGo` = `1.24.0`).
 - **T-R6** Add a root facade contract test: compile-time assertions that each
   public identifier has the expected type (and is identical to its `codec`
   counterpart), plus a behavioral smoke test through `Struct`/`Marshal`/
@@ -202,6 +231,11 @@ types, and is the most complex of the three. Not recommended.
 - **T-R8** Docs: README package-layout section, `CHANGELOG.md` `[Unreleased]`,
   `AGENTS.md` context, Makefile header comment.
 - **T-R9** Full verification (§9) and a before/after benchmark comparison.
+- **B-only**: T-R3b move `scanner/` → `internal/scanner/`; T-R3c add
+  `qijson.Kind` (+ consts, and `Valid` if re-exported); T-R7b update `gen.go`
+  to emit `qijson.KindNull` and drop the scanner import, regenerate fixtures,
+  update `gen_test.go`; T-R8b rewrite the scanner docs and Article VI bullet;
+  T-R9b add a migration note.
 
 ## 9. Verification
 
@@ -210,31 +244,28 @@ types, and is the most complex of the three. Not recommended.
 3. `go vet ./...`
 4. `golangci-lint run` (v2, 0 issues)
 5. `go test -race ./... -count=1`
-6. `go generate ./... && git diff --exit-code`
-7. `go doc -all .` diff against the T-R2 snapshot: only the package-level
-   layout lines may differ; no identifier may disappear or change signature.
+6. `go generate ./... && git diff --exit-code` (under B this diff is expected
+   once, then committed)
+7. `go doc -all .` diff against the T-R2 snapshot: only the package-layout
+   lines may differ; no identifier may disappear or change signature (under B,
+   the documented scanner removals are the only exceptions).
 8. `go test -run=^$ -bench=. -benchmem ./...` compared with T-R2.
 
 ## 10. Risks and rollback
 
-- **Alias/doc regression** (§5.3): mitigate with full facade docs; verify
-  pkg.go.dev if available.
+- **Alias/doc regression** (§5.3): full facade docs; verify pkg.go.dev.
 - **Test relocation hides a facade bug**: mitigated by T-R6; the gentest package
   also exercises the facade end to end.
-- **Floor move surprises a consumer**: only under 7.A, documented in the
-  constitution, `AGENTS.md`, `CHANGELOG.md` and the goversion test.
-- **Rollback**: the whole change is one branch of pure moves plus a facade; a
-  revert restores the single-package layout with no data or API migration.
+- **Floor move surprises a consumer**: documented in the constitution,
+  `AGENTS.md`, `CHANGELOG.md` and the goversion test.
+- **B breaks consumer builds** (generated files and `scanner` imports): needs a
+  migration note and a deliberate release.
+- **Rollback**: A is one branch of pure moves plus a facade; a revert restores
+  the single-package layout. B is harder to revert once consumers regenerate.
 
 ## 11. Open questions
 
-1. Option 7.A, 7.B or 7.C for the Go floor / alias strategy?
-2. Confirm `scanner/` stays public at `qi-json/scanner` (the target-layout
-   sketch's `scanner/` line is ambiguous; hiding it would break Article VI and
-   generated imports).
-3. Keep the sentinels unexported (§5.5), or take the opportunity to export
-   `Err*` (new public API + amendment)?
-4. Is the `errors.go` → `error.go` rename in the plan's sketch wanted, or keep
-   the idiomatic plural `errors.go`? Same question for `unmarshal.go` →
-   `decode.go` (the plan explicitly asks for `decode.go`, so that rename is
-   assumed).
+1. §7.A or §7.B for the scanner?
+2. Under B: re-export `qijson.Valid` or drop validation entirely?
+3. Under B: `qijson.Kind` as an alias to the internal kind, or a distinct public
+   type that mirrors the seven constants?
