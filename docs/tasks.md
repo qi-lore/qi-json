@@ -109,8 +109,10 @@ never renumber, never reuse a retired identifier.
 - [X] M006 - Retire `docs/task.md` and introduce the task registry (constitution v3.9.0)
 - [X] M007 - Normalize the plan files' headers to design records
 
+### Process and repository settings
+
+- [X] P001 - Protect `main` and `dev` with branch protection and the `verify` check
+
 ## Planned
 
-Next up: **P001**, protect `main` and `dev` with branch protection and the `verify` check.
-
-- [ ] P001 - Protect `main` and `dev` with branch protection and the `verify` check
+No planned tasks. The backlog is empty.
