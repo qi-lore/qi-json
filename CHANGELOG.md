@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-22
+
+### Changed
+
+- `qijson`: every library sentinel is now defined once and inspectable with
+  `errors.Is` (code-quality task T-Q2). The element-constructor guards
+  (`errNilElementDecoder`, `errNilElementEncoder`) plus `errUnsupportedDynamicType`
+  (`field.go`) and `errNoFieldEncoder` (`schema.go`) replace the `errors.New`
+  calls that were made inside function bodies and are wrapped with `%w`. No
+  exported identifier changed; the only visible effect is two programming-error
+  messages that now read `qijson: cannot encode <T> as JSON: unsupported dynamic
+  type` and `qijson: field "x": no encoder`.
+- Documented the error-wrapping policy (code-quality task T-Q1) in `doc.go` and
+  the constitution (v3.7.0), mirrored in `AGENTS.md`: a decode failure is a typed
+  `*qijson.Error` carrying the JSON path and offset, returned unwrapped, so
+  `errors.As` reaches it and `errors.Is` reaches its cause; a programming error
+  is an inspectable sentinel. New `error_policy_test.go` pins the guarantee end to
+  end across every entry point and through a nested `ObjectDecoder` delegation.
+  No behavior change.
+- Documented ownership, concurrency and lifecycle on the public API (code-quality
+  task T-Q3): `Schema` is immutable once built (the reject setters mutate it and
+  must not race with use), `Field`/`Codec`/`NewCodec` are plain closures,
+  `*Error`/`*TypeError` are immutable, `Writer` is not safe for concurrent use
+  and `Bytes` aliases its buffer, the entry points do not retain `data` and the
+  `[]byte` from `Marshal` is caller-owned, and `scanner.NewTokenizer` documents
+  that it aliases `data`. Comments only; no behavior change.
+
 ## [0.2.2] - 2026-11-22
 
 ### Added

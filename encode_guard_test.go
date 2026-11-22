@@ -10,8 +10,8 @@ import (
 var decodeOnlyInt = dec((*Reader).ReadInt)
 
 // TestEncodeNilElementEncoder proves that encoding a non-empty container through
-// a decode-only Codec is an error, not a nil-function panic, and that a nil
-// container still encodes to null without needing an encoder.
+// a decode-only Codec is an inspectable error, not a nil-function panic, and that
+// a nil container still encodes to null without needing an encoder.
 func TestEncodeNilElementEncoder(t *testing.T) {
 	type containers struct {
 		S []int64
@@ -21,11 +21,11 @@ func TestEncodeNilElementEncoder(t *testing.T) {
 		Slice[containers, int64]("s", func(c *containers) *[]int64 { return &c.S }, decodeOnlyInt),
 		Map[containers, int64]("m", func(c *containers) *map[string]int64 { return &c.M }, decodeOnlyInt),
 	)
-	if _, err := cm.Marshal(containers{S: []int64{1}}); err == nil {
-		t.Error("slice: Marshal error = nil, want a nil element encoder error")
+	if _, err := cm.Marshal(containers{S: []int64{1}}); !errors.Is(err, errNilElementEncoder) {
+		t.Errorf("slice: err = %v, want errNilElementEncoder", err)
 	}
-	if _, err := cm.Marshal(containers{M: map[string]int64{"k": 1}}); err == nil {
-		t.Error("map: Marshal error = nil, want a nil element encoder error")
+	if _, err := cm.Marshal(containers{M: map[string]int64{"k": 1}}); !errors.Is(err, errNilElementEncoder) {
+		t.Errorf("map: err = %v, want errNilElementEncoder", err)
 	}
 	data, err := cm.Marshal(containers{})
 	if err != nil {
@@ -37,8 +37,8 @@ func TestEncodeNilElementEncoder(t *testing.T) {
 
 	type fixed struct{ A [1]int64 }
 	fa := Struct(Array[fixed, int64]("a", func(c *fixed) []int64 { return c.A[:] }, decodeOnlyInt))
-	if _, err := fa.Marshal(fixed{}); err == nil {
-		t.Error("array: Marshal error = nil, want a nil element encoder error")
+	if _, err := fa.Marshal(fixed{}); !errors.Is(err, errNilElementEncoder) {
+		t.Errorf("array: err = %v, want errNilElementEncoder", err)
 	}
 }
 

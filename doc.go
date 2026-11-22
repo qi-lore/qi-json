@@ -57,6 +57,16 @@
 // replaces invalid UTF-8 in a string with U+FFFD (the decoder, in contrast,
 // rejects invalid UTF-8). It never uses reflection.
 //
+// A decode failure is a *Error: it records the JSON path of the offending value,
+// the byte offset, a Kind (syntax, type, unknown field, duplicate field or
+// depth) and an underlying cause. The *Error is returned unwrapped — it is
+// itself the context a caller needs — so errors.As reaches it and errors.Is
+// reaches its cause (a *TypeError, or a decoder sentinel such as the
+// invalid-UTF-8 cause). A misuse of the API (a nil target, a nil Codec
+// direction, a Field without an encoder, a non-finite number) is instead a plain
+// sentinel error, defined once in this package and reachable with errors.Is.
+// See the constitution's "Rigorous Code Quality" section for the wrapping rule.
+//
 // A field or element whose type is a struct from another package can be bound
 // without hand-written closures. If the foreign type implements Decoder and
 // Encoder, build the field with ObjectDecoder (or ObjectDecoderPtr for a pointer

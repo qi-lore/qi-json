@@ -7,7 +7,8 @@ the research that drove it is `.opencode/plan/2026-11-22-third-party-struct-fiel
 **D3**, the Go-version floor mismatch (§2.5), was the next task and is now
 **done (2026-11-22)**, shipping in **v0.2.1**, per
 `.opencode/plan/2026-11-22-go-version-floor.md`. All recorded gaps are closed;
-the next task is the code-quality refactoring **T-Q2**
+the code-quality refactoring **T-Q2** is done (2026-11-22), **T-Q1** is done
+(2026-11-22), **T-Q3** is done (2026-11-22), and the next task is **T-Q4**
 (`.opencode/plan/2026-11-22-git-and-code-quality-reglament.md`).
 **Related**: `docs/constitution.md`, `README.md`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
@@ -232,8 +233,9 @@ and the implementation (`.opencode/plan/2026-11-22-foreign-struct-fields-impl.md
   one. Plan and results: `.opencode/plan/2026-11-22-go-version-floor.md`.
 - **D4 (baseline + handoff).** This session recorded the scenarios at the
   **v0.1.1** baseline and opened the research task; the struct work shipped in
-  **v0.2.0**, the Go-floor fix in **v0.2.1** and the release-flow documentation
-  in **v0.2.2**, so the current baseline is now **v0.2.2**.
+  **v0.2.0**, the Go-floor fix in **v0.2.1**, the release-flow documentation in
+  **v0.2.2**, and the code-quality work (T-Q1…T-Q3) in **v0.2.3**, so the current
+  baseline is now **v0.2.3**.
 
 ---
 

@@ -190,6 +190,13 @@ addition:
 
 - Errors MUST be wrapped with context using `fmt.Errorf("...: %w", err)`.
 - Bare errors MUST NOT be returned from deeper layers.
+- The typed `*qijson.Error` **is** the context: it carries the JSON path and byte
+  offset of the failure and is returned unwrapped through `Decoder`/`Encoder`, so
+  a caller reaches it with `errors.As` and its cause with `errors.Is`. The
+  `fmt.Errorf("...: %w", err)` rule applies where a layer adds *new* context — for
+  example, wrapping a sentinel cause, which is the only wrapping the decoder and
+  encoder do today. Adding a literal `%w` at the public boundary instead would
+  change error strings and is a deliberate behavior change, not a style tweak.
 - Sentinel errors MUST be defined in the package that owns the surface where
   callers need to inspect them: the `qijson` module root or `scanner`. There is
   no separate `core` package; this repository's surface is fixed by Article VI.
@@ -211,4 +218,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, resolve the
 discrepancy against `docs/task.md`, then update both.
 
-**Version**: 3.6.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.7.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22

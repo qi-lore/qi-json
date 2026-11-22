@@ -2,6 +2,7 @@ package qijson
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -9,8 +10,17 @@ import (
 	"qi-json/scanner"
 )
 
-// Schema decodes JSON objects into values of T. Build one with Struct; the zero
-// value is not usable.
+// errNoFieldEncoder reports a Field whose Encode is nil, reached by
+// Schema.Encode. It is a programming error rather than a property of the input,
+// so it is a plain error rather than a *qijson.Error.
+var errNoFieldEncoder = errors.New("no encoder")
+
+// Schema decodes and encodes JSON objects into and from values of T. Build one
+// with Struct; the zero value is not usable.
+//
+// A Schema is immutable once built and safe for concurrent use by Decode, Encode,
+// Marshal, Unmarshal and UnmarshalInto. RejectUnknown and RejectDuplicate mutate
+// it, so finish configuring it before sharing it.
 type Schema[T any] struct {
 	// fields holds the fields sorted by Name for binary-search lookup.
 	fields []Field[T]
@@ -38,14 +48,16 @@ func Struct[T any](fields ...Field[T]) *Schema[T] {
 }
 
 // RejectUnknown returns s configured to fail on an object member that no field
-// matches. By default such members are ignored.
+// matches. By default such members are ignored. It mutates s, so it must not run
+// concurrently with any use of s or with RejectDuplicate.
 func (s *Schema[T]) RejectUnknown() *Schema[T] {
 	s.rejectUnknown = true
 	return s
 }
 
 // RejectDuplicate returns s configured to fail when an object repeats a member
-// that a field already consumed. By default the last occurrence wins.
+// that a field already consumed. By default the last occurrence wins. It mutates
+// s, so it must not run concurrently with any use of s or with RejectUnknown.
 func (s *Schema[T]) RejectDuplicate() *Schema[T] {
 	s.rejectDuplicate = true
 	return s
@@ -95,7 +107,7 @@ func (s *Schema[T]) Encode(w *Writer, v *T) error {
 			continue
 		}
 		if f.Encode == nil {
-			return fmt.Errorf("qijson: field %q has no encoder", f.Name)
+			return fmt.Errorf("qijson: field %q: %w", f.Name, errNoFieldEncoder)
 		}
 		if err := w.Key(f.Name); err != nil {
 			return err
@@ -107,7 +119,9 @@ func (s *Schema[T]) Encode(w *Writer, v *T) error {
 	return w.EndObject()
 }
 
-// Marshal encodes v as a JSON object. It is the counterpart to Unmarshal.
+// Marshal encodes v as a JSON object. It is the counterpart to Unmarshal. The
+// returned []byte is freshly allocated and owned by the caller, who may keep and
+// modify it.
 func (s *Schema[T]) Marshal(v T) ([]byte, error) {
 	var w Writer
 	if err := s.Encode(&w, &v); err != nil {
@@ -122,7 +136,7 @@ func (s *Schema[T]) Marshal(v T) ([]byte, error) {
 	return w.buf, nil
 }
 
-// Unmarshal decodes data into a new T.
+// Unmarshal decodes data into a new T. data is not retained after the call.
 func (s *Schema[T]) Unmarshal(data []byte) (T, error) {
 	var v T
 	err := s.UnmarshalInto(data, &v)
@@ -131,7 +145,7 @@ func (s *Schema[T]) Unmarshal(data []byte) (T, error) {
 
 // UnmarshalInto decodes data into v, which must be non-nil. Members present in
 // data overwrite the corresponding fields of v; members absent from data leave
-// v unchanged.
+// v unchanged. v is written in place and data is not retained after the call.
 func (s *Schema[T]) UnmarshalInto(data []byte, v *T) error {
 	r := newReader(scanner.NewTokenizer(data))
 	if err := s.Decode(r, v); err != nil {

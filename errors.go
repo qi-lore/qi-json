@@ -47,7 +47,9 @@ func (k ErrorKind) String() string {
 
 // Error describes a failure to decode JSON into a Go value. It records where in
 // the input the failure happened and wraps the underlying cause so callers can
-// inspect it with errors.As and errors.Unwrap.
+// inspect it with errors.As and errors.Unwrap. A *Error returned by this package
+// is immutable: its fields may be read, including from another goroutine, but
+// never written.
 type Error struct {
 	// Path is the JSON path of the value being decoded, such as "$.a.b[2].c".
 	Path string
@@ -96,7 +98,8 @@ func (e *Error) Unwrap() error {
 	return e.Err
 }
 
-// TypeError describes a JSON value whose type does not match the target.
+// TypeError describes a JSON value whose type does not match the target. A
+// returned *TypeError is immutable.
 type TypeError struct {
 	// Want is the JSON type the target expected, such as "string".
 	Want string

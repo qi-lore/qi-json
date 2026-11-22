@@ -111,7 +111,10 @@ type Tokenizer struct {
 	state tokenizer
 }
 
-// NewTokenizer returns a Tokenizer positioned at the start of data.
+// NewTokenizer returns a Tokenizer positioned at the start of data. The
+// Tokenizer reads from data without copying: the caller must keep data alive and
+// unmodified for the Tokenizer's lifetime, and every byte slice a read returns
+// aliases data. A Tokenizer is not safe for concurrent use.
 func NewTokenizer(data []byte) *Tokenizer {
 	t := &Tokenizer{}
 	t.state.v.data = data
