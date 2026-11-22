@@ -23,7 +23,8 @@ import (
 //
 // A mistake (a Key outside an object, an unbalanced End, a second top-level
 // value) sets a sticky error: the remaining calls are no-ops and Bytes returns
-// nil. Read the failure with Err. Encoding into a Writer never uses reflection.
+// nil. Read the failure with Err. Encoding into a Writer never uses reflection. A
+// Writer is not safe for concurrent use; give each goroutine its own.
 type Writer struct {
 	buf []byte
 	err error
@@ -71,7 +72,9 @@ func (w *Writer) Reset() {
 }
 
 // Bytes returns the JSON written so far, or nil if the Writer has failed. The
-// result is valid while the Writer is not used again.
+// slice aliases the Writer's internal buffer: the caller must not modify it, and
+// it is valid only while the Writer is not written to or reset again. Use
+// slices.Clone for a copy that outlives the Writer.
 func (w *Writer) Bytes() []byte {
 	if w.err != nil {
 		return nil

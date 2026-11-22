@@ -32,6 +32,7 @@ var errNilTarget = errors.New("qijson: nil target")
 //	cfg, err := qijson.Unmarshal[Config](data)
 //
 // The document must hold exactly one JSON value; trailing input is an error.
+// data is not retained after the call.
 func Unmarshal[T any, PT interface {
 	*T
 	Decoder
@@ -49,6 +50,7 @@ func Unmarshal[T any, PT interface {
 // Unmarshal, matching Schema.UnmarshalInto.
 //
 // The document must hold exactly one JSON value; trailing input is an error.
+// data is not retained after the call.
 func UnmarshalInto[T any, PT interface {
 	*T
 	Decoder
@@ -69,7 +71,8 @@ func UnmarshalInto[T any, PT interface {
 // v must implement Decoder, which a type does by defining DecodeJSON (usually by
 // delegating to a Schema). Decode works in place, merging into whatever v already
 // holds, and reports the same errors as UnmarshalInto: a syntax error, a JSON
-// type that does not match v, or trailing input after the single value.
+// type that does not match v, or trailing input after the single value. v is
+// written in place and data is not retained after the call.
 //
 // A nil interface is reported as errNilTarget. Because qijson may not use
 // reflection, a typed-nil target (an interface holding a nil pointer) is not

@@ -35,6 +35,10 @@ var (
 // Writer. Build fields with the type-specific constructors (String, Int, Float,
 // Bool and their Ptr variants, Object, Slice, Map, Array, Any, Raw) or supply a
 // custom Decode.
+//
+// A Field is a plain value holding closures and carries no state of its own, so
+// it is safe to share exactly when the target its closures read and write is not
+// shared.
 type Field[T any] struct {
 	// Name is the JSON member name this field matches. Names must be unique
 	// within a Schema.

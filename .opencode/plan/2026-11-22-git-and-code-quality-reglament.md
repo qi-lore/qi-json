@@ -1,9 +1,9 @@
 # qi-json — Git and Code Quality Reglament (governance + audit)
 
 **Date**: 2026-11-22
-**Status**: governance added; audit recorded; **T-Q2 done** (2026-11-22) and
-**T-Q1 done** (2026-11-22); refactoring tasks T-Q3 and T-Q4 open — **the next
-task is T-Q3** (public-API documentation pass).
+**Status**: governance added; audit recorded; **T-Q2, T-Q1 and T-Q3 done**
+(2026-11-22); refactoring task T-Q4 open — **the next task is T-Q4** (Uber Go
+Style Guide review pass).
 **Related**: `docs/constitution.md` (§ Git and Review Discipline, § Rigorous Code
 Quality), `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
@@ -136,6 +136,8 @@ sentinel, that decision needs its own amendment.
 
 ### T-Q3 — public-API documentation pass (ownership, concurrency, lifecycle)
 
+**Done (2026-11-22).** Results below.
+
 - `Schema[T]`: state that a `Schema` is immutable once built and safe for
   concurrent decode/encode, but `RejectUnknown`/`RejectDuplicate` mutate it and
   must not race with use (finish building it before sharing).
@@ -148,6 +150,37 @@ sentinel, that decision needs its own amendment.
   `data`, which the caller must keep alive and unmodified.
 - **Acceptance**: every exported identifier has a sentence covering ownership,
   concurrency and/or lifecycle as applicable; `golangci-lint` stays green.
+
+#### T-Q3 results
+
+- **Shipped** (doc comments only, no code change):
+  - `schema.go` — `Schema[T]` states it is immutable once built and safe for
+    concurrent use, with `RejectUnknown`/`RejectDuplicate` mutating it and not
+    racing with use; both setters now say they mutate `s`; `Marshal`,
+    `Unmarshal` and `UnmarshalInto` state the returned `[]byte` is caller-owned
+    and that `data` is not retained.
+  - `field.go` — `Field[T]` states it is a plain value of closures, shareable
+    exactly when its captured target is not shared.
+  - `encode.go` — `Marshal` (caller-owned `[]byte`), `Encode` (writes only to `w`,
+    does not retain `v`), `Codec[E]` and `NewCodec` (plain function pair, whose
+    concurrency is the closures').
+  - `errors.go` — `*Error` and `*TypeError` returned by the package are
+    immutable.
+  - `writer.go` — `Writer` is not safe for concurrent use; `Bytes` aliases the
+    internal buffer and is valid only until the next write or reset (clone to
+    keep it).
+  - `unmarshal.go` — `Unmarshal`, `UnmarshalInto` and `Decode` state `v` is
+    written in place and `data` is not retained.
+  - `scanner/token.go` — `NewTokenizer` states the tokenizer aliases `data`
+    (keep it alive and unmodified) and is not safe for concurrent use; the
+    package doc already carried the equivalent notes.
+- **Already present** (audited, left as is): `Reader` documents no-copy and
+  not-safe-for-concurrent-use; `scanner.Valid` documents concurrent safety;
+  the `scanner` package doc documents aliasing and the no-copy rule.
+- **Not applicable**: `ErrorKind` and its constants are plain value types with
+  no resource, so they carry no ownership sentence.
+- **Verification**: `make verify` green (0 lint issues); `go test -race ./...`
+  green.
 
 ### T-Q4 — Uber Go Style Guide review pass
 
