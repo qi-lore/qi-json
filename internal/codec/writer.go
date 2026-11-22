@@ -259,7 +259,7 @@ func (w *Writer) BeginArray() error {
 	}
 	w.buf = append(w.buf, '[')
 	w.endValue()
-	w.stack = append(w.stack, writerFrame{object: false})
+	w.stack = append(w.stack, writerFrame{})
 	return nil
 }
 

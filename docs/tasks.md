@@ -93,6 +93,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q001 - Pin the error-wrapping policy
 - [X] Q002 - Make every library sentinel inspectable
 - [X] Q003 - Document ownership, concurrency and lifecycle
+- [X] Q004 - Uber Go Style Guide review pass
 - [X] Q005 - Keep error messages and doc comments free of project-document references
 
 ### Module, packaging and governance
@@ -106,8 +107,7 @@ never renumber, never reuse a retired identifier.
 
 ## Planned
 
-Next up: **Q004**, the Uber Go Style Guide review pass.
+Next up: **M007**, normalize the plan files' headers to design records.
 
-- [ ] Q004 - Uber Go Style Guide review pass
 - [ ] M007 - Normalize the plan files' headers to design records: drop the status and backlog lines the Task Tracking rule forbids
 - [ ] P001 - Protect `main` and `dev` with branch protection and the `verify` check
