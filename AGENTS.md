@@ -98,6 +98,10 @@ All Go code follows the Uber Go Style Guide
 - Goroutines need clear ownership and shutdown paths; no leaks.
 - Propagate context explicitly; blocking operations accept `context.Context`.
 - No panics in library code for recoverable conditions.
+- Error messages and exported doc comments describe behavior; they never cite
+  project documents (`docs/`, `.opencode/plan/`, the constitution or the README).
+  A consumer does not have the repository, and a failure should say what is wrong,
+  not where to read about it.
 
 The library is synchronous (no goroutines, no blocking calls), so the goroutine
 and context rules bind only when such code is added. Open gaps are tracked in

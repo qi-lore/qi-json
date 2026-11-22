@@ -92,6 +92,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q001 - Pin the error-wrapping policy
 - [X] Q002 - Make every library sentinel inspectable
 - [X] Q003 - Document ownership, concurrency and lifecycle
+- [X] Q005 - Keep error messages and doc comments free of project-document references
 
 ### Module, packaging and governance
 

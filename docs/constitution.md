@@ -248,6 +248,10 @@ addition:
 - Context propagation MUST be explicit. Blocking operations MUST accept
   `context.Context`.
 - No panics in library code for recoverable error conditions.
+- Error messages and exported doc comments MUST describe behavior. They MUST NOT
+  cite project documents (`docs/`, `.opencode/plan/`, the constitution or the
+  README): a consumer of the module does not have the repository, and a failure
+  should explain what is wrong, not where to read about it.
 
 The library is synchronous today: it starts no goroutines and no exported
 operation blocks, so the goroutine and context rules bind only when such code is
@@ -260,4 +264,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.9.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.10.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
