@@ -2,7 +2,8 @@
 
 **Date**: 2026-11-22
 **Status**: governance added; audit recorded; **T-Q2 done** (2026-11-22);
-refactoring tasks T-Q1, T-Q3 and T-Q4 open.
+refactoring tasks T-Q1, T-Q3 and T-Q4 open — **the next task is T-Q1** (pin the
+error-wrapping policy).
 **Related**: `docs/constitution.md` (§ Git and Review Discipline, § Rigorous Code
 Quality), `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`,
 `.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
