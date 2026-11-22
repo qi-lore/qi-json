@@ -19,7 +19,8 @@ be re-run with the new import path. See
 `.opencode/plan/2026-11-22-internal-codec-extraction.md`.
 
 **Related**: `docs/constitution.md`, `README.md`,
-`.opencode/plan/2026-11-21-post-decoder-backlog.md` §9.
+`.opencode/plan/2026-11-21-post-decoder-backlog.md` §9,
+`.opencode/plan/2026-11-22-generator-distribution.md` (Scenario 3).
 
 ## 1. Purpose
 
@@ -302,3 +303,44 @@ With a hand-written `Schema` + `DecodeJSON`, both print `{Field1:x Field2:7}`.
 | hand-written schema, exported fields only | decodes: `A={X:1 Y:hi} B={Name:n Count:9 secret:}` |
 | binding an unexported foreign field | `v.secret undefined (cannot refer to unexported field secret)` |
 | `qijson.Int` on an `int` field | `cannot use func(v *LocalStruct) *int … as func(*LocalStruct) *int64 value` |
+
+---
+
+## 6. Scenario 3 — the code generator on `PATH`
+
+### 6.1 Question
+
+> "I imported `qi-json` into my project. Now I want the `qi-json-gen` command to
+> live in my `PATH`."
+
+### 6.2 What happens
+
+Nothing out of the box: there is no install instruction anywhere in the
+repository, and the README only showed `go run <module>/cmd/qi-json-gen` — with a
+stale module path (`qi-json/cmd/qi-json-gen`) from before the module rename.
+Because `cmd/qi-json-gen` is a `main` package, importing the library does not make
+the command available, and `go get` of the module does not build it.
+
+### 6.3 The gap
+
+A module cannot install a command by being imported. The generator must be
+obtained as a *tool*: run from the module graph, recorded in `go.mod`, installed
+into `$GOBIN`, or downloaded as a prebuilt binary. The minimal-step answer depends
+on whether the user wants a bare command on `PATH` or is happy for `go generate`
+to run it, and on whether a Go toolchain is present at all.
+
+### 6.4 Decision
+
+Four delivery paths are documented in the README (**Installing the generator**),
+and a release now publishes prebuilt binaries and a Homebrew cask:
+
+- `//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen …` — no
+  install; the version is locked to the imported module (recommended default);
+- `go get -tool github.com/qi-lore/qi-json/cmd/qi-json-gen` + `go tool
+  qi-json-gen` — recorded in `go.mod` (Go 1.24+);
+- `go install github.com/qi-lore/qi-json/cmd/qi-json-gen@vX.Y.Z` — a bare command
+  in `$(go env GOBIN)` on `PATH`;
+- `brew install qi-lore/tap/qi-json-gen` — a released binary, no Go toolchain.
+
+Full options, decisions and risks:
+`.opencode/plan/2026-11-22-generator-distribution.md`.

@@ -1,0 +1,48 @@
+# Publishes the optional `cmd/qi-json-gen` generator when a version tag is
+# pushed.
+#
+# The release flow in docs/constitution.md tags the merge commit on `main` with
+# `vX.Y.Z` and pushes the tag. This workflow then runs GoReleaser
+# (`.goreleaser.yaml`): it builds prebuilt archives for linux, macOS and
+# Windows (amd64 and arm64), attaches them and `checksums.txt` to the GitHub
+# release, and pushes the Homebrew cask to the `qi-lore/homebrew-tap` tap.
+#
+# Requires a repository secret `HOMEBREW_TAP_GITHUB_TOKEN`: a token with write
+# access to `qi-lore/homebrew-tap`. Without it the GitHub release still
+# succeeds; only the cask push fails.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  goreleaser:
+    name: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
