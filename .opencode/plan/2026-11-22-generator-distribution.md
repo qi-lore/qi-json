@@ -69,29 +69,40 @@ bare command on `PATH`":
 ## 4. Files
 
 - `.goreleaser.yaml` — the build, archive, checksum and cask configuration.
-- `.github/workflows/release.yml` — tag-triggered GoReleaser run.
+- `.github/workflows/release.yml` — tag-triggered GoReleaser run; creates the
+  tap repository if it is missing.
 - `Makefile` — `release-check` runs `goreleaser check` locally.
 - `README.md` — an **Installing the generator** section (options A–D) and a fix
   of the stale `qi-json/cmd/qi-json-gen` module path in the `go:generate`
   directive and the direct-run examples.
 
-## 5. External steps the maintainer must take (outside this repository)
+## 5. Bootstrap and external steps
 
-These cannot be done from the repository and are not automated:
+Everything but one credential is automated:
 
-- Create the `qi-lore/homebrew-tap` repository with an initial commit (a cask
-  directory); GoReleaser pushes `Casks/qi-json-gen.rb` there on release.
-- Add a repository secret `HOMEBREW_TAP_GITHUB_TOKEN` to `qi-lore/qi-json`: a
-  token with write access to the tap. `GITHUB_TOKEN` alone cannot push to
-  another repository.
-- Nothing else: the first `v*` tag after this lands runs the workflow.
+- **Automatic.** The release workflow's `ensure tap repository` step runs
+  `gh repo create qi-lore/homebrew-tap` when the tap does not exist (GoReleaser
+  pushes casks but does not create the tap), so the maintainer does not create
+  the repository by hand; on later releases the step is a no-op.
+- **Manual, once.** Add a repository secret `HOMEBREW_TAP_GITHUB_TOKEN` to
+  `qi-lore/qi-json`: a fine-grained token scoped to `qi-lore/homebrew-tap` with
+  Contents and Administration write. `GITHUB_TOKEN` is scoped to this repository
+  and cannot push to another, and GitHub does not let a workflow create its own
+  secrets, so this one credential cannot be bootstrapped from the repository.
+- After the secret exists, a `v*` tag needs no manual step.
+
+The fully self-hosted alternative — write the cask into this repository and rely
+on the two-argument `brew tap <user>/<repo> <URL>` — needs no new secret but is
+rejected: Homebrew's one-argument `brew tap` requires a `homebrew-` repository
+name, so users would have to pass the URL, and the cask would have to land on
+the protected default branch.
 
 ## 6. Risks
 
 | Risk | Mitigation |
 |---|---|
 | GoReleaser schema drift between major versions | Config pins `version: 2`; the workflow pins `~> v2`; `make release-check` validates locally. |
-| The cask push fails when the token is missing | The GitHub release (archives + checksums) still succeeds; only the cask step fails, and the workflow comment says so. |
+| The tap steps fail when the token is missing | The secret is required and the workflow comment says so; the archives still upload, then the run fails at the tap. Prefer a fine-grained token scoped to the tap. |
 | `@latest` in `go install` drifts from the imported version | The README recommends an explicit `@vX.Y.Z`, and A/B are the recommended default. |
 | Homebrew may quarantine the downloaded binary on macOS | A known Homebrew behaviour for prebuilt CLI binaries; the `go install` and `go run` paths are unaffected. |
 | A release tag already used before this workflow existed still triggers it | GoReleaser attaches artifacts to the existing GitHub release; re-running is idempotent with `--clean`. |

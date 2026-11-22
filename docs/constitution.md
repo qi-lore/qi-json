@@ -227,9 +227,11 @@ install the command without the repository. GoReleaser (`.goreleaser.yaml`, run 
 `.github/workflows/release.yml` on the `vX.Y.Z` tag from step 5) builds archives
 for linux, macOS and Windows on amd64 and arm64, attaches them and
 `checksums.txt` to the GitHub release, and pushes a Homebrew cask to the
-`qi-lore/homebrew-tap` tap. `go install` and a `go.mod` `tool` directive remain
-the version-pinned paths a consumer uses; the release is additive and changes no
-module or runtime behavior.
+`qi-lore/homebrew-tap` tap, creating that repository if it does not exist. A
+repository secret `HOMEBREW_TAP_GITHUB_TOKEN` with write access to the tap is
+required. `go install` and a `go.mod` `tool` directive remain the version-pinned
+paths a consumer uses; the release is additive and changes no module or runtime
+behavior.
 
 ### CI enforcement
 
