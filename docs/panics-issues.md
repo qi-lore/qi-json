@@ -22,7 +22,7 @@ deliberate (documented) trade-off, and what merely looks risky but is correct.
 
 | # | Issue | Class | Severity | Status |
 |---|---|---|---|---|
-| 1 | `Schema.UnmarshalInto` / `Schema.Decode` panic on a nil target | Nil deref (panic) | High | Unresolved |
+| 1 | `Schema.UnmarshalInto` / `Schema.Decode` panic on a nil target | Nil deref (panic) | High | Resolved (Q006) |
 | 2 | `Marshal` completeness guard defeated by `WriteRaw` | Defeated invariant | Medium | Unresolved |
 | 3 | `Object` / nested `Schema` panic on a nil schema | Nil deref (panic) | Medium | Unresolved |
 | 4 | `Struct` does not enforce unique field names | Silent misconfiguration | Medium | Unresolved |
@@ -34,8 +34,10 @@ deliberate (documented) trade-off, and what merely looks risky but is correct.
 
 Issues 1–4 are new defects not recorded in `docs/fn-comparison.md`. Issues 5–9
 are the documented trade-offs that the same note already lists; they are
-restated here, confirmed, so the record is self-contained. Every issue in the
-table is **unresolved** — this audit changed no code.
+restated here, confirmed, so the record is self-contained. The audit itself
+changed no code; fixes land as tasks (see `docs/tasks.md`) and are reflected in
+the Summary table and the Resolution indicator, which track state after the
+review.
 
 ---
 
@@ -135,6 +137,13 @@ if v == nil {
 from `schema.go` (same package). A test can pin it alongside
 `TestUnmarshalInvalidTarget`'s "nil pointer" subtest, and the doc comment should
 drop the bare "must be non-nil" precondition in favor of the sentinel contract.
+
+**Resolution (Q006).** `Schema.Decode` and `Schema.UnmarshalInto` now guard
+`v == nil` and return `errNilTarget`; both doc comments state the sentinel
+contract instead of the "must be non-nil" precondition. `TestSchemaNilTarget`
+pins the behavior for both methods. `Schema.Encode` was left unchanged: it is
+not part of this issue, and it is reached through `Marshal`, which always passes
+a non-nil target.
 
 ---
 
@@ -489,19 +498,19 @@ they are recorded so a later reader does not re-litigate them:
 
 ## Resolution indicator
 
-> **Status: UNRESOLVED (0 of 9 issues fixed).**
+> **Status: IN PROGRESS (1 of 9 issues fixed).**
 >
-> This audit is a read-only assessment: no library source was modified, so
-> every issue listed above — the four new defects (1–4) and the five documented
-> trade-offs (5–9) — remains open. The canonical task state lives in
-> `docs/tasks.md`; this indicator is informational and must be updated (or the
-> issues recorded as tasks) when fixes land.
+> Issue 1 was fixed by task Q006: `Schema.Decode` and `Schema.UnmarshalInto` now
+> return `errNilTarget` for a nil target instead of panicking. The three
+> remaining new defects (2–4) and the five documented trade-offs (5–9) are still
+> open. The canonical task state lives in `docs/tasks.md`; this indicator is
+> informational and must be updated when further fixes land.
 >
 > Per-issue status:
 >
 > | # | Issue | Status |
 > |---|---|---|
-> | 1 | `Schema.UnmarshalInto`/`Decode` nil-target panic | UNRESOLVED |
+> | 1 | `Schema.UnmarshalInto`/`Decode` nil-target panic | RESOLVED (Q006) |
 > | 2 | `Marshal` completeness defeated by `WriteRaw` | UNRESOLVED |
 > | 3 | `Object`/nested `Schema` nil-schema panic | UNRESOLVED |
 > | 4 | `Struct` unique-field-name enforcement | UNRESOLVED |
