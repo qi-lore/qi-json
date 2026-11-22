@@ -7,12 +7,11 @@
 # Windows (amd64 and arm64), attaches them and `checksums.txt` to the GitHub
 # release, and pushes the Homebrew cask to `qi-lore/homebrew-tap`.
 #
-# Requires a repository secret `HOMEBREW_TAP_GITHUB_TOKEN`: a token with write
-# access to `qi-lore/homebrew-tap` and permission to create it if it does not
-# exist (a fine-grained PAT scoped to the tap, with Contents and Administration
-# write, is enough). The `ensure tap repository` step creates the tap on the
-# first release; after that it is a no-op. The secret is required: without it
-# the tap steps fail.
+# Requires a repository secret `HOMEBREW_TAP_GITHUB_TOKEN`: a fine-grained token
+# with `Contents: write` on the `qi-lore/homebrew-tap` repository. The tap is a
+# separate, long-lived repository created once by hand (Homebrew needs it to
+# exist); it is not created here. The secret is required: without it the cask
+# push fails after the archives have been uploaded.
 
 name: Release
 
@@ -40,13 +39,6 @@ jobs:
         with:
           go-version-file: go.mod
           check-latest: true
-      - name: ensure tap repository
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-        run: |
-          gh repo view qi-lore/homebrew-tap >/dev/null 2>&1 ||
-            gh repo create qi-lore/homebrew-tap --public \
-              --description "Homebrew casks for qi-lore tools"
       - name: run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

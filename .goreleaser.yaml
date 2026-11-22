@@ -5,7 +5,7 @@
 # install it without the repository. This file builds archives for linux, macOS
 # and Windows (amd64 and arm64), attaches them and a checksums file to the
 # GitHub release, and pushes a Homebrew cask to the qi-lore/homebrew-tap tap
-# (which .github/workflows/release.yml creates if it does not exist).
+# (a separate repository that must exist; see the README).
 #
 # It is run by .github/workflows/release.yml when a vX.Y.Z tag is pushed.
 # Validate local changes with `goreleaser check` (see `make release-check`).
@@ -63,6 +63,9 @@ homebrew_casks:
     description: "Code generator for the qi-json reflection-free JSON library"
     directory: Casks
     commit_msg_template: "chore: update qi-json-gen cask to {{ .Tag }}"
+    commit_author:
+      name: qi-json-releaser
+      email: qi-json-releaser@users.noreply.github.com
     repository:
       owner: qi-lore
       name: homebrew-tap
