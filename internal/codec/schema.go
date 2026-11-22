@@ -66,7 +66,14 @@ func (s *Schema[T]) RejectDuplicate() *Schema[T] {
 // Decode reads one JSON object from r and stores its members into v. A member
 // that no field matches is ignored unless RejectUnknown was set; a member that
 // repeats is overwritten unless RejectDuplicate was set.
+//
+// A nil v is a programming error reported as errNilTarget rather than a panic,
+// matching the other decode entry points.
 func (s *Schema[T]) Decode(r *Reader, v *T) error {
+	if v == nil {
+		return errNilTarget
+	}
+
 	var seen []bool
 	if s.rejectDuplicate {
 		seen = make([]bool, len(s.fields))
@@ -143,10 +150,17 @@ func (s *Schema[T]) Unmarshal(data []byte) (T, error) {
 	return v, err
 }
 
-// UnmarshalInto decodes data into v, which must be non-nil. Members present in
-// data overwrite the corresponding fields of v; members absent from data leave
-// v unchanged. v is written in place and data is not retained after the call.
+// UnmarshalInto decodes data into v. Members present in data overwrite the
+// corresponding fields of v; members absent from data leave v unchanged. v is
+// written in place and data is not retained after the call.
+//
+// A nil v is a programming error reported as errNilTarget rather than a panic,
+// matching UnmarshalInto and Decode in the semantic layer.
 func (s *Schema[T]) UnmarshalInto(data []byte, v *T) error {
+	if v == nil {
+		return errNilTarget
+	}
+
 	r := newReader(scanner.NewTokenizer(data))
 	if err := s.Decode(r, v); err != nil {
 		return err
