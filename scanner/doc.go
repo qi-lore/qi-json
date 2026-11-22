@@ -44,8 +44,8 @@
 // must not be modified. Valid is safe for concurrent use; a Tokenizer carries
 // state and must not be copied or used concurrently.
 //
-// The exported surface — Valid plus the tokenizer (Kind and Tokenizer) — is
-// sanctioned by docs/constitution.md Article VI; the decoder in package qijson
-// consumes the tokenizer. The implementation stays allocation-free for documents
-// nesting at most nestingInline levels.
+// The exported surface — Valid plus the tokenizer (Kind and Tokenizer) — is the
+// package's complete API; the decoder in package qijson consumes the tokenizer.
+// The implementation stays allocation-free for documents nesting at most
+// nestingInline levels.
 package scanner
