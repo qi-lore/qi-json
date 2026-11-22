@@ -283,11 +283,10 @@ func (g *gen) foreignStarCodec(owner, fname, jname string, t *types.Pointer) (st
 // null sets it nil, otherwise a fresh value is decoded through schema, and a nil
 // pointer encodes as null. It is the A and D counterpart to ObjectDecoderPtr.
 func (g *gen) schemaPtrCodec(owner, fname, jname, goType, schema string) string {
-	g.needScanner = true
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "qijson.Field[%s]{Name: %q, Decode: func(r *qijson.Reader, v *%s) error {\n", owner, jname, owner)
 	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
-	b.WriteString("\tif k == scanner.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
+	b.WriteString("\tif k == qijson.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
 	fmt.Fprintf(&b, "\t\tv.%s = nil\n\t\treturn nil\n\t}\n", fname)
 	fmt.Fprintf(&b, "\te := new(%s)\n\tif err := %s.Decode(r, e); err != nil {\n\t\treturn err\n\t}\n", goType, schema)
 	fmt.Fprintf(&b, "\tv.%s = e\n\treturn nil\n\t},\n", fname)

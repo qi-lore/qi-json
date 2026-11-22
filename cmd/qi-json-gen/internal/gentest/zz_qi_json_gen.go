@@ -8,7 +8,6 @@ package gentest
 import (
 	"github.com/qi-lore/qi-json"
 	"github.com/qi-lore/qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
-	"github.com/qi-lore/qi-json/scanner"
 	"math"
 	"time"
 )
@@ -23,7 +22,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()
@@ -46,7 +45,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()
@@ -69,7 +68,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		f, err := r.ReadFloat()
@@ -92,7 +91,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()
@@ -115,7 +114,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			if err := r.ReadNull(); err != nil {
 				return err
 			}
@@ -155,7 +154,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()
@@ -178,7 +177,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			if err := r.ReadNull(); err != nil {
 				return err
 			}
@@ -210,7 +209,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		s, err := r.ReadString()
@@ -231,7 +230,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		b, err := r.ReadBool()
@@ -251,7 +250,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		s, err := r.ReadString()
@@ -271,7 +270,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			if err := r.ReadNull(); err != nil {
 				return err
 			}
@@ -300,7 +299,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		b, err := r.ReadBool()
@@ -322,7 +321,7 @@ var configSchema = qijson.Struct[Config](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			if err := r.ReadNull(); err != nil {
 				return err
 			}
@@ -364,7 +363,7 @@ var pointSchema = qijson.Struct[Point](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()
@@ -387,7 +386,7 @@ var pointSchema = qijson.Struct[Point](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()
@@ -440,7 +439,7 @@ var xtypesThingSchema = qijson.Struct[xtypes.Thing](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()
@@ -463,7 +462,7 @@ var xtypesThingSchema = qijson.Struct[xtypes.Thing](
 		if err != nil {
 			return err
 		}
-		if k == scanner.KindNull {
+		if k == qijson.KindNull {
 			return r.ReadNull()
 		}
 		n, err := r.ReadInt()

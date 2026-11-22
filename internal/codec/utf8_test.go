@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // invalidUTF8Cases pairs a JSON document with the byte offset of the first

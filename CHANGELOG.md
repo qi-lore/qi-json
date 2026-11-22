@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking.** The syntax layer moved behind the facade. The
+  `github.com/qi-lore/qi-json/scanner` subpackage is gone; the syntax engine now
+  lives in `internal/scanner` and `qijson` re-exports its whole surface —
+  `Valid`, the `Kind` type with its seven constants, and the tokenizing
+  `Tokenizer` with `NewTokenizer` — so there is a single public import path,
+  `github.com/qi-lore/qi-json`. Names, signatures and behavior are unchanged
+  (`qijson.Kind` is the type `Reader.Peek` returns), so migration is a qualifier
+  and import-path rewrite (`scanner.X` → `qijson.X`). `qi-json-gen` output must
+  be regenerated: it no longer imports `scanner` and compares against
+  `qijson.KindNull`.
+
 ## [0.3.1] - 2026-11-22
 
 ### Changed

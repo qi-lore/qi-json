@@ -2,16 +2,17 @@
 
 A from-scratch JSON library with four Go packages:
 
-- `scanner/` (import `github.com/qi-lore/qi-json/scanner`) — the single-pass
-  syntax layer; exports `Valid` and the tokenizer (`Kind` plus a tokenizing
-  type).
-- `.` (import `github.com/qi-lore/qi-json`, package `qijson`) — the public facade
-  of the reflection-free semantic layer (the decoder and encoder): type aliases,
-  const re-exports and one-line wrapper functions. Not `encoding/json`-compatible;
-  no `reflect`, no `unsafe`.
+- `.` (import `github.com/qi-lore/qi-json`, package `qijson`) — the single public
+  import path. The facade of the reflection-free semantic layer (the decoder and
+  encoder) and of the syntax layer (`Valid`, `Kind` plus the tokenizer), through
+  type aliases, const re-exports and one-line wrapper functions. Not
+  `encoding/json`-compatible; no `reflect`, no `unsafe`.
 - `internal/codec/` — the semantic engine behind that facade. Internal, so
   external code cannot import it and its internals may change without a
   compatibility promise.
+- `internal/scanner/` — the single-pass syntax engine: `Valid` and the tokenizer
+  (`Kind` plus a tokenizing type). Internal; the facade re-exports its whole
+  surface.
 - `cmd/qi-json-gen` — the optional, stdlib-only code generator that emits
   `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags. No `reflect`/`unsafe`; it targets only the exported `qijson` surface.
@@ -36,9 +37,9 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 ## Other commands
 
 - `go test -race ./...`
-- `go test ./scanner -run '^TestInvalidDocuments$'` — run one test/table
-- `go test -run=^$ -fuzz=FuzzValid -fuzztime=10s ./scanner` — fuzz (`-run=^$` is required)
-- `go test -run=^$ -bench=. -benchmem ./scanner` — benchmarks
+- `go test ./internal/scanner -run '^TestInvalidDocuments$'` — run one test/table
+- `go test -run=^$ -fuzz=FuzzValid -fuzztime=10s ./internal/scanner` — fuzz (`-run=^$` is required)
+- `go test -run=^$ -bench=. -benchmem ./internal/scanner` — benchmarks
 - `go generate ./...` — regenerate `cmd/qi-json-gen` fixtures — no other package
   emits generated code
 
@@ -92,8 +93,8 @@ All Go code follows the Uber Go Style Guide
   (path + offset) and is returned unwrapped; use `%w` only where a layer adds new
   context (for example a sentinel cause).
 - Define a sentinel in the package that owns the behavior (`internal/codec` for
-  the decoder and encoder, `scanner` for the syntax layer) and expose it through
-  the `qijson` facade only when a caller must inspect it.
+  the decoder and encoder, `internal/scanner` for the syntax layer) and expose it
+  through the `qijson` facade only when a caller must inspect it.
 - Public APIs document ownership, concurrency safety, and lifecycle.
 - Goroutines need clear ownership and shutdown paths; no leaks.
 - Propagate context explicitly; blocking operations accept `context.Context`.
@@ -109,15 +110,17 @@ and context rules bind only when such code is added. Open gaps are tracked in
 
 ## API and naming
 
-- `scanner.Valid(data []byte) bool` is the scanner's headline export — the same
-  name and signature as `encoding/json.Valid`. The sanctioned public surface is
-  exactly the scanner tokenizer and the `qijson` decoder and encoder
-  (constitution Article VI); do not export anything else without a new
-  amendment.
-- `scanner.validate(data []byte) (parseError, bool)` is unexported and returns
-  the first failure plus whether the input is invalid. Tests assert messages and
-  1-based positions through it; `Valid` is `!failed`. The error is a value type so
-  that returning it does not drag the validator's inline stack to the heap.
+- `Valid(data []byte) bool` (in `internal/scanner`, re-exported as `qijson.Valid`)
+  is the syntax layer's headline export — the same name and signature as
+  `encoding/json.Valid`. The sanctioned public surface is exactly the `qijson`
+  decoder and encoder plus the re-exported syntax surface (`Valid`, `Kind` and
+  the tokenizer) (constitution Article VI); do not export anything else without a
+  new amendment.
+- `validate(data []byte) (parseError, bool)` in `internal/scanner` is unexported
+  and returns the first failure plus whether the input is invalid. Tests assert
+  messages and 1-based positions through it; `Valid` is `!failed`. The error is a
+  value type so that returning it does not drag the validator's inline stack to
+  the heap.
 - Internal names are repo-specific, not copies of encoding/json internals:
   `validator`, `container`/`containerObject`/`containerArray`, `parseError`,
   `skipSpace`, `scanString`, `scanEscape`, `scanLiteral`, `scanNumber`,
@@ -129,9 +132,10 @@ and context rules bind only when such code is added. Open gaps are tracked in
   delimiter after a completed value (see "Contract details that are easy to
   break" below). The object-member scan is deliberately written twice so it stays
   inline; extracting it into a helper costs about 8% on object-heavy documents.
-- `qijson` is the semantic layer: a reflection-free decoder and encoder over
-  `scanner`. It MUST NOT import `encoding/json` and MUST NOT use `reflect` or
-  `unsafe`; struct binding is by compile-time accessor closures. Its API is
+- `qijson` is the semantic layer: a reflection-free decoder and encoder over the
+  syntax engine in `internal/scanner`. It MUST NOT import `encoding/json` and
+  MUST NOT use `reflect` or `unsafe`; struct binding is by compile-time accessor
+  closures. Its API is
   deliberately not `encoding/json`-compatible. The non-generic `Decode(data, v
   Decoder) error` mirrors `UnmarshalInto` for a caller that does not want to name
   a type argument; the encoder mirrors it with `Marshal[T, PT](v T) ([]byte,
@@ -145,12 +149,13 @@ and context rules bind only when such code is added. Open gaps are tracked in
   qi-json-aware foreign type; Article VI, added 2026-11-22). Plans and tasks:
   `.opencode/plan/2026-11-21-json-decoder.md` and
   `.opencode/plan/2026-11-21-json-encoder.md`.
-- The `qijson` root is a facade: `internal/codec` holds the implementation and
-  `qijson.go` re-exports it through type aliases, constants and wrapper
-  functions. Keep the public contract (including ownership, concurrency and
-  lifecycle docs) on the facade; the engine's internals stay unexported. The
-  aliases are why the Go floor is 1.24. See
-  `.opencode/plan/2026-11-22-internal-codec-extraction.md`.
+- The `qijson` root is a facade: `internal/codec` and `internal/scanner` hold
+  the implementations and `qijson.go` re-exports them through type aliases,
+  constants and wrapper functions. Keep the public contract (including ownership,
+  concurrency and lifecycle docs) on the facade; the engines' internals stay
+  unexported. The generic aliases are why the Go floor is 1.24. See
+  `.opencode/plan/2026-11-22-internal-codec-extraction.md` and
+  `.opencode/plan/2026-11-22-scanner-consolidation.md`.
 - `cmd/qi-json-gen` is the optional code generator (stdlib only: `go/ast`,
   `go/parser`, `go/format`, and `go/types` via the source importer for
   cross-package named types; same-package named scalar types are resolved from
@@ -202,6 +207,8 @@ and context rules bind only when such code is added. Open gaps are tracked in
   - `.opencode/plan/2026-11-21-package-rename.md` — the relocation and rename.
   - `.opencode/plan/2026-11-22-internal-codec-extraction.md` — the `internal/codec`
     extraction and the canonical module path.
+  - `.opencode/plan/2026-11-22-scanner-consolidation.md` — the move of the syntax
+    layer to `internal/scanner` and its re-export through the facade.
   - `.opencode/plan/2026-11-22-third-party-struct-fields.md` and
     `.opencode/plan/2026-11-22-foreign-struct-fields-impl.md` — foreign struct
     fields: research and implementation.

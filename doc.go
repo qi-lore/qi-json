@@ -1,6 +1,8 @@
 // Package qijson is the semantic layer of qi-json: a reflection-free JSON
-// decoder and encoder built on the syntax engine in
-// github.com/qi-lore/qi-json/scanner.
+// decoder and encoder built on an internal single-pass syntax engine. The
+// same package also exposes that engine's syntax validator (Valid) and its
+// pull tokenizer (Tokenizer), so a caller can validate or walk a document
+// without going through the semantic layer.
 //
 // The API is deliberately not compatible with encoding/json. Decoding and
 // encoding arbitrary targets without reflection needs a compile-time field
@@ -26,8 +28,8 @@
 // RejectDuplicate is set.
 //
 // A decoded string value or object member name must be valid UTF-8; invalid
-// UTF-8 is a syntax error. The scanner is syntax-only and does not check UTF-8,
-// so the decoder is stricter than scanner.Valid on this one point.
+// UTF-8 is a syntax error. Valid is syntax-only and does not check UTF-8, so
+// the decoder is stricter than Valid on this one point.
 //
 // A type that implements Decoder can be decoded without naming its Schema. The
 // usual implementation delegates to a Schema:

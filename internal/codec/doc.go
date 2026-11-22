@@ -1,6 +1,6 @@
 // Package codec is the implementation of the qijson semantic layer: a
 // reflection-free JSON decoder and encoder built on the syntax engine in
-// github.com/qi-lore/qi-json/scanner.
+// github.com/qi-lore/qi-json/internal/scanner.
 //
 // It is internal. The public contract — types, functions, sentinels and their
 // documentation — lives in package qijson at the module root, which re-exports
