@@ -1,6 +1,9 @@
-// Package scanner is the syntax layer of qi-json. It exports Valid, the syntax
-// validator, and the Tokenizer that the semantic layer in package qijson
-// consumes. Valid's name and signature match encoding/json.Valid.
+// Package scanner is the internal syntax engine of qi-json: Valid, the syntax
+// validator, and the Tokenizer the semantic layer in package codec consumes.
+// The module root package qijson re-exports this package's whole surface —
+// Valid, the Kind taxonomy and the Tokenizer — so a caller reaches it through
+// github.com/qi-lore/qi-json. This package is internal and not importable by
+// external code. Valid's name and signature match encoding/json.Valid.
 //
 // Valid reports whether a byte slice is a syntactically valid JSON text. It is
 // a single pass over the slice: it walks with an index, scans strings, numbers,
@@ -44,8 +47,8 @@
 // must not be modified. Valid is safe for concurrent use; a Tokenizer carries
 // state and must not be copied or used concurrently.
 //
-// The exported surface — Valid plus the tokenizer (Kind and Tokenizer) — is the
-// package's complete API; the decoder in package qijson consumes the tokenizer.
-// The implementation stays allocation-free for documents nesting at most
+// The exported surface — Valid plus the tokenizer (Kind and Tokenizer) — is
+// re-exported in full by package qijson, which is the only import path a caller
+// needs. The implementation stays allocation-free for documents nesting at most
 // nestingInline levels.
 package scanner

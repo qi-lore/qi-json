@@ -6,32 +6,35 @@ accessor closures, optionally generated from struct tags.
 
 | Package | Import path | Role |
 |---|---|---|
-| `scanner` | `github.com/qi-lore/qi-json/scanner` | Syntax layer: `Valid` and a pull tokenizer |
-| `qijson` | `github.com/qi-lore/qi-json` | Public facade of the semantic layer: type aliases, constants and wrappers |
+| `qijson` | `github.com/qi-lore/qi-json` | The one public package: the semantic layer plus the re-exported syntax surface (`Valid`, `Kind`, `Tokenizer`) |
 | `internal/codec` | `github.com/qi-lore/qi-json/internal/codec` | Implementation of the semantic layer behind the facade (internal) |
+| `internal/scanner` | `github.com/qi-lore/qi-json/internal/scanner` | Single-pass syntax engine behind the facade (internal) |
 | `cmd/qi-json-gen` | `github.com/qi-lore/qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.3.1** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.4.0** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.3.1** (2026-11-22).
+Current release: **v0.4.0** (2026-11-22).
 
-v0.3.1 is a documentation release: `docs/task.md` is retired and `docs/tasks.md`
-becomes the single source of truth for task state, and error messages and exported
-doc comments no longer cite project documents. No code or public API changes.
+v0.4.0 consolidates the syntax layer behind the facade: the `scanner` subpackage
+is gone, the syntax engine lives in `internal/scanner`, and `qijson` re-exports
+its whole surface — `Valid`, the `Kind` type with its seven constants, and the
+tokenizing `Tokenizer` with `NewTokenizer`. There is now a single public import
+path, `github.com/qi-lore/qi-json`. Names, signatures and behavior are unchanged
+(`qijson.Kind` *is* the type `Reader.Peek` returns), so the change is an
+import-path and qualifier rewrite; it is nonetheless breaking for anyone who
+imported `github.com/qi-lore/qi-json/scanner`. See **Migrating from 0.3.x** below.
 
-The previous release, v0.3.0, moved the semantic engine behind the `qijson`
-facade: the decoder and encoder now live in `internal/codec`, and the module root
-re-exports them through type aliases, constants and wrappers. The public API is
-unchanged — `qijson.Reader` *is* `codec.Reader` — so `errors.As`, generated
-`Field` literals and every call site keep working, while the engine's internals
-are no longer importable. That release also adopted the canonical module path
-`github.com/qi-lore/qi-json` and raised the Go floor to **1.24** for the facade's
-generic type aliases. Both of those are breaking for importers; see **Migrating
-from 0.2.x** below. See [CHANGELOG.md](CHANGELOG.md) for the change history; the
-git tags record the release series.
+The previous release, v0.3.1, was a documentation release (`docs/tasks.md` became
+the single source of truth for task state; error messages and doc comments no
+longer cite project documents). The release before it, v0.3.0, moved the semantic
+engine behind the `qijson` facade into `internal/codec`, adopted the canonical
+module path `github.com/qi-lore/qi-json`, and raised the Go floor to **1.24** for
+the facade's generic type aliases — both breaking for importers; see **Migrating
+from 0.2.x**. See [CHANGELOG.md](CHANGELOG.md) for the change history; the git
+tags record the release series.
 
 ## Why another JSON library
 
@@ -71,6 +74,29 @@ generic type aliases) and adds a `toolchain go1.27.3` line, which merely names
 the toolchain used to develop the project — a dependency's `toolchain` line is
 ignored, so it does not raise the floor for a consumer.
 
+### Migrating from 0.3.x
+
+The syntax layer moved behind the facade. The `scanner` subpackage is no longer
+importable; its whole surface is re-exported from `qijson`. One import path and a
+qualifier change:
+
+```diff
+-import "github.com/qi-lore/qi-json/scanner"
++import "github.com/qi-lore/qi-json"
+
+-ok := scanner.Valid(data)
+-tok := scanner.NewTokenizer(data)
+-if k == scanner.KindNull { ... }
++ok := qijson.Valid(data)
++tok := qijson.NewTokenizer(data)
++if k == qijson.KindNull { ... }
+```
+
+The names, signatures and behavior are identical — `qijson.Kind` *is* the token
+kind `Reader.Peek` returns — so only the qualifier and the import line change.
+Regenerate any `qi-json-gen` output: it no longer imports `scanner` and compares
+against `qijson.KindNull`.
+
 ### Migrating from 0.2.x
 
 Three edits are required:
@@ -85,7 +111,8 @@ Three edits are required:
 
 Nothing else changes: `qijson.Reader` and `qijson.Writer` are the same types as
 before, so `errors.As`, generated `Field` literals and existing call sites
-compile unchanged once the imports are updated.
+compile unchanged once the imports are updated. (v0.4.0 then folds the
+`scanner` subpackage into the facade — see **Migrating from 0.3.x**.)
 
 ## Quick start
 
@@ -209,7 +236,7 @@ encode functions, built with `qijson.NewCodec(decode, encode)`.
 - Strings are unescaped (`\" \\ \/ \b \f \n \r \t \uXXXX`, including surrogate
   pairs); a lone surrogate becomes `U+FFFD`. A decoded string value or member
   name must be valid UTF-8 — invalid UTF-8 is a syntax error — so the decoder is
-  stricter here than `scanner.Valid`, which checks syntax only.
+  stricter here than `qijson.Valid`, which checks syntax only.
 - `Slice`, `Map`, and `Array` fields build into a temporary and assign only on
   success, so a failed decode leaves that field unchanged. An `Object` field
   decodes into the nested struct directly, so a failure partway through can
@@ -330,12 +357,12 @@ With `-strict`, every generated schema chains `RejectUnknown` and
 (see [Decoding rules](#decoding-rules)). The output is deterministic and checked
 in; `TestGeneratedFixtureUpToDate` fails if it drifts from the generator.
 
-## The scanner
+## The syntax layer
 
 ```go
-ok := scanner.Valid(data)                         // syntax only
+ok := qijson.Valid(data)                          // syntax only
 
-tok := scanner.NewTokenizer(data)
+tok := qijson.NewTokenizer(data)
 kind, err := tok.Peek()                           // KindNull ... KindEnd
 raw, err := tok.ReadString()                      // aliases data, still escaped
 ```
@@ -344,9 +371,9 @@ raw, err := tok.ReadString()                      // aliases data, still escaped
 and does not check UTF-8 or surrogate pairing. `Tokenizer` is pull-based and
 shares the same scalar scanners and error contract, so a decode failure reports
 the same message and 1-based position as `Valid` would. It is the engine behind
-`qijson`; most callers should use `qijson` instead. Byte slices returned by
-`ReadString`, `ReadNumber`, and `ReadRaw` alias the input. `Valid` is safe for
-concurrent use; a `Tokenizer` must not be copied or shared.
+the semantic layer; most callers should use a `Schema` instead. Byte slices
+returned by `ReadString`, `ReadNumber`, and `ReadRaw` alias the input. `Valid` is
+safe for concurrent use; a `Tokenizer` must not be copied or shared.
 
 ## Design constraints
 

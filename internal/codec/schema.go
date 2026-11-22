@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // errNoFieldEncoder reports a Field whose Encode is nil, reached by

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // newTestReader returns a Reader positioned at the start of doc.

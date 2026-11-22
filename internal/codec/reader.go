@@ -7,7 +7,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // compsInline is the number of JSON path components held inline in a Reader
@@ -18,7 +18,7 @@ const compsInline = 8
 
 // Reader decodes typed values from a JSON document, tracking the JSON path of
 // the value being decoded so that errors point at the offending member. It reads
-// from the pull tokenizer in github.com/qi-lore/qi-json/scanner: whitespace,
+// from the pull tokenizer: whitespace,
 // separators and object keys are handled by the tokenizer and the Object and
 // Array iterators.
 //

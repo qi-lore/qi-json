@@ -3,7 +3,7 @@ package codec
 import (
 	"errors"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // Decoder is implemented by types that decode themselves from JSON. A decoder

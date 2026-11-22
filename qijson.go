@@ -14,8 +14,15 @@ package qijson
 // sets, so the method reference for the aliased types remains on the
 // declarations in internal/codec; the type-level contract (ownership,
 // concurrency and lifecycle) is repeated here.
+//
+// This file also re-exports the syntax engine from internal/scanner — Valid, the
+// Kind taxonomy and the Tokenizer — so the whole module has one public import
+// path, github.com/qi-lore/qi-json.
 
-import "github.com/qi-lore/qi-json/internal/codec"
+import (
+	"github.com/qi-lore/qi-json/internal/codec"
+	"github.com/qi-lore/qi-json/internal/scanner"
+)
 
 // Error describes a failure to decode JSON into a Go value. It records where in
 // the input the failure happened and wraps the underlying cause so callers can
@@ -164,7 +171,7 @@ func Encode(w *Writer, v Encoder) error {
 
 // Reader decodes typed values from a JSON document, tracking the JSON path of
 // the value being decoded so that errors point at the offending member. It reads
-// from the pull tokenizer in github.com/qi-lore/qi-json/scanner: whitespace,
+// from the pull tokenizer: whitespace,
 // separators and object keys are handled by the tokenizer and the Object and
 // Array iterators.
 //
@@ -379,4 +386,77 @@ type Codec[E any] = codec.Codec[E]
 // safety of the closures.
 func NewCodec[E any](decode func(*Reader) (E, error), encode func(*Writer, E) error) Codec[E] {
 	return codec.NewCodec(decode, encode)
+}
+
+// Kind identifies the JSON token a Tokenizer is positioned on: the token
+// taxonomy of the syntax engine. Peek reports one of these, and a decoder or
+// Field that branches on the shape of the next JSON value compares it — for
+// example, a JSON null sets a pointer field to nil.
+//
+// A Kind returned by Reader.Peek is identical to the syntax engine's, so it
+// compares equal to the Kind constants below.
+type Kind = scanner.Kind
+
+const (
+	// KindNull is the null literal.
+	KindNull = scanner.KindNull
+
+	// KindBool is the true or false literal.
+	KindBool = scanner.KindBool
+
+	// KindString is a string value or an object key.
+	KindString = scanner.KindString
+
+	// KindNumber is a number literal.
+	KindNumber = scanner.KindNumber
+
+	// KindObject is an object value, introduced by '{'.
+	KindObject = scanner.KindObject
+
+	// KindArray is an array value, introduced by '['.
+	KindArray = scanner.KindArray
+
+	// KindEnd is reported by Peek at the closing '}' or ']' of the current
+	// object or array, and at the end of the document once the top-level value
+	// and any trailing whitespace have been consumed.
+	KindEnd = scanner.KindEnd
+)
+
+// Valid reports whether data is a syntactically valid JSON text. It is a single
+// pass over data: it walks with an index, scans strings, numbers, whitespace and
+// literals in bulk, and keeps an explicit stack of open containers. It does not
+// build values and does not validate UTF-8 or surrogate pairs, and unlike
+// encoding/json.Valid it accepts any JSON value at the top level and applies no
+// nesting depth limit. Valid is safe for concurrent use.
+func Valid(data []byte) bool {
+	return scanner.Valid(data)
+}
+
+// Tokenizer turns a JSON document into a stream of typed tokens. It reads one
+// document without building Go values, which suits a minifier, a streaming
+// splitter or an analyzer that walks arbitrary documents. Construct one with
+// NewTokenizer; the zero value is not ready to use.
+//
+// The methods are pull-based: Peek reports the kind of the next value token
+// without consuming it, and the Read*/Begin*/End* methods consume it.
+// Whitespace, commas and the ':' after an object key are consumed
+// automatically, so inside an object the stream is key, value, key, value, ...
+// and Peek reports KindEnd at the closing brace. Inside an array it is value,
+// value, ... and Peek reports KindEnd at the closing bracket. At the top level
+// Peek reports KindEnd once the single top-level value and its trailing
+// whitespace are consumed.
+//
+// Byte slices returned by ReadString, ReadNumber and ReadRaw alias the input
+// passed to NewTokenizer and must not be modified.
+//
+// A Tokenizer must not be copied after first use, and it is not safe for
+// concurrent use: give each goroutine its own.
+type Tokenizer = scanner.Tokenizer
+
+// NewTokenizer returns a Tokenizer positioned at the start of data. The
+// Tokenizer reads from data without copying: the caller must keep data alive and
+// unmodified for the Tokenizer's lifetime, and every byte slice a read returns
+// aliases data.
+func NewTokenizer(data []byte) *Tokenizer {
+	return scanner.NewTokenizer(data)
 }

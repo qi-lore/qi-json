@@ -17,6 +17,16 @@ func writePkg(t *testing.T, src string) string {
 	return dir
 }
 
+// assertNoScannerImport fails if generated source still imports the retired
+// scanner subpackage: generated code compares the token kind through the qijson
+// facade (qijson.KindNull), so it never needs the scanner import.
+func assertNoScannerImport(t *testing.T, src string) {
+	t.Helper()
+	if strings.Contains(src, `"github.com/qi-lore/qi-json/scanner"`) {
+		t.Errorf("generated source still imports the scanner subpackage\n---\n%s", src)
+	}
+}
+
 func TestGenerateScalars(t *testing.T) {
 	dir := writePkg(t, `package example
 
@@ -67,7 +77,7 @@ type Config struct {
 	}
 	src := string(got)
 	want := []string{
-		"if k == scanner.KindNull",
+		"if k == qijson.KindNull",
 		"int64(int8(n)) != n",
 		"n < 0 || int64(uint16(n)) != n",
 		"f > math.MaxFloat32 || f < -math.MaxFloat32",
@@ -75,7 +85,6 @@ type Config struct {
 		"n < 0 || int64(uint64(n)) != n",
 		"int64(Port(n)) != n",
 		"func qiRangeError(r *qijson.Reader, want string) error {",
-		`"github.com/qi-lore/qi-json/scanner"`,
 		`"math"`,
 	}
 	for _, w := range want {
@@ -83,6 +92,7 @@ type Config struct {
 			t.Errorf("generated source missing %q\n---\n%s", w, src)
 		}
 	}
+	assertNoScannerImport(t, src)
 }
 
 func TestGenerateContainers(t *testing.T) {
@@ -255,7 +265,7 @@ type Config struct {
 		`v.Timeout = time.Duration(n)`,
 		`qijson.Field[Config]{Name: "deadline"`,
 		`v.Deadline = &e`,
-		`if k == scanner.KindNull`,
+		`if k == qijson.KindNull`,
 	}
 	for _, w := range want {
 		if !strings.Contains(src, w) {
@@ -303,13 +313,13 @@ type Config struct {
 		`func qiEncodeStatus(w *qijson.Writer, v Status) error {`,
 		`func qiDecodeMode(r *qijson.Reader) (Mode, error) {`,
 		`func qiEncodeMode(w *qijson.Writer, v Mode) error {`,
-		`"github.com/qi-lore/qi-json/scanner"`,
 	}
 	for _, w := range want {
 		if !strings.Contains(src, w) {
 			t.Errorf("generated source missing %q\n---\n%s", w, src)
 		}
 	}
+	assertNoScannerImport(t, src)
 }
 
 func TestGenerateCrossPackagePlainStruct(t *testing.T) {
