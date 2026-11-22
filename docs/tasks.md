@@ -115,4 +115,4 @@ never renumber, never reuse a retired identifier.
 
 ## Planned
 
-No planned tasks. The backlog is empty.
+- [ ] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
