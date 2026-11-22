@@ -11,27 +11,30 @@ accessor closures, optionally generated from struct tags.
 | `internal/scanner` | `github.com/qi-lore/qi-json/internal/scanner` | Single-pass syntax engine behind the facade (internal) |
 | `cmd/qi-json-gen` | `github.com/qi-lore/qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.3.1** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.4.0** (2026-11-22). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.3.1** (2026-11-22).
+Current release: **v0.4.0** (2026-11-22).
 
-v0.3.1 is a documentation release: `docs/task.md` is retired and `docs/tasks.md`
-becomes the single source of truth for task state, and error messages and exported
-doc comments no longer cite project documents. No code or public API changes.
+v0.4.0 consolidates the syntax layer behind the facade: the `scanner` subpackage
+is gone, the syntax engine lives in `internal/scanner`, and `qijson` re-exports
+its whole surface — `Valid`, the `Kind` type with its seven constants, and the
+tokenizing `Tokenizer` with `NewTokenizer`. There is now a single public import
+path, `github.com/qi-lore/qi-json`. Names, signatures and behavior are unchanged
+(`qijson.Kind` *is* the type `Reader.Peek` returns), so the change is an
+import-path and qualifier rewrite; it is nonetheless breaking for anyone who
+imported `github.com/qi-lore/qi-json/scanner`. See **Migrating from 0.3.x** below.
 
-The previous release, v0.3.0, moved the semantic engine behind the `qijson`
-facade: the decoder and encoder now live in `internal/codec`, and the module root
-re-exports them through type aliases, constants and wrappers. The public API is
-unchanged — `qijson.Reader` *is* `codec.Reader` — so `errors.As`, generated
-`Field` literals and every call site keep working, while the engine's internals
-are no longer importable. That release also adopted the canonical module path
-`github.com/qi-lore/qi-json` and raised the Go floor to **1.24** for the facade's
-generic type aliases. Both of those are breaking for importers; see **Migrating
-from 0.2.x** below. See [CHANGELOG.md](CHANGELOG.md) for the change history; the
-git tags record the release series.
+The previous release, v0.3.1, was a documentation release (`docs/tasks.md` became
+the single source of truth for task state; error messages and doc comments no
+longer cite project documents). The release before it, v0.3.0, moved the semantic
+engine behind the `qijson` facade into `internal/codec`, adopted the canonical
+module path `github.com/qi-lore/qi-json`, and raised the Go floor to **1.24** for
+the facade's generic type aliases — both breaking for importers; see **Migrating
+from 0.2.x**. See [CHANGELOG.md](CHANGELOG.md) for the change history; the git
+tags record the release series.
 
 ## Why another JSON library
 
@@ -108,7 +111,7 @@ Three edits are required:
 
 Nothing else changes: `qijson.Reader` and `qijson.Writer` are the same types as
 before, so `errors.As`, generated `Field` literals and existing call sites
-compile unchanged once the imports are updated. (A later release then folds the
+compile unchanged once the imports are updated. (v0.4.0 then folds the
 `scanner` subpackage into the facade — see **Migrating from 0.3.x**.)
 
 ## Quick start
