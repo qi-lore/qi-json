@@ -53,6 +53,22 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 - CI (`.github/workflows/ci.yml`) enforces the branch name, the target branch,
   the commit messages, and the verification sequence.
 
+## Release flow
+
+- `dev` integrates work; a release promotes it to `main`.
+- Choose the version (SemVer; pre-1.0: patch for a fix or documentation change,
+  minor for a new or changed capability).
+- Prepare the release on `dev` (never on a feature branch): promote the
+  `CHANGELOG.md` `[Unreleased]` entry to `[X.Y.Z] - YYYY-MM-DD` and reopen an
+  empty `[Unreleased]`; update the `README.md` version block; do the housekeeping
+  (mark done items, point the next task, refresh baseline references); commit as
+  `chore(release): vX.Y.Z` with a full body; run `make verify`.
+- Open the `dev` → `main` pull request (the only PR allowed into `main`) and let
+  CI pass.
+- Merge into `main`, then tag the merge commit: `git tag vX.Y.Z <merge-sha>` and
+  push the tag.
+- Keep `dev` — do not delete the integration branch.
+
 ## Code quality
 
 All Go code follows the Uber Go Style Guide
@@ -178,6 +194,10 @@ and context rules bind only when such code is added. Open gaps are tracked in
     and Review Discipline** and **Rigorous Code Quality** rules added to the
     constitution (v3.5.0) and `AGENTS.md`, plus the audit and the refactoring
     tasks T-Q1…T-Q4 they imply (resume here for code-quality work).
+  - `.opencode/plan/2026-11-22-release-flow.md` — **done 2026-11-22**: the
+    **Release flow** section added to the constitution (v3.6.0) and mirrored in
+    `AGENTS.md` (choose the version, prepare on `dev`, the `dev` → `main` pull
+    request, tag the merge commit, keep `dev`).
   - `.opencode/plan/2026-11-21-package-rename.md` — relocated the semantic layer
     to the module root and renamed it `qijson` (done 2026-11-21).
   - `.opencode/plan/2026-11-21-scanner-rewrite.md` — scanner rewrite rationale
