@@ -114,3 +114,7 @@ never renumber, never reuse a retired identifier.
 Next up: **P001**, protect `main` and `dev` with branch protection and the `verify` check.
 
 - [ ] P001 - Protect `main` and `dev` with branch protection and the `verify` check
+- [ ] Q006 - Return `errNilTarget` instead of panicking on a nil `Schema` target
+- [ ] Q007 - Make the `Marshal` completeness guard hold against an empty `WriteRaw`
+- [ ] Q008 - Return a sentinel instead of panicking on a nil nested `Schema` in `Object`
+- [ ] Q009 - Enforce unique field names in `Struct`
