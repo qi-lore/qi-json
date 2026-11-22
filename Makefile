@@ -1,4 +1,4 @@
-# Developer Makefile for qi-json (packages qijson at the module root, internal/codec, scanner and cmd/qi-json-gen).
+# Developer Makefile for qi-json (packages qijson at the module root, internal/codec, internal/scanner and cmd/qi-json-gen).
 #
 # The required verification order is defined in docs/constitution.md:
 #   test -> gofmt check -> vet -> golangci-lint
@@ -7,7 +7,7 @@
 GO            ?= go
 GOLANGCI_LINT ?= golangci-lint
 PKG           ?= ./...
-SCANNER       ?= ./scanner
+SCANNER       ?= ./internal/scanner
 FUZZ_TIME     ?= 10s
 BENCH_TIME    ?= 1s
 COVER_PROFILE ?= cover.out

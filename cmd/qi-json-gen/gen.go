@@ -63,7 +63,6 @@ type gen struct {
 	known   map[string]bool
 
 	// Import and helper bookkeeping.
-	needScanner bool
 	needMath    bool
 	needRange   bool
 	helpers     map[string]string
@@ -316,10 +315,6 @@ func (g *gen) writeImports(buf *bytes.Buffer) {
 	lines := map[string]string{ // import path -> import line
 		qijsonPath: fmt.Sprintf("%q", qijsonPath),
 	}
-	if g.needScanner {
-		scannerPath := qijsonPath + "/scanner"
-		lines[scannerPath] = fmt.Sprintf("%q", scannerPath)
-	}
 	if g.needMath {
 		lines["math"] = `"math"`
 	}
@@ -550,7 +545,6 @@ func ctor(fn, owner, jname, fname, retType string) string {
 // is "string" or "bool"; a pointer field writes null when nil. It is the string
 // and bool analogue of numericCodec.
 func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) string {
-	g.needScanner = true
 	read, name := "\ts, err := r.ReadString()\n\tif err != nil {\n\t\treturn err\n\t}\n", "s"
 	if kind == "bool" {
 		read, name = "\tb, err := r.ReadBool()\n\tif err != nil {\n\t\treturn err\n\t}\n", "b"
@@ -560,10 +554,10 @@ func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) 
 	fmt.Fprintf(&b, "qijson.Field[%s]{Name: %q, Decode: func(r *qijson.Reader, v *%s) error {\n", owner, jname, owner)
 	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
 	if ptr {
-		b.WriteString("\tif k == scanner.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
+		b.WriteString("\tif k == qijson.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
 		fmt.Fprintf(&b, "\t\tv.%s = nil\n\t\treturn nil\n\t}\n", fname)
 	} else {
-		b.WriteString("\tif k == scanner.KindNull {\n\t\treturn r.ReadNull()\n\t}\n")
+		b.WriteString("\tif k == qijson.KindNull {\n\t\treturn r.ReadNull()\n\t}\n")
 	}
 	b.WriteString(read)
 	if ptr {
@@ -603,17 +597,16 @@ func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) 
 // goType and whose underlying basic type is basic. qijson has no width-aware
 // constructor, so the closure converts and range-checks by round-trip.
 func (g *gen) numericCodec(owner, fname, jname, goType, basic string, ptr bool) string {
-	g.needScanner = true
 	g.needRange = true
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "qijson.Field[%s]{Name: %q, Decode: func(r *qijson.Reader, v *%s) error {\n", owner, jname, owner)
 	b.WriteString("\tk, err := r.Peek()\n\tif err != nil {\n\t\treturn err\n\t}\n")
 	if ptr {
-		b.WriteString("\tif k == scanner.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
+		b.WriteString("\tif k == qijson.KindNull {\n\t\tif err := r.ReadNull(); err != nil {\n\t\t\treturn err\n\t\t}\n")
 		fmt.Fprintf(&b, "\t\tv.%s = nil\n\t\treturn nil\n\t}\n", fname)
 	} else {
-		b.WriteString("\tif k == scanner.KindNull {\n\t\treturn r.ReadNull()\n\t}\n")
+		b.WriteString("\tif k == qijson.KindNull {\n\t\treturn r.ReadNull()\n\t}\n")
 	}
 
 	switch basic {

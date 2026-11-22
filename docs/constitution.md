@@ -48,22 +48,32 @@ implementation and support structural changes with benchmarks.
 
 ### VI. Public Surface
 
-`scanner.Valid(data []byte) bool` is the scanner's headline export, matching
-`encoding/json.Valid` in name and signature. `scanner.validate` stays unexported:
-it returns the first `parseError` plus whether the input is invalid, so
-diagnostics stay testable without widening the API.
+The public surface is reached through exactly one import path,
+`github.com/qi-lore/qi-json` (package `qijson`). The syntax validator lives in
+the internal package `internal/scanner` as `Valid(data []byte) bool`, matching
+`encoding/json.Valid` in name and signature; `scanner.validate` stays unexported
+there: it returns the first `parseError` plus whether the input is invalid, so
+diagnostics stay testable without widening the API. The facade re-exports
+`Valid`, so callers never import the syntax package directly.
 
-Four further surfaces are sanctioned (amended 2026-11-21; the delegation
-constructor added 2026-11-22; rationale:
+Three further surfaces are sanctioned (amended 2026-11-21; the delegation
+constructor added 2026-11-22; the scanner moved behind `internal/scanner` and
+re-exported 2026-11-22; rationale:
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
 `.opencode/plan/2026-11-21-json-encoder.md`,
-`.opencode/plan/2026-11-22-third-party-struct-fields.md`; the decoder/encoder
+`.opencode/plan/2026-11-22-third-party-struct-fields.md`,
+`.opencode/plan/2026-11-22-scanner-consolidation.md`; the decoder/encoder
 package was relocated to the module root and renamed `qijson` per
 `.opencode/plan/2026-11-21-package-rename.md`):
 
-- **`scanner` tokenizer** — a `Kind` and a tokenizing type exposing
-  `Peek`/`Read*`/`Begin*`/`End*`/`Skip`/`Offset`/`Err`, so the semantic layer
+- **`qijson` syntax re-exports** — the syntax engine's whole former surface,
+  reached through the facade: `Valid`, the `Kind` type with its seven constants
+  (`KindNull`, `KindBool`, `KindString`, `KindNumber`, `KindObject`, `KindArray`,
+  `KindEnd`), and the tokenizing type with `NewTokenizer`, exposing
+  `Peek`/`Read*`/`Begin*`/`End*`/`Skip`/`Offset`/`Err`. They are aliases and
+  wrappers of `internal/scanner`, so `Reader.Peek`'s `Kind` and generated code's
+  `KindNull` comparison stay identical across the boundary and the semantic layer
   consumes the same engine.
 - **`qijson` decoder** — the reflection-free semantic layer: a generic
   `Unmarshal`/`UnmarshalInto` and the non-generic `Decode`, the `Decoder`
@@ -94,9 +104,11 @@ as `Scanner`, `SyntaxError`, `scanBegin*`, or `stateBegin*`.
 
 The implementation of the `qijson` decoder and encoder lives in `internal/codec`
 (added 2026-11-22; rationale:
-`.opencode/plan/2026-11-22-internal-codec-extraction.md`). It is an internal
-package, not a public surface: the module root is a thin facade of type aliases
-and wrappers, so external code cannot import the engine and its internals may
+`.opencode/plan/2026-11-22-internal-codec-extraction.md`) and the syntax engine in
+`internal/scanner` (moved there 2026-11-22; rationale:
+`.opencode/plan/2026-11-22-scanner-consolidation.md`). Both are internal
+packages, not a public surface: the module root is a thin facade of type aliases
+and wrappers, so external code cannot import the engines and their internals may
 change without a compatibility promise. The facade MUST re-export the entire
 public contract, including the ownership, concurrency and lifecycle
 documentation the public types and functions require.
@@ -119,9 +131,9 @@ Additional commands, used where the task touches the relevant code:
 
 ```text
 go test -race ./...
-go test ./scanner -run '^TestInvalidDocuments$'      # one test or table
-go test -run=^$ -fuzz=FuzzValid -fuzztime=10s ./scanner   # -run=^$ is required
-go test -run=^$ -bench=. -benchmem ./scanner
+go test ./internal/scanner -run '^TestInvalidDocuments$'      # one test or table
+go test -run=^$ -fuzz=FuzzValid -fuzztime=10s ./internal/scanner   # -run=^$ is required
+go test -run=^$ -bench=. -benchmem ./internal/scanner
 go generate ./...                                    # regenerate generator fixtures
 ```
 
@@ -136,12 +148,14 @@ success path MUST stay allocation-free (`TestValidDoesNotAllocate`).
   used to develop the project and is ignored by consumers.
 - Four packages under module `github.com/qi-lore/qi-json` (the module root is a
   package):
-  - `.` (module root) — `qijson`, the public facade of the reflection-free
-    semantic layer (decode and encode);
+  - `.` (module root) — `qijson`, the public facade: it re-exports the semantic
+    layer (decode and encode) and the syntax layer (`Valid`, `Kind` and the
+    tokenizer);
   - `internal/codec/` — the semantic engine behind that facade; internal, not a
     public surface;
-  - `scanner/` — `Valid` and the tokenizer over the single-pass scanner
-    (`valid.go`, `scan.go`, `token.go`, `doc.go`);
+  - `internal/scanner/` — the syntax engine: `Valid` and the tokenizer over the
+    single-pass scanner (`valid.go`, `scan.go`, `token.go`, `doc.go`); internal,
+    not a public surface;
   - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
@@ -240,7 +254,7 @@ addition:
   encoder do today. Adding a literal `%w` at the public boundary instead would
   change error strings and is a deliberate behavior change, not a style tweak.
 - Sentinel errors MUST be defined in the package that owns the surface where
-  callers need to inspect them: the `qijson` module root or `scanner`. There is
+  callers need to inspect them: the `qijson` module root or `internal/scanner`. There is
   no separate `core` package; this repository's surface is fixed by Article VI.
 - Public APIs MUST document ownership, concurrency safety, and lifecycle
   expectations.
@@ -264,4 +278,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.10.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.11.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22

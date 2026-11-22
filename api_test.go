@@ -6,6 +6,7 @@ import (
 
 	"github.com/qi-lore/qi-json"
 	"github.com/qi-lore/qi-json/internal/codec"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // The facade must re-export the engine types identically, so external code sees
@@ -19,6 +20,25 @@ var (
 	_ codec.ErrorKind  = qijson.KindSyntax
 	_ qijson.Decoder   = (*smokeConfig)(nil)
 	_ qijson.Encoder   = (*smokeConfig)(nil)
+)
+
+// The syntax engine is re-exported through the same facade: Kind and Tokenizer
+// are aliases of the internal scanner's, and the seven Kind constants are
+// values of that type, so Reader.Peek's result compares equal to them.
+var (
+	_ scanner.Kind                   = qijson.KindNull
+	_ qijson.Kind                    = scanner.KindEnd
+	_ *scanner.Tokenizer             = (*qijson.Tokenizer)(nil)
+	_ func([]byte) bool              = qijson.Valid
+	_ func([]byte) *qijson.Tokenizer = qijson.NewTokenizer
+
+	_ qijson.Kind = qijson.KindNull
+	_ qijson.Kind = qijson.KindBool
+	_ qijson.Kind = qijson.KindString
+	_ qijson.Kind = qijson.KindNumber
+	_ qijson.Kind = qijson.KindObject
+	_ qijson.Kind = qijson.KindArray
+	_ qijson.Kind = qijson.KindEnd
 )
 
 // These compile-time assertions pin the signature of every constructor and entry
@@ -154,5 +174,88 @@ func TestFacadeFieldLiteral(t *testing.T) {
 	}
 	if got := string(data); got != `{"n":-7}` {
 		t.Fatalf("Marshal = %s", got)
+	}
+}
+
+// TestFacadeScannerSurface proves the re-exported syntax engine works through
+// the facade alone: Valid validates, and the tokenizer walks a document and
+// reports the Kind constants the facade publishes.
+func TestFacadeScannerSurface(t *testing.T) {
+	if !qijson.Valid([]byte(`{"a":[1,true,null]}`)) {
+		t.Fatal("Valid(valid) = false")
+	}
+	if qijson.Valid([]byte(`{"a":}`)) {
+		t.Fatal("Valid(invalid) = true")
+	}
+
+	tok := qijson.NewTokenizer([]byte(`[1,"two"]`))
+	if err := tok.BeginArray(); err != nil {
+		t.Fatalf("BeginArray: %v", err)
+	}
+	for i, want := range []qijson.Kind{qijson.KindNumber, qijson.KindString, qijson.KindEnd} {
+		k, err := tok.Peek()
+		if err != nil {
+			t.Fatalf("Peek #%d: %v", i, err)
+		}
+		if k != want {
+			t.Fatalf("Peek #%d = %v, want %v", i, k, want)
+		}
+		if want == qijson.KindEnd {
+			break
+		}
+		if err := tok.Skip(); err != nil {
+			t.Fatalf("Skip #%d: %v", i, err)
+		}
+	}
+	if err := tok.EndArray(); err != nil {
+		t.Fatalf("EndArray: %v", err)
+	}
+}
+
+// TestFacadePeekKindIdentity proves a custom Field can branch on the token kind
+// through the facade: Reader.Peek returns a qijson.Kind, and a JSON null is
+// recognised by comparing against qijson.KindNull.
+func TestFacadePeekKindIdentity(t *testing.T) {
+	type holder struct{ N *int64 }
+
+	schema := qijson.Struct(qijson.Field[holder]{
+		Name: "n",
+		Decode: func(r *qijson.Reader, h *holder) error {
+			k, err := r.Peek()
+			if err != nil {
+				return err
+			}
+			if k == qijson.KindNull {
+				return r.ReadNull()
+			}
+			n, err := r.ReadInt()
+			if err != nil {
+				return err
+			}
+			h.N = &n
+			return nil
+		},
+		Encode: func(w *qijson.Writer, h *holder) error {
+			if h.N == nil {
+				return w.WriteNull()
+			}
+			return w.WriteInt(*h.N)
+		},
+	})
+
+	var got holder
+	if err := schema.UnmarshalInto([]byte(`{"n":7}`), &got); err != nil {
+		t.Fatalf("UnmarshalInto: %v", err)
+	}
+	if got.N == nil || *got.N != 7 {
+		t.Fatalf("n = %v, want 7", got.N)
+	}
+
+	got = holder{}
+	if err := schema.UnmarshalInto([]byte(`{"n":null}`), &got); err != nil {
+		t.Fatalf("UnmarshalInto(null): %v", err)
+	}
+	if got.N != nil {
+		t.Fatalf("n = %v, want nil", *got.N)
 	}
 }

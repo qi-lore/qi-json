@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 func TestStructDecode(t *testing.T) {

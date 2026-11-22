@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // Sentinel errors for misuse of the container constructors. They are

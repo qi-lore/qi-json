@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/qi-lore/qi-json/scanner"
+	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // fuzzAny decodes any JSON value at the document root. It runs the whole
