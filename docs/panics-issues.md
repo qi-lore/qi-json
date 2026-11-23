@@ -24,7 +24,7 @@ deliberate (documented) trade-off, and what merely looks risky but is correct.
 |---|---|---|---|---|
 | 1 | `Schema.UnmarshalInto` / `Schema.Decode` panic on a nil target | Nil deref (panic) | High | Resolved (Q006) |
 | 2 | `Marshal` completeness guard defeated by `WriteRaw` | Defeated invariant | Medium | Resolved (Q007) |
-| 3 | `Object` / nested `Schema` panic on a nil schema | Nil deref (panic) | Medium | Unresolved |
+| 3 | `Object` / nested `Schema` panic on a nil schema | Nil deref (panic) | Medium | Resolved (Q008) |
 | 4 | `Struct` does not enforce unique field names | Silent misconfiguration | Medium | Unresolved |
 | 5 | Typed-nil receiver panics in `Decode` / `Encode` | Nil deref (panic) | Medium | Documented, unresolved |
 | 6 | Under-consuming `DecodeJSON` makes `Decode` accept invalid JSON | Defeated invariant | Medium | Documented, unresolved |
@@ -307,6 +307,15 @@ check `schema == nil` in the returned closures and return a new sentinel such as
 `errNilSchema` so the failure is inspectable with `errors.Is`, consistent with
 the existing sentinels.
 
+**Resolution (Q008).** `Object` now checks `schema == nil` in both closures and
+returns the new `errNilSchema` sentinel, so the nil pointer is never
+dereferenced and the misuse is inspectable with `errors.Is`. The check follows
+the pattern of `errNilElementDecoder` / `errNilElementEncoder` and
+`errNoFieldEncoder`. On decode it runs after the JSON-null branch, so a null
+member still decodes without needing the schema, matching how a null container
+decodes without needing its element codec. `TestObjectNilSchema` pins the decode
+and encode errors and the null case.
+
 ---
 
 ## Issue 4 — `Struct` does not enforce unique field names
@@ -510,11 +519,12 @@ they are recorded so a later reader does not re-litigate them:
 
 ## Resolution indicator
 
-> **Status: IN PROGRESS (1 of 9 issues fixed).**
+> **Status: IN PROGRESS (3 of 9 issues fixed).**
 >
-> Issue 1 was fixed by task Q006: `Schema.Decode` and `Schema.UnmarshalInto` now
-> return `errNilTarget` for a nil target instead of panicking. The three
-> remaining new defects (2–4) and the five documented trade-offs (5–9) are still
+> Issues 1–3 were fixed by tasks Q006, Q007 and Q008: the nil-target and
+> nil-schema misuses now return sentinels instead of panicking, and `Marshal`
+> rejects an empty raw write that used to defeat its completeness guard. The
+> remaining new defect (4) and the five documented trade-offs (5–9) are still
 > open. The canonical task state lives in `docs/tasks.md`; this indicator is
 > informational and must be updated when further fixes land.
 >
@@ -523,8 +533,8 @@ they are recorded so a later reader does not re-litigate them:
 > | # | Issue | Status |
 > |---|---|---|
 > | 1 | `Schema.UnmarshalInto`/`Decode` nil-target panic | RESOLVED (Q006) |
-> | 2 | `Marshal` completeness defeated by `WriteRaw` | UNRESOLVED |
-> | 3 | `Object`/nested `Schema` nil-schema panic | UNRESOLVED |
+> | 2 | `Marshal` completeness defeated by `WriteRaw` | RESOLVED (Q007) |
+> | 3 | `Object`/nested `Schema` nil-schema panic | RESOLVED (Q008) |
 > | 4 | `Struct` unique-field-name enforcement | UNRESOLVED |
 > | 5 | Typed-nil receiver panic (`Decode`/`Encode`) | UNRESOLVED (documented) |
 > | 6 | Under-consuming `DecodeJSON` accepts invalid JSON | UNRESOLVED (documented) |

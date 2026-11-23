@@ -23,6 +23,9 @@ var (
 	// Codec whose Encode is nil.
 	errNilElementEncoder = errors.New("qijson: nil element encoder")
 
+	// errNilSchema reports an Object field built with a nil *Schema.
+	errNilSchema = errors.New("qijson: nil schema")
+
 	// errUnsupportedDynamicType reports a value in an any field whose dynamic
 	// type encodeAny does not know how to write, since qijson may not use
 	// reflection to discover one.
@@ -171,8 +174,9 @@ func BoolPtr[T any](name string, field func(*T) **bool) Field[T] {
 }
 
 // Object decodes a JSON object into a nested struct field using schema. A JSON
-// null leaves the field unchanged. Because a struct is never empty, an Object
-// field is never omitted by omitempty.
+// null leaves the field unchanged, and a nil schema is reported as errNilSchema
+// rather than dereferenced. Because a struct is never empty, an Object field is
+// never omitted by omitempty.
 func Object[T, S any](name string, field func(*T) *S, schema *Schema[S]) Field[T] {
 	return Field[T]{
 		Name: name,
@@ -184,9 +188,15 @@ func Object[T, S any](name string, field func(*T) *S, schema *Schema[S]) Field[T
 			if k == scanner.KindNull {
 				return r.ReadNull()
 			}
+			if schema == nil {
+				return errNilSchema
+			}
 			return schema.Decode(r, field(v))
 		},
 		Encode: func(w *Writer, v *T) error {
+			if schema == nil {
+				return errNilSchema
+			}
 			return schema.Encode(w, field(v))
 		},
 	}
