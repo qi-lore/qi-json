@@ -90,3 +90,39 @@ func TestEncodeSurfacesWriterError(t *testing.T) {
 		t.Errorf("err = %v, want errMultipleRoots", err)
 	}
 }
+
+// rawNilEnc marks the root written with an empty WriteRaw and returns nil.
+type rawNilEnc struct{}
+
+func (rawNilEnc) EncodeJSON(w *Writer) error { return w.WriteRaw(nil) }
+
+// TestMarshalEmptyRaw proves Marshal does not accept a document whose only
+// "value" was an empty WriteRaw: WriteRaw rejects the empty write outright, and
+// the completeness guard requires the root value to have produced bytes.
+func TestMarshalEmptyRaw(t *testing.T) {
+	if _, err := Marshal[rawNilEnc](rawNilEnc{}); !errors.Is(err, errEmptyRaw) {
+		t.Errorf("Marshal: err = %v, want errEmptyRaw", err)
+	}
+
+	var w Writer
+	if err := w.WriteRaw(nil); !errors.Is(err, errEmptyRaw) {
+		t.Errorf("WriteRaw(nil): err = %v, want errEmptyRaw", err)
+	}
+	if err := w.WriteRaw([]byte{}); !errors.Is(err, errEmptyRaw) {
+		t.Errorf("WriteRaw(empty): err = %v, want errEmptyRaw", err)
+	}
+	if w.Err() == nil {
+		t.Error("WriteRaw(empty) did not set the sticky error")
+	}
+}
+
+// TestWriterCompleteRequiresValue pins the completeness guard on its own: a
+// writer that marked the root written without emitting any bytes is not complete,
+// independently of WriteRaw's empty-value guard.
+func TestWriterCompleteRequiresValue(t *testing.T) {
+	var w Writer
+	w.wroteRoot = true
+	if w.complete() {
+		t.Error("complete() = true with no bytes written")
+	}
+}

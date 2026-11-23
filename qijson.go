@@ -225,7 +225,9 @@ type Schema[T any] = codec.Schema[T]
 
 // Struct returns a Schema that decodes and encodes a JSON object using fields.
 // Field names must be unique; the order of the arguments does not matter, and
-// Encode writes members in that argument (declaration) order.
+// Encode writes members in that argument (declaration) order. A repeated name is
+// a programming error: every Decode and Encode of the returned Schema fails with
+// an error instead of silently binding and writing an ambiguous member.
 func Struct[T any](fields ...Field[T]) *Schema[T] {
 	return codec.Struct(fields...)
 }

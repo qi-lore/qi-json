@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-23
+
+### Added
+
+- Documentation: two code-level assessment records. `docs/fn-comparison.md`
+  documents the semantic differences between the generic and non-generic entry
+  points (`Unmarshal`/`UnmarshalInto` versus `Decode`, `Marshal` versus `Encode`)
+  from the code rather than from the doc comments; `docs/panics-issues.md` audits
+  the engine for panics, defeatable guards and silent misbehavior and classifies
+  each finding as a defect, a deliberate trade-off, or correct. No code change.
+
+### Changed
+
+- Repository settings: `main` and `dev` are protected by branch rulesets. `main`
+  requires a pull request (zero approvals) and the `verify` status check; `dev`
+  requires the `verify` status check. Both block deletions and force pushes. The
+  `main` ruleset keeps an organization-admin bypass as an emergency escape hatch.
+  No code or public API change.
+
+### Fixed
+
+- `qijson`: `Schema.UnmarshalInto` and `Schema.Decode` return the `errNilTarget`
+  sentinel for a nil `*T` target instead of panicking with a nil-pointer
+  dereference, matching the generic `UnmarshalInto` and the non-generic
+  `Decode`/`Encode`, which already reported the same misuse as a recoverable
+  error. The panic was a defect: a public entry point crashed where every sibling
+  returned an inspectable sentinel. (Code-quality task Q006.)
+- `qijson`: `Writer.WriteRaw` rejects an empty slice with the `errEmptyRaw`
+  sentinel, and `Marshal`'s completeness guard now requires the root value to have
+  produced at least one byte. An `EncodeJSON` that called `WriteRaw(nil)` used to
+  satisfy the guard without emitting a value, so `Marshal` returned `(nil, nil)`
+  instead of an error; the same empty write inside a container produced the
+  invalid text `[1,]` or `{"a":}`. (Code-quality task Q007.)
+- `qijson`: `Object` returns the `errNilSchema` sentinel for a nil nested
+  `*Schema[S]` instead of dereferencing the nil receiver. A JSON `null` member
+  still decodes without needing the schema, matching how a null container decodes
+  without its element codec. (Code-quality task Q008.)
+- `qijson`: `Struct` now enforces its documented unique-field-name requirement.
+  Two fields sharing a name used to bind a member to whichever duplicate the
+  binary search reached and made `Encode` write the key twice (`{"x":1,"x":2}`).
+  `Struct` records the `errDuplicateFieldName` sentinel (wrapped with the
+  offending name) and `Decode`/`Encode` return it before doing any work, so
+  `Marshal`, `Unmarshal` and `UnmarshalInto` surface it too. The constructor keeps
+  its `*Schema[T]` signature, so generated code and fixtures are unchanged.
+  (Code-quality task Q009.)
+
 ## [0.4.1] - 2026-11-22
 
 ### Added

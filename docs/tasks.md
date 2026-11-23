@@ -98,6 +98,10 @@ never renumber, never reuse a retired identifier.
 - [X] Q003 - Document ownership, concurrency and lifecycle
 - [X] Q004 - Uber Go Style Guide review pass
 - [X] Q005 - Keep error messages and doc comments free of project-document references
+- [X] Q006 - Return `errNilTarget` instead of panicking on a nil `Schema` target
+- [X] Q007 - Make the `Marshal` completeness guard hold against an empty `WriteRaw`
+- [X] Q008 - Return a sentinel instead of panicking on a nil nested `Schema` in `Object`
+- [X] Q009 - Enforce unique field names in `Struct`
 
 ### Module, packaging and governance
 
@@ -109,8 +113,10 @@ never renumber, never reuse a retired identifier.
 - [X] M006 - Retire `docs/task.md` and introduce the task registry (constitution v3.9.0)
 - [X] M007 - Normalize the plan files' headers to design records
 
+### Process and repository settings
+
+- [X] P001 - Protect `main` and `dev` with branch protection and the `verify` check
+
 ## Planned
 
-Next up: **P001**, protect `main` and `dev` with branch protection and the `verify` check.
-
-- [ ] P001 - Protect `main` and `dev` with branch protection and the `verify` check
+- [ ] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)

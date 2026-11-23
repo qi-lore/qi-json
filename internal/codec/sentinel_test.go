@@ -35,6 +35,31 @@ func TestDecodeNilElementDecoder(t *testing.T) {
 	}
 }
 
+// TestObjectNilSchema proves that using an Object field built with a nil
+// *Schema is an inspectable error rather than a nil-pointer panic, and that a
+// JSON null still decodes without needing the schema.
+func TestObjectNilSchema(t *testing.T) {
+	type inner struct{ N int64 }
+	type outer struct{ In inner }
+
+	schema := Struct(Object[outer, inner]("in", func(o *outer) *inner { return &o.In }, nil))
+
+	if _, err := schema.Unmarshal([]byte(`{"in":{"n":1}}`)); !errors.Is(err, errNilSchema) {
+		t.Errorf("decode: err = %v, want errNilSchema", err)
+	}
+	if _, err := schema.Marshal(outer{}); !errors.Is(err, errNilSchema) {
+		t.Errorf("encode: err = %v, want errNilSchema", err)
+	}
+
+	got, err := schema.Unmarshal([]byte(`{"in":null}`))
+	if err != nil {
+		t.Fatalf("decode null: err = %v, want nil", err)
+	}
+	if got.In != (inner{}) {
+		t.Errorf("decode null: In = %+v, want the zero value", got.In)
+	}
+}
+
 // TestEncodeFieldWithoutEncoder proves that encoding through a Field whose
 // Encode is nil is an inspectable error rather than a nil-function panic.
 func TestEncodeFieldWithoutEncoder(t *testing.T) {

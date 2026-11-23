@@ -15,6 +15,12 @@ import (
 // so it is a plain error rather than a *qijson.Error.
 var errNoFieldEncoder = errors.New("no encoder")
 
+// errDuplicateFieldName reports a Struct built with two fields of the same Name.
+// It is a programming error rather than a property of the input, so it is a
+// plain error rather than a *qijson.Error. A Schema carrying it fails every
+// Decode and Encode instead of silently binding and writing an ambiguous member.
+var errDuplicateFieldName = errors.New("qijson: duplicate field name")
+
 // Schema decodes and encodes JSON objects into and from values of T. Build one
 // with Struct; the zero value is not usable.
 //
@@ -31,11 +37,18 @@ type Schema[T any] struct {
 
 	rejectUnknown   bool
 	rejectDuplicate bool
+
+	// buildErr records a misuse caught by Struct, such as a duplicate field
+	// name. Decode and Encode return it before doing any work, so a
+	// misconfigured Schema fails every use instead of silently misbehaving.
+	buildErr error
 }
 
 // Struct returns a Schema that decodes and encodes a JSON object using fields.
 // Field names must be unique; the order of the arguments does not matter, and
-// Encode writes members in that argument (declaration) order.
+// Encode writes members in that argument (declaration) order. A repeated name is
+// a programming error: every Decode and Encode of the returned Schema fails with
+// an error instead of silently binding and writing an ambiguous member.
 func Struct[T any](fields ...Field[T]) *Schema[T] {
 	s := &Schema[T]{
 		fields: slices.Clone(fields),
@@ -44,6 +57,12 @@ func Struct[T any](fields ...Field[T]) *Schema[T] {
 	slices.SortFunc(s.fields, func(a, b Field[T]) int {
 		return strings.Compare(a.Name, b.Name)
 	})
+	for i := 1; i < len(s.fields); i++ {
+		if s.fields[i].Name == s.fields[i-1].Name {
+			s.buildErr = fmt.Errorf("%w %q", errDuplicateFieldName, s.fields[i].Name)
+			break
+		}
+	}
 	return s
 }
 
@@ -66,7 +85,17 @@ func (s *Schema[T]) RejectDuplicate() *Schema[T] {
 // Decode reads one JSON object from r and stores its members into v. A member
 // that no field matches is ignored unless RejectUnknown was set; a member that
 // repeats is overwritten unless RejectDuplicate was set.
+//
+// A nil v is a programming error reported as errNilTarget rather than a panic,
+// matching the other decode entry points.
 func (s *Schema[T]) Decode(r *Reader, v *T) error {
+	if s.buildErr != nil {
+		return s.buildErr
+	}
+	if v == nil {
+		return errNilTarget
+	}
+
 	var seen []bool
 	if s.rejectDuplicate {
 		seen = make([]bool, len(s.fields))
@@ -98,6 +127,9 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 // Encode writes v as a JSON object to w, emitting members in declaration order.
 // A field whose OmitEmpty is set and whose Empty reports true is skipped.
 func (s *Schema[T]) Encode(w *Writer, v *T) error {
+	if s.buildErr != nil {
+		return s.buildErr
+	}
 	if err := w.BeginObject(); err != nil {
 		return err
 	}
@@ -143,10 +175,17 @@ func (s *Schema[T]) Unmarshal(data []byte) (T, error) {
 	return v, err
 }
 
-// UnmarshalInto decodes data into v, which must be non-nil. Members present in
-// data overwrite the corresponding fields of v; members absent from data leave
-// v unchanged. v is written in place and data is not retained after the call.
+// UnmarshalInto decodes data into v. Members present in data overwrite the
+// corresponding fields of v; members absent from data leave v unchanged. v is
+// written in place and data is not retained after the call.
+//
+// A nil v is a programming error reported as errNilTarget rather than a panic,
+// matching UnmarshalInto and Decode in the semantic layer.
 func (s *Schema[T]) UnmarshalInto(data []byte, v *T) error {
+	if v == nil {
+		return errNilTarget
+	}
+
 	r := newReader(scanner.NewTokenizer(data))
 	if err := s.Decode(r, v); err != nil {
 		return err

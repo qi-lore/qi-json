@@ -168,6 +168,24 @@ func TestStructNested(t *testing.T) {
 	}
 }
 
+func TestStructDuplicateFieldName(t *testing.T) {
+	type config struct {
+		A int64
+		B int64
+	}
+	schema := Struct(
+		Int[config]("x", func(c *config) *int64 { return &c.A }),
+		Int[config]("x", func(c *config) *int64 { return &c.B }),
+	)
+
+	if _, err := schema.Unmarshal([]byte(`{"x":1}`)); !errors.Is(err, errDuplicateFieldName) {
+		t.Errorf("Unmarshal() error = %v, want errDuplicateFieldName", err)
+	}
+	if _, err := schema.Marshal(config{}); !errors.Is(err, errDuplicateFieldName) {
+		t.Errorf("Marshal() error = %v, want errDuplicateFieldName", err)
+	}
+}
+
 func TestStructNestedErrorPath(t *testing.T) {
 	type point struct {
 		X int64
@@ -349,6 +367,31 @@ func TestStructEmptyObject(t *testing.T) {
 	if got != (config{}) {
 		t.Fatalf("Unmarshal() = %+v, want the zero value", got)
 	}
+}
+
+// TestSchemaNilTarget pins that the Schema entry points report a nil target as
+// errNilTarget rather than dereferencing it and panicking, matching the generic
+// UnmarshalInto and the non-generic Decode.
+func TestSchemaNilTarget(t *testing.T) {
+	type config struct {
+		Name string
+	}
+	schema := Struct(
+		String[config]("name", func(c *config) *string { return &c.Name }),
+	)
+
+	t.Run("Decode", func(t *testing.T) {
+		r := newReader(scanner.NewTokenizer([]byte(`{"name":"x"}`)))
+		if err := schema.Decode(r, nil); !errors.Is(err, errNilTarget) {
+			t.Fatalf("Decode(nil) error = %v, want %v", err, errNilTarget)
+		}
+	})
+
+	t.Run("UnmarshalInto", func(t *testing.T) {
+		if err := schema.UnmarshalInto([]byte(`{"name":"x"}`), nil); !errors.Is(err, errNilTarget) {
+			t.Fatalf("UnmarshalInto(nil) error = %v, want %v", err, errNilTarget)
+		}
+	})
 }
 
 func TestStructNoAllocs(t *testing.T) {

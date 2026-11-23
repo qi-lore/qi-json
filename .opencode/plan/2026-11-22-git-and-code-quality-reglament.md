@@ -257,6 +257,22 @@ GitHub branch protection cannot be enforced by a workflow file:
 
 Record the settings change in the PR description when it is applied.
 
+**Applied 2026-11-22** with two branch rulesets, both active and both with an
+empty bypass list except where noted:
+
+- `main-protect` (id `27815726`, targets the default branch): rules `deletion`,
+  `non_fast_forward`, `pull_request` (zero required approvals) and
+  `required_status_checks` (`verify`, strict policy off). The pre-existing
+  `OrganizationAdmin` bypass (`always`) is deliberately kept as an emergency
+  escape hatch, so an organization admin can still push to `main` directly.
+- `dev-protect` (id `27828232`, targets `refs/heads/dev`): rules `deletion`,
+  `non_fast_forward` and `required_status_checks` (`verify`, strict policy off);
+  no bypass actors.
+
+`verify` is the GitHub Actions job name in `.github/workflows/ci.yml`
+(`integration_id` 15368). The legacy branch-protection API is not used; the
+rulesets are the enforcement mechanism.
+
 ## 6. Verification
 
 Governance change (this one): `make verify` green (docs/CI only), YAML of

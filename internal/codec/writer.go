@@ -55,6 +55,7 @@ var (
 	errEndWithoutBegin  = errors.New("qijson: End called without a matching Begin")
 	errMultipleRoots    = errors.New("qijson: multiple top-level values")
 	errNonFinite        = errors.New("qijson: cannot encode a non-finite number")
+	errEmptyRaw         = errors.New("qijson: WriteRaw called with an empty value")
 	errIncomplete       = errors.New("qijson: encoder did not write one complete JSON value")
 )
 
@@ -86,11 +87,13 @@ func (w *Writer) Bytes() []byte {
 func (w *Writer) Err() error { return w.err }
 
 // complete reports whether w holds exactly one complete top-level JSON value:
-// the single root value has been written and every container it opened has been
-// closed. It is how Marshal rejects an Encoder that returned nil without writing
-// a whole value.
+// the single root value has been written, every container it opened has been
+// closed, and the value produced at least one byte. The byte check rejects an
+// Encoder that marked the root written with an empty WriteRaw, which would
+// otherwise pass with no value at all. It is how Marshal rejects an Encoder that
+// returned nil without writing a whole value.
 func (w *Writer) complete() bool {
-	return w.err == nil && w.wroteRoot && len(w.stack) == 0
+	return w.err == nil && w.wroteRoot && len(w.stack) == 0 && len(w.buf) > 0
 }
 
 // fail records err as the sticky error, unless one is already set, and returns
@@ -214,8 +217,14 @@ func (w *Writer) WriteFloat(v float64) error {
 
 // WriteRaw writes raw JSON bytes verbatim, without validation. It is used for a
 // value that was already known to be valid JSON, such as the bytes a Raw field
-// captured while decoding.
+// captured while decoding. v must hold exactly one complete JSON value; an empty
+// slice is rejected with errEmptyRaw, since it would mark the document complete
+// without writing a value. The bytes are trusted: a non-empty v that is not valid
+// JSON is written as-is.
 func (w *Writer) WriteRaw(v []byte) error {
+	if len(v) == 0 {
+		return w.fail(errEmptyRaw)
+	}
 	if err := w.beginValue(); err != nil {
 		return err
 	}
