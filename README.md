@@ -11,19 +11,30 @@ accessor closures, optionally generated from struct tags.
 | `internal/scanner` | `github.com/qi-lore/qi-json/internal/scanner` | Single-pass syntax engine behind the facade (internal) |
 | `cmd/qi-json-gen` | `github.com/qi-lore/qi-json/cmd/qi-json-gen` | Optional code generator for struct tags |
 
-Released as **v0.4.1** (2026-11-22). The decoder and encoder are complete and
+Released as **v0.4.2** (2026-11-23). The decoder and encoder are complete and
 benchmarked; as a pre-1.0 release the API may still change.
 
 ## Version
 
-Current release: **v0.4.1** (2026-11-22).
+Current release: **v0.4.2** (2026-11-23).
 
-v0.4.1 is a documentation release: the README gains an **Installing the
-generator** section covering `go run`, the Go 1.24 `tool` directive and
-`go install`, and the stale `qi-json/cmd/qi-json-gen` module path in the codegen
-examples is corrected. It also folds in an internal Uber Go Style Guide review
-pass; no public API, error message or runtime behavior changed, and `go.mod`
-gains no dependency.
+v0.4.2 is a robustness release: four defects that turned a programming error into
+a panic or a silently malformed result are now inspectable sentinels or precise
+errors. `Schema.UnmarshalInto` and `Schema.Decode` return `errNilTarget` for a nil
+target instead of panicking; `Object` returns `errNilSchema` for a nil nested
+schema instead of dereferencing it; `Writer.WriteRaw` rejects an empty slice and
+`Marshal`'s completeness guard now requires the root to emit a value; and
+`Struct` enforces its documented unique-field-name requirement. The public API is
+unchanged. Two code-level assessment records were added
+(`docs/fn-comparison.md`, `docs/panics-issues.md`), and `main` and `dev` are now
+protected by branch rulesets.
+
+The previous release, v0.4.1, was a documentation release: the README gains an
+**Installing the generator** section covering `go run`, the Go 1.24 `tool`
+directive and `go install`, and the stale `qi-json/cmd/qi-json-gen` module path
+in the codegen examples is corrected. It also folds in an internal Uber Go Style
+Guide review pass; no public API, error message or runtime behavior changed, and
+`go.mod` gains no dependency.
 
 The previous release, v0.4.0, consolidated the syntax layer behind the facade:
 the `scanner` subpackage is gone, the syntax engine lives in `internal/scanner`,
@@ -368,7 +379,7 @@ go get -tool github.com/qi-lore/qi-json/cmd/qi-json-gen
 go tool qi-json-gen -type=Config
 
 # 3. Install a bare command on PATH (match your imported version).
-go install github.com/qi-lore/qi-json/cmd/qi-json-gen@v0.4.1
+go install github.com/qi-lore/qi-json/cmd/qi-json-gen@v0.4.2
 qi-json-gen -type=Config
 ```
 
