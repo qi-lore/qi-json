@@ -23,7 +23,7 @@ deliberate (documented) trade-off, and what merely looks risky but is correct.
 | # | Issue | Class | Severity | Status |
 |---|---|---|---|---|
 | 1 | `Schema.UnmarshalInto` / `Schema.Decode` panic on a nil target | Nil deref (panic) | High | Resolved (Q006) |
-| 2 | `Marshal` completeness guard defeated by `WriteRaw` | Defeated invariant | Medium | Unresolved |
+| 2 | `Marshal` completeness guard defeated by `WriteRaw` | Defeated invariant | Medium | Resolved (Q007) |
 | 3 | `Object` / nested `Schema` panic on a nil schema | Nil deref (panic) | Medium | Unresolved |
 | 4 | `Struct` does not enforce unique field names | Silent misconfiguration | Medium | Unresolved |
 | 5 | Typed-nil receiver panics in `Decode` / `Encode` | Nil deref (panic) | Medium | Documented, unresolved |
@@ -245,6 +245,18 @@ invites tokens like `nil`.
 Option 1 alone does not fix the `"1 2"` case (invalid but non-empty); that case
 is arguably "raw is trusted", so the practical fix is option 2 plus a doc note
 that `WriteRaw` must receive exactly one valid JSON value.
+
+**Resolution (Q007).** The fix takes option 3 (both). `Writer.WriteRaw` now
+rejects an empty slice with the `errEmptyRaw` sentinel, so the misuse is reported
+where it happens and a nested empty raw write can no longer corrupt the document
+(`[1,]`, `{"a":}`). `Writer.complete` additionally requires the root value to
+have produced at least one byte (`len(w.buf) > 0`), so the guard checks the
+invariant it claims to enforce rather than assuming no zero-byte writer exists.
+`Marshal` therefore returns `errEmptyRaw` instead of `(nil, nil)` for an encoder
+that calls `WriteRaw(nil)`. `TestMarshalEmptyRaw` pins the behavior through
+`Marshal` and `WriteRaw`, and `TestWriterCompleteRequiresValue` pins the guard
+directly. The `"1 2"` case is unchanged: `WriteRaw` is documented as trusted, so a
+non-empty but invalid raw value remains the caller's responsibility.
 
 ---
 
