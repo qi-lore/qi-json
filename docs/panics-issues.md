@@ -25,7 +25,7 @@ deliberate (documented) trade-off, and what merely looks risky but is correct.
 | 1 | `Schema.UnmarshalInto` / `Schema.Decode` panic on a nil target | Nil deref (panic) | High | Resolved (Q006) |
 | 2 | `Marshal` completeness guard defeated by `WriteRaw` | Defeated invariant | Medium | Resolved (Q007) |
 | 3 | `Object` / nested `Schema` panic on a nil schema | Nil deref (panic) | Medium | Resolved (Q008) |
-| 4 | `Struct` does not enforce unique field names | Silent misconfiguration | Medium | Unresolved |
+| 4 | `Struct` does not enforce unique field names | Silent misconfiguration | Medium | Resolved (Q009) |
 | 5 | Typed-nil receiver panics in `Decode` / `Encode` | Nil deref (panic) | Medium | Documented, unresolved |
 | 6 | Under-consuming `DecodeJSON` makes `Decode` accept invalid JSON | Defeated invariant | Medium | Documented, unresolved |
 | 7 | Value-receiver `DecodeJSON` silently no-ops | Silent misbehavior | Low | Documented, unresolved |
@@ -369,6 +369,15 @@ consistent with Go's "resolve programming errors loudly" convention; a returned
 error would be more in line with the constructor-sentinel pattern already used
 elsewhere.
 
+**Resolution (Q009).** `Struct` now scans its sorted fields for a repeated name
+and records the new `errDuplicateFieldName` sentinel on the `Schema` (wrapped with
+the offending name); `Decode` and `Encode` return it before doing any work, so
+`Marshal`, `Unmarshal` and `UnmarshalInto` surface it too. The constructor keeps
+its `*Schema[T]` signature, so generated code and fixtures are unchanged, and no
+panic is introduced — the same direction as the Q006–Q008 fixes. The sentinel
+mirrors `errNilElementDecoder`, `errNilSchema` and `errNoFieldEncoder`, and
+`TestStructDuplicateFieldName` pins the decode and encode paths.
+
 ---
 
 ## Issue 5 — Typed-nil receiver panics in `Decode` / `Encode` (documented)
@@ -519,14 +528,15 @@ they are recorded so a later reader does not re-litigate them:
 
 ## Resolution indicator
 
-> **Status: IN PROGRESS (3 of 9 issues fixed).**
+> **Status: IN PROGRESS (4 of 9 issues fixed).**
 >
-> Issues 1–3 were fixed by tasks Q006, Q007 and Q008: the nil-target and
-> nil-schema misuses now return sentinels instead of panicking, and `Marshal`
-> rejects an empty raw write that used to defeat its completeness guard. The
-> remaining new defect (4) and the five documented trade-offs (5–9) are still
-> open. The canonical task state lives in `docs/tasks.md`; this indicator is
-> informational and must be updated when further fixes land.
+> Issues 1–4 were fixed by tasks Q006, Q007, Q008 and Q009: the nil-target and
+> nil-schema misuses now return sentinels instead of panicking, `Marshal`
+> rejects an empty raw write that used to defeat its completeness guard, and
+> `Struct` rejects duplicate field names instead of emitting an ambiguous
+> object. The five documented trade-offs (5–9) are still open. The canonical task
+> state lives in `docs/tasks.md`; this indicator is informational and must be
+> updated when further fixes land.
 >
 > Per-issue status:
 >
@@ -535,7 +545,7 @@ they are recorded so a later reader does not re-litigate them:
 > | 1 | `Schema.UnmarshalInto`/`Decode` nil-target panic | RESOLVED (Q006) |
 > | 2 | `Marshal` completeness defeated by `WriteRaw` | RESOLVED (Q007) |
 > | 3 | `Object`/nested `Schema` nil-schema panic | RESOLVED (Q008) |
-> | 4 | `Struct` unique-field-name enforcement | UNRESOLVED |
+> | 4 | `Struct` unique-field-name enforcement | RESOLVED (Q009) |
 > | 5 | Typed-nil receiver panic (`Decode`/`Encode`) | UNRESOLVED (documented) |
 > | 6 | Under-consuming `DecodeJSON` accepts invalid JSON | UNRESOLVED (documented) |
 > | 7 | Value-receiver `DecodeJSON` no-op | UNRESOLVED (documented) |

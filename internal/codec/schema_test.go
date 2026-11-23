@@ -168,6 +168,24 @@ func TestStructNested(t *testing.T) {
 	}
 }
 
+func TestStructDuplicateFieldName(t *testing.T) {
+	type config struct {
+		A int64
+		B int64
+	}
+	schema := Struct(
+		Int[config]("x", func(c *config) *int64 { return &c.A }),
+		Int[config]("x", func(c *config) *int64 { return &c.B }),
+	)
+
+	if _, err := schema.Unmarshal([]byte(`{"x":1}`)); !errors.Is(err, errDuplicateFieldName) {
+		t.Errorf("Unmarshal() error = %v, want errDuplicateFieldName", err)
+	}
+	if _, err := schema.Marshal(config{}); !errors.Is(err, errDuplicateFieldName) {
+		t.Errorf("Marshal() error = %v, want errDuplicateFieldName", err)
+	}
+}
+
 func TestStructNestedErrorPath(t *testing.T) {
 	type point struct {
 		X int64
