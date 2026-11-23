@@ -101,6 +101,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q006 - Return `errNilTarget` instead of panicking on a nil `Schema` target
 - [X] Q007 - Make the `Marshal` completeness guard hold against an empty `WriteRaw`
 - [X] Q008 - Return a sentinel instead of panicking on a nil nested `Schema` in `Object`
+- [X] Q009 - Enforce unique field names in `Struct`
 
 ### Module, packaging and governance
 
@@ -118,5 +119,4 @@ never renumber, never reuse a retired identifier.
 
 ## Planned
 
-- [ ] Q009 - Enforce unique field names in `Struct`
 - [ ] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
