@@ -28,6 +28,9 @@ never renumber, never reuse a retired identifier.
 | `Q` | Code quality |
 | `M` | Module, packaging and governance |
 | `P` | Process and repository settings |
+| `N` | Network and streaming (`io` adapters, multi-value, token stream) |
+| `H` | Encoding/decoding extension hooks |
+| `A` | `encoding/json` parity surface (gated; needs an Article III/VI amendment) |
 
 ## Completed
 
@@ -119,4 +122,39 @@ never renumber, never reuse a retired identifier.
 
 ## Planned
 
+### Module, packaging and governance
+
 - [ ] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
+- [ ] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
+- [ ] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
+
+### Encoder
+
+- [ ] E002 - Pooled reusable `Writer` buffer and `BuildBytes(reuse ...[]byte)`
+- [ ] E003 - Reuse the writer buffer inside `Marshal`
+
+### Decoder
+
+- [ ] D011 - Decode fast path: avoid copying clean strings; bounded UTF-8 path
+- [ ] D012 - Preallocate slice and map capacity from a length hint
+
+### Network and streaming
+
+- [ ] N001 - `Writer.DumpTo(io.Writer)` and `ReadCloser` for encode streaming
+- [ ] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
+- [ ] N003 - Multi-value decode loop (NDJSON support)
+- [ ] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
+- [ ] N005 - Formatting: `MarshalIndent`/`Indent`/`Compact`/`HTMLEscape`, `SetIndent`/`SetEscapeHTML`
+
+### Extension hooks
+
+- [ ] H001 - `Optional`/`IsZero` omit hooks
+- [ ] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
+
+### API parity
+
+- [ ] A001 - `encoding/json`-parity entry points and tag binding (gated on M010)
+
+### Code quality
+
+- [ ] Q010 - External comparative benchmark harness (qi-json vs stdlib vs easyjson)
