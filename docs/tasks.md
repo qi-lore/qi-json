@@ -19,7 +19,7 @@ never renumber, never reuse a retired identifier.
 
 | Prefix | Area |
 |---|---|
-| `S` | Scanner and syntax layer (`scanner/`) |
+| `S` | Scanner and syntax layer (`internal/scanner/`) |
 | `D` | Decoder (`internal/codec/`, decode path) |
 | `E` | Encoder (`internal/codec/`, encode path) |
 | `G` | Code generator (`cmd/qi-json-gen/`) |
@@ -115,6 +115,7 @@ never renumber, never reuse a retired identifier.
 - [X] M005 - Release flow governance (constitution v3.6.0)
 - [X] M006 - Retire `docs/task.md` and introduce the task registry (constitution v3.9.0)
 - [X] M007 - Normalize the plan files' headers to design records
+- [X] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
 
 ### Process and repository settings
 
@@ -124,7 +125,6 @@ never renumber, never reuse a retired identifier.
 
 ### Module, packaging and governance
 
-- [ ] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
 - [ ] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
 - [ ] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 

@@ -511,7 +511,7 @@ branch name, the target branch and the commit messages of each pull request.
 ```
 .                        public facade: type aliases, constants and wrappers (package qijson) + the facade contract test
 internal/codec/          the engine: Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package codec)
-scanner/                 Valid, the tokenizer, benchmarks and differential tests
+internal/scanner/        Valid, the tokenizer, benchmarks and differential tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
 docs/tasks.md            the task registry: single source of truth for task state
 docs/constitution.md     governing rules and the sanctioned public surface
