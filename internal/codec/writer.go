@@ -129,6 +129,32 @@ func (w *Writer) Bytes() []byte {
 	return w.buf
 }
 
+// BuildBytes returns the JSON written so far, or nil if the Writer has failed.
+// Unlike Bytes it never hands out the Writer's internal buffer: the document is
+// appended to the optional caller-supplied buffer, reusing that buffer's
+// capacity, or with no buffer to a freshly allocated one. The result is owned by
+// the caller — it may be kept and modified — and the Writer stays valid and
+// reusable, so one Writer can build document after document across a Reset.
+//
+// Pass a scratch buffer to amortise allocation across calls. To append the
+// document at the start of the caller's buffer, pass it truncated, buf[:0]:
+//
+//	var w qijson.Writer
+//	// ... write one value ...
+//	doc := w.BuildBytes(buf[:0])
+//
+// At most one reuse buffer is used; any further arguments are ignored.
+func (w *Writer) BuildBytes(reuse ...[]byte) []byte {
+	if w.err != nil {
+		return nil
+	}
+	var dst []byte
+	if len(reuse) > 0 {
+		dst = reuse[0]
+	}
+	return append(dst, w.buf...)
+}
+
 // Err returns the first error the Writer hit, or nil.
 func (w *Writer) Err() error { return w.err }
 

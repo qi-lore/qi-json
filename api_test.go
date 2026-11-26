@@ -65,6 +65,7 @@ var (
 	_ func() *qijson.Writer                                                                            = qijson.NewWriter
 	_ func([]byte, qijson.Decoder) error                                                               = qijson.Decode
 	_ func(*qijson.Writer, qijson.Encoder) error                                                       = qijson.Encode
+	_ func(*qijson.Writer, ...[]byte) []byte                                                           = (*qijson.Writer).BuildBytes
 	_ func(smokeConfig) ([]byte, error)                                                                = qijson.Marshal[smokeConfig, *smokeConfig]
 	_ func([]byte) (smokeConfig, error)                                                                = qijson.Unmarshal[smokeConfig, *smokeConfig]
 	_ func([]byte, *smokeConfig) error                                                                 = qijson.UnmarshalInto[smokeConfig, *smokeConfig]
@@ -122,6 +123,32 @@ func TestFacadeRoundTrip(t *testing.T) {
 	}
 	if got := string(w.Bytes()); got != string(data) {
 		t.Fatalf("Encode = %s, want %s", got, data)
+	}
+}
+
+// TestFacadeBuildBytes proves the writer-buffer reuse surface is reachable from
+// outside the module: BuildBytes returns a caller-owned copy of the document and
+// reuses the capacity of a supplied buffer.
+func TestFacadeBuildBytes(t *testing.T) {
+	want := smokeConfig{Name: "qi-json", Port: 8080}
+	w := qijson.NewWriter()
+	if err := qijson.Encode(w, &want); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+
+	doc := w.BuildBytes()
+	if wantDoc := `{"name":"qi-json","port":8080}`; string(doc) != wantDoc {
+		t.Fatalf("BuildBytes = %s, want %s", doc, wantDoc)
+	}
+
+	const reuseCap = 4096
+	buf := make([]byte, 0, reuseCap)
+	got := w.BuildBytes(buf)
+	if string(got) != string(doc) {
+		t.Fatalf("BuildBytes(reuse) = %s, want %s", got, doc)
+	}
+	if cap(got) != reuseCap {
+		t.Errorf("cap(got) = %d, want the reused %d", cap(got), reuseCap)
 	}
 }
 

@@ -2,7 +2,6 @@ package codec
 
 import (
 	"errors"
-	"slices"
 )
 
 // Encoder is implemented by types that encode themselves to JSON. An encoder
@@ -52,7 +51,7 @@ func Marshal[T any, PT interface {
 	if !w.complete() {
 		return nil, errIncomplete
 	}
-	return slices.Clone(w.buf), nil
+	return w.BuildBytes(), nil
 }
 
 // Encode encodes v into w. It is the non-generic counterpart to Marshal for a
