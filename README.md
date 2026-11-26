@@ -410,6 +410,7 @@ ok := qijson.Valid(data)                          // syntax only
 tok := qijson.NewTokenizer(data)
 kind, err := tok.Peek()                           // KindNull ... KindEnd
 raw, err := tok.ReadString()                      // aliases data, still escaped
+tv, err := tok.Token()                            // nil | bool | Number | string | Delim; io.EOF at end
 ```
 
 `Valid` accepts any JSON value at the top level, applies no nesting depth limit,
@@ -417,8 +418,11 @@ and does not check UTF-8 or surrogate pairing. `Tokenizer` is pull-based and
 shares the same scalar scanners and error contract, so a decode failure reports
 the same message and 1-based position as `Valid` would. It is the engine behind
 the semantic layer; most callers should use a `Schema` instead. Byte slices
-returned by `ReadString`, `ReadNumber`, and `ReadRaw` alias the input. `Valid` is
-safe for concurrent use; a `Tokenizer` must not be copied or shared.
+returned by `ReadString`, `ReadNumber`, and `ReadRaw` alias the input. `Token`
+returns the next token in one call (`nil`, `bool`, `Number`, `string` or
+`Delim`) and `io.EOF` at the end; strings keep their escapes and, unlike
+`ReadString`/`ReadNumber`, the returned value is a copy that is safe to retain.
+`Valid` is safe for concurrent use; a `Tokenizer` must not be copied or shared.
 
 ## Design constraints
 

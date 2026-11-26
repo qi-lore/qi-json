@@ -56,6 +56,21 @@ func (k Kind) String() string {
 	}
 }
 
+// Number is a JSON number literal, held as its raw bytes exactly as they appear
+// in the input. Token returns a Number rather than a float64 so the literal is
+// preserved with full precision; convert it with strconv when a numeric value is
+// needed.
+type Number string
+
+// Delim is a JSON delimiter: one of '{', '}', '[' or ']'. Token returns it to
+// mark the opening and closing of an object or array.
+type Delim rune
+
+// Token is one token of a JSON document, as returned by Tokenizer.Token: nil for
+// null, a bool for true or false, a Number for a number, a string for a string
+// value or object key, and a Delim for an object or array delimiter.
+type Token any
+
 // tokenizer holds the state shared by the Tokenizer methods. It carries its own
 // frame stack so it never collides with the validator's nesting stack, but
 // reuses the validator's data slice, scalar scanners and error contract.
@@ -238,6 +253,25 @@ func (t *Tokenizer) ReadNumber() ([]byte, error) { return t.state.readNumber() }
 // ReadRaw consumes the next value, composites included, and returns its raw
 // bytes exactly as they appear in the input.
 func (t *Tokenizer) ReadRaw() ([]byte, error) { return t.state.readRaw() }
+
+// Token returns the next token of the stream: nil for null, a bool for true or
+// false, a Number for a number, a string for a string value or an object key,
+// and a Delim ('{', '}', '[' or ']') for a container delimiter. It returns
+// io.EOF once the whole stream has been consumed, and otherwise the Tokenizer's
+// sticky error.
+//
+// Token consumes the separators itself: the commas between members and elements
+// and the ':' after an object key are never returned, so an object yields its
+// opening Delim, then key and value tokens in order, then its closing Delim. A
+// string value and an object key are both returned as a string; their position
+// in the stream tells them apart.
+//
+// A returned string is the bytes between the quotes and a returned Number is the
+// raw number literal: escape sequences are left intact and are not unescaped.
+// Unlike ReadString and ReadNumber, which return a []byte that aliases the input,
+// Token returns a string or Number value; the conversion copies the bytes, so a
+// returned token is independent of the Tokenizer and safe to retain.
+func (t *Tokenizer) Token() (Token, error) { return t.state.token() }
 
 // BeginObject consumes the '{' that starts an object and opens it.
 func (t *Tokenizer) BeginObject() error { return t.state.begin(containerObject) }
@@ -625,6 +659,66 @@ func (st *tokenizer) readRaw() ([]byte, error) {
 		return nil, err
 	}
 	return st.v.data[start:st.i], nil
+}
+
+// token returns the next token of the stream. It reuses peek for classification
+// and the typed reads, Begin* and End* for consumption, so the token stream and
+// the Peek/Read* stream stay consistent by construction. It reports io.EOF once
+// the top-level value (and, for a reader-backed tokenizer, every following value)
+// has been consumed.
+func (st *tokenizer) token() (Token, error) {
+	k, err := st.peek()
+	if err != nil {
+		return nil, err
+	}
+
+	switch k {
+	case KindNull:
+		if err := st.readNull(); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	case KindBool:
+		b, err := st.readBool()
+		if err != nil {
+			return nil, err
+		}
+		return b, nil
+	case KindString:
+		s, err := st.readString()
+		if err != nil {
+			return nil, err
+		}
+		return string(s), nil
+	case KindNumber:
+		n, err := st.readNumber()
+		if err != nil {
+			return nil, err
+		}
+		return Number(n), nil
+	case KindObject:
+		if err := st.begin(containerObject); err != nil {
+			return nil, err
+		}
+		return Delim('{'), nil
+	case KindArray:
+		if err := st.begin(containerArray); err != nil {
+			return nil, err
+		}
+		return Delim('['), nil
+	default: // KindEnd
+		if st.depth == 0 {
+			return nil, io.EOF
+		}
+		kind := st.frame(st.depth - 1).kind
+		if err := st.end(kind); err != nil {
+			return nil, err
+		}
+		if kind == containerObject {
+			return Delim('}'), nil
+		}
+		return Delim(']'), nil
+	}
 }
 
 // skip consumes and discards the next value, composites included.

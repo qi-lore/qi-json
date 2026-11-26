@@ -426,6 +426,23 @@ const (
 	KindEnd = scanner.KindEnd
 )
 
+// Token is one token of a JSON document, as returned by Tokenizer.Token: nil for
+// null, a bool for true or false, a Number for a number, a string for a string
+// value or object key, and a Delim for an object or array delimiter. It is an
+// alias of the syntax engine's token union, so a token produced by Token and
+// type-asserted here is identical to the engine's.
+type Token = scanner.Token
+
+// Number is a JSON number literal, held as its raw bytes exactly as they appear
+// in the input. Token returns a Number rather than a float64 so the literal is
+// preserved with full precision; convert it with strconv when a numeric value is
+// needed.
+type Number = scanner.Number
+
+// Delim is a JSON delimiter: one of '{', '}', '[' or ']'. Token returns it to
+// mark the opening and closing of an object or array.
+type Delim = scanner.Delim
+
 // Valid reports whether data is a syntactically valid JSON text. It is a single
 // pass over data: it walks with an index, scans strings, numbers, whitespace and
 // literals in bulk, and keeps an explicit stack of open containers. It does not
@@ -442,7 +459,9 @@ func Valid(data []byte) bool {
 // byte slice or NewDecoder for an io.Reader; the zero value is not ready to use.
 //
 // The methods are pull-based: Peek reports the kind of the next value token
-// without consuming it, and the Read*/Begin*/End* methods consume it.
+// without consuming it, and the Read*/Begin*/End* methods consume it. Token is
+// the single-call alternative: it returns the next token as a Token (nil, bool,
+// Number, string or Delim) and io.EOF at the end of the stream.
 // Whitespace, commas and the ':' after an object key are consumed
 // automatically, so inside an object the stream is key, value, key, value, ...
 // and Peek reports KindEnd at the closing brace. Inside an array it is value,
@@ -453,7 +472,10 @@ func Valid(data []byte) bool {
 // stream.
 //
 // Byte slices returned by ReadString, ReadNumber and ReadRaw alias the input
-// passed to NewTokenizer and must not be modified.
+// passed to NewTokenizer and must not be modified. A string or Number returned
+// by Token is instead a copy: escape sequences are left intact (the syntax layer
+// does not unescape) and the value is independent of the Tokenizer, so it is
+// safe to retain.
 //
 // A Tokenizer must not be copied after first use, and it is not safe for
 // concurrent use: give each goroutine its own.
@@ -490,7 +512,10 @@ func NewTokenizer(data []byte) *Tokenizer {
 // where a returned slice aliases the caller's data and stays valid for the
 // Tokenizer's lifetime, a slice returned here is valid only until the next read
 // method, which may append to the buffer and move it. Copy the bytes to keep
-// them.
+// them. A string or Number returned by Token is a copy and is always safe to
+// retain.
+//
+// Token reports io.EOF once every value in the stream has been consumed.
 //
 // Errors: a read error from r other than io.EOF is returned, wrapped, as the
 // Tokenizer's sticky error; a syntax error is reported exactly as NewTokenizer
