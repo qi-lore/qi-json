@@ -116,6 +116,7 @@ never renumber, never reuse a retired identifier.
 - [X] M006 - Retire `docs/task.md` and introduce the task registry (constitution v3.9.0)
 - [X] M007 - Normalize the plan files' headers to design records
 - [X] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
+- [X] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
 - [X] M011 - Create feature/task branches from `dev`, not `main` (constitution v3.12.0)
 
 ### Process and repository settings
@@ -126,7 +127,6 @@ never renumber, never reuse a retired identifier.
 
 ### Module, packaging and governance
 
-- [ ] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
 - [ ] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 
 ### Encoder
