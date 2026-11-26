@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"strconv"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -58,6 +59,51 @@ var (
 	errEmptyRaw         = errors.New("qijson: WriteRaw called with an empty value")
 	errIncomplete       = errors.New("qijson: encoder did not write one complete JSON value")
 )
+
+// Writer buffers are recycled through a pool so a short-lived encode can start
+// from a warmed allocation instead of growing a slice from nil. pooledBufCap
+// sizes a fresh buffer for a typical record; pooledBufMax caps what the pool
+// retains, so one large document does not pin memory there.
+const (
+	pooledBufCap = 1024
+	pooledBufMax = 64 << 10
+)
+
+// bufPool recycles the byte slices behind Writers. It stores *[]byte so a
+// Get/Put round-trip does not box a slice header.
+var bufPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 0, pooledBufCap)
+		return &b
+	},
+}
+
+// acquireBuf returns an empty buffer taken from the pool.
+func acquireBuf() []byte { return (*bufPool.Get().(*[]byte))[:0] }
+
+// releaseBuf returns b to the pool unless it is empty or grew past pooledBufMax.
+// The caller must not use b afterwards.
+func releaseBuf(b []byte) {
+	if cap(b) == 0 || cap(b) > pooledBufMax {
+		return
+	}
+	b = b[:0]
+	bufPool.Put(&b)
+}
+
+// newPooledWriter returns an empty Writer whose buffer comes from the pool. Call
+// release when done so the buffer returns for reuse.
+func newPooledWriter() *Writer { return &Writer{buf: acquireBuf()} }
+
+// release returns the Writer's buffer to the pool and clears the Writer. Call it
+// only after the buffer's contents have been copied out, because the buffer may
+// be handed to another Writer.
+func (w *Writer) release() {
+	buf := w.buf
+	w.Reset()
+	w.buf = nil
+	releaseBuf(buf)
+}
 
 // NewWriter returns a new, empty Writer.
 func NewWriter() *Writer { return &Writer{} }

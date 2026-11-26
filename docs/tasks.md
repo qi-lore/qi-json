@@ -58,6 +58,7 @@ never renumber, never reuse a retired identifier.
 ### Encoder
 
 - [X] E001 - Encoder: `Writer`, `Marshal`/`Encode`, `Codec[E]`, `Schema`/`Field` encode
+- [X] E002 - Pooled reusable `Writer` buffer (no new exported names)
 
 ### Code generator
 
@@ -132,7 +133,6 @@ never renumber, never reuse a retired identifier.
 
 ### Encoder
 
-- [ ] E002 - Pooled reusable `Writer` buffer (no new exported names)
 - [ ] E003 - Reuse the writer buffer inside `Marshal` (after E002)
 - [ ] E004 - `BuildBytes(reuse ...[]byte)` writer-buffer reuse (gated on M012)
 
