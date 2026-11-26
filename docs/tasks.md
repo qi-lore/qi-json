@@ -54,6 +54,7 @@ never renumber, never reuse a retired identifier.
 - [X] D008 - README documentation for the decoder
 - [X] D009 - Non-generic `Decode` entry point
 - [X] D010 - Decoder UTF-8 policy and pinned semantic defaults
+- [X] D011 - Decode fast path: avoid copying clean strings; bounded UTF-8 path
 
 ### Encoder
 
@@ -135,7 +136,6 @@ never renumber, never reuse a retired identifier.
 
 ### Decoder
 
-- [ ] D011 - Decode fast path: avoid copying clean strings; bounded UTF-8 path
 - [ ] D012 - Preallocate slice and map capacity from a length hint
 
 ### Network and streaming

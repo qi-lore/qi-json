@@ -381,7 +381,8 @@ func TestSchemaNilTarget(t *testing.T) {
 	)
 
 	t.Run("Decode", func(t *testing.T) {
-		r := newReader(scanner.NewTokenizer([]byte(`{"name":"x"}`)))
+		const doc = `{"name":"x"}`
+		r := newReader(scanner.NewTokenizer([]byte(doc)), doc)
 		if err := schema.Decode(r, nil); !errors.Is(err, errNilTarget) {
 			t.Fatalf("Decode(nil) error = %v, want %v", err, errNilTarget)
 		}
@@ -411,7 +412,7 @@ func TestStructNoAllocs(t *testing.T) {
 	)
 
 	data := []byte(`{"x":1,"y":2,"on":true}`)
-	r := newReader(scanner.NewTokenizer(data))
+	r := newReader(scanner.NewTokenizer(data), string(data))
 
 	// p is hoisted so that taking its address inside the measured region does
 	// not itself allocate; the decode machinery must not allocate at all.

@@ -12,7 +12,7 @@ import (
 
 // newTestReader returns a Reader positioned at the start of doc.
 func newTestReader(doc string) *Reader {
-	return newReader(scanner.NewTokenizer([]byte(doc)))
+	return newReader(scanner.NewTokenizer([]byte(doc)), doc)
 }
 
 func TestReadStringUnescapes(t *testing.T) {
@@ -402,7 +402,7 @@ func TestPrimitiveNoAllocs(t *testing.T) {
 	const doc = `[123,1.5e3,true,null]`
 
 	data := []byte(doc)
-	r := newReader(scanner.NewTokenizer(data))
+	r := newReader(scanner.NewTokenizer(data), doc)
 
 	// Baseline: constructing a tokenizer and nothing else.
 	base := testing.AllocsPerRun(100, func() {
