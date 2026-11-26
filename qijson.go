@@ -20,6 +20,8 @@ package qijson
 // path, github.com/qi-lore/qi-json.
 
 import (
+	"io"
+
 	"github.com/qi-lore/qi-json/internal/codec"
 	"github.com/qi-lore/qi-json/internal/scanner"
 )
@@ -437,7 +439,8 @@ func Valid(data []byte) bool {
 // Tokenizer turns a JSON document into a stream of typed tokens. It reads one
 // document without building Go values, which suits a minifier, a streaming
 // splitter or an analyzer that walks arbitrary documents. Construct one with
-// NewTokenizer; the zero value is not ready to use.
+// NewTokenizer for a byte slice or NewDecoder for an io.Reader; the zero value
+// is not ready to use.
 //
 // The methods are pull-based: Peek reports the kind of the next value token
 // without consuming it, and the Read*/Begin*/End* methods consume it.
@@ -461,4 +464,33 @@ type Tokenizer = scanner.Tokenizer
 // aliases data.
 func NewTokenizer(data []byte) *Tokenizer {
 	return scanner.NewTokenizer(data)
+}
+
+// NewDecoder returns a Tokenizer that reads one JSON document from r. It is the
+// streaming counterpart to NewTokenizer: instead of a byte slice, the Tokenizer
+// pulls bytes from r on demand and refills its internal buffer as it goes, so a
+// value may straddle a read boundary and r may return short reads. The Kind
+// sequence, the scalar values and the Offset values it reports for a document
+// are the same as NewTokenizer's over the same bytes.
+//
+// Ownership and lifecycle: the Tokenizer does not own r and never closes it; the
+// caller keeps r open and valid for the Tokenizer's lifetime and closes it when
+// done. The Tokenizer reads from r only while a method needs more input, and it
+// stops once the single top-level value and its trailing whitespace are
+// consumed. A Tokenizer is not safe for concurrent use: give each goroutine its
+// own, with its own reader.
+//
+// Aliasing: byte slices returned by ReadString, ReadNumber and ReadRaw alias the
+// Tokenizer's internal buffer, which grows as r is drained. Unlike NewTokenizer,
+// where a returned slice aliases the caller's data and stays valid for the
+// Tokenizer's lifetime, a slice returned here is valid only until the next read
+// method, which may append to the buffer and move it. Copy the bytes to keep
+// them.
+//
+// Errors: a read error from r other than io.EOF is returned, wrapped, as the
+// Tokenizer's sticky error; a syntax error is reported exactly as NewTokenizer
+// reports it for the same bytes. A nil r yields a nil-reader error rather than a
+// panic.
+func NewDecoder(r io.Reader) *Tokenizer {
+	return scanner.NewDecoder(r)
 }

@@ -141,7 +141,7 @@ never renumber, never reuse a retired identifier.
 
 ### Network and streaming
 
-- [ ] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
+- [X] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
 - [ ] N003 - Multi-value decode loop (NDJSON support)
 - [ ] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
 - [ ] N005 - Formatting: `MarshalIndent`/`Indent`/`Compact`/`HTMLEscape`, `SetIndent`/`SetEscapeHTML`

@@ -28,11 +28,12 @@ var (
 // are aliases of the internal scanner's, and the seven Kind constants are
 // values of that type, so Reader.Peek's result compares equal to them.
 var (
-	_ scanner.Kind                   = qijson.KindNull
-	_ qijson.Kind                    = scanner.KindEnd
-	_ *scanner.Tokenizer             = (*qijson.Tokenizer)(nil)
-	_ func([]byte) bool              = qijson.Valid
-	_ func([]byte) *qijson.Tokenizer = qijson.NewTokenizer
+	_ scanner.Kind                      = qijson.KindNull
+	_ qijson.Kind                       = scanner.KindEnd
+	_ *scanner.Tokenizer                = (*qijson.Tokenizer)(nil)
+	_ func([]byte) bool                 = qijson.Valid
+	_ func([]byte) *qijson.Tokenizer    = qijson.NewTokenizer
+	_ func(io.Reader) *qijson.Tokenizer = qijson.NewDecoder
 
 	_ qijson.Kind = qijson.KindNull
 	_ qijson.Kind = qijson.KindBool
@@ -259,6 +260,34 @@ func TestFacadeScannerSurface(t *testing.T) {
 	}
 
 	tok := qijson.NewTokenizer([]byte(`[1,"two"]`))
+	if err := tok.BeginArray(); err != nil {
+		t.Fatalf("BeginArray: %v", err)
+	}
+	for i, want := range []qijson.Kind{qijson.KindNumber, qijson.KindString, qijson.KindEnd} {
+		k, err := tok.Peek()
+		if err != nil {
+			t.Fatalf("Peek #%d: %v", i, err)
+		}
+		if k != want {
+			t.Fatalf("Peek #%d = %v, want %v", i, k, want)
+		}
+		if want == qijson.KindEnd {
+			break
+		}
+		if err := tok.Skip(); err != nil {
+			t.Fatalf("Skip #%d: %v", i, err)
+		}
+	}
+	if err := tok.EndArray(); err != nil {
+		t.Fatalf("EndArray: %v", err)
+	}
+}
+
+// TestFacadeNewDecoder proves the reader-backed tokenizer is reachable through
+// the facade: NewDecoder reads a document from an io.Reader and reports the
+// same Kind constants as the slice-backed tokenizer.
+func TestFacadeNewDecoder(t *testing.T) {
+	tok := qijson.NewDecoder(bytes.NewReader([]byte(`[1,"two"]`)))
 	if err := tok.BeginArray(); err != nil {
 		t.Fatalf("BeginArray: %v", err)
 	}
