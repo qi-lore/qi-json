@@ -206,7 +206,7 @@ type Reader = codec.Reader
 // Writer is not safe for concurrent use; give each goroutine its own. Its methods
 // are WriteNull, WriteBool, WriteString, WriteInt, WriteUint, WriteFloat,
 // WriteRaw, BeginObject, EndObject, BeginArray, EndArray, Key, Bytes, BuildBytes,
-// Reset and Err.
+// DumpTo, ReadCloser, Reset and Err.
 type Writer = codec.Writer
 
 // NewWriter returns a new, empty Writer.

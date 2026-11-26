@@ -128,6 +128,10 @@ never renumber, never reuse a retired identifier.
 
 - [X] P001 - Protect `main` and `dev` with branch protection and the `verify` check
 
+### Network and streaming
+
+- [X] N001 - `Writer.DumpTo(io.Writer)` and `ReadCloser` for encode streaming
+
 ## Planned
 
 ### Module, packaging and governance
@@ -137,7 +141,6 @@ never renumber, never reuse a retired identifier.
 
 ### Network and streaming
 
-- [ ] N001 - `Writer.DumpTo(io.Writer)` and `ReadCloser` for encode streaming
 - [ ] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
 - [ ] N003 - Multi-value decode loop (NDJSON support)
 - [ ] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
