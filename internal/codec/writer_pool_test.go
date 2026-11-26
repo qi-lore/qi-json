@@ -1,6 +1,9 @@
 package codec
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // The writer buffer pool is internal: it backs a Writer's byte slice so a
 // short-lived encode can reuse a warmed allocation without adding any exported
@@ -90,5 +93,95 @@ func TestPooledWriterRelease(t *testing.T) {
 	}
 	if !reused {
 		t.Errorf("release never returned a buffer of capacity %d to the pool", wantedCap)
+	}
+}
+
+// pooledMin is a document size the pool's New never reaches (New allocates
+// pooledBufCap), so observing a retained buffer this large proves a Marshaller
+// used the pool. It stays under pooledBufMax so releaseBuf keeps the buffer.
+const pooledMin = 8 * pooledBufCap
+
+// wideString is an Encoder whose single member carries a string long enough to
+// grow the writer past pooledBufCap, so the buffer it hands back is recognizable
+// by capacity.
+type wideString struct{ s string }
+
+func (v *wideString) EncodeJSON(w *Writer) error {
+	if err := w.BeginObject(); err != nil {
+		return err
+	}
+	if err := w.Key("s"); err != nil {
+		return err
+	}
+	if err := w.WriteString(v.s); err != nil {
+		return err
+	}
+	return w.EndObject()
+}
+
+// TestMarshalReusesPooledBuffer proves Marshal writes through a pooled Writer and
+// returns its buffer for reuse: it encodes a document large enough that the
+// buffer must have come from the pool's warm allocation, then looks for that
+// capacity back in the pool. sync.Pool may drop a stored item, so it retries.
+func TestMarshalReusesPooledBuffer(t *testing.T) {
+	v := &wideString{s: strings.Repeat("x", pooledMin)}
+
+	reused := false
+	for i := 0; i < 64 && !reused; i++ {
+		got, err := Marshal[wideString](*v)
+		if err != nil {
+			t.Fatalf("Marshal: %v", err)
+		}
+		if len(got) < pooledMin {
+			t.Fatalf("Marshal produced %d bytes, want at least %d", len(got), pooledMin)
+		}
+		reused = cap(acquireBuf()) >= pooledMin
+	}
+	if !reused {
+		t.Errorf("Marshal never returned a buffer of capacity %d to the pool", pooledMin)
+	}
+}
+
+// TestSchemaMarshalReusesPooledBuffer is the Schema.Marshal counterpart: the
+// schema path must reuse the same pooled buffer.
+func TestSchemaMarshalReusesPooledBuffer(t *testing.T) {
+	schema := Struct(String[wideString]("s", func(v *wideString) *string { return &v.s }))
+	v := wideString{s: strings.Repeat("x", pooledMin)}
+
+	reused := false
+	for i := 0; i < 64 && !reused; i++ {
+		got, err := schema.Marshal(v)
+		if err != nil {
+			t.Fatalf("Marshal: %v", err)
+		}
+		if len(got) < pooledMin {
+			t.Fatalf("Marshal produced %d bytes, want at least %d", len(got), pooledMin)
+		}
+		reused = cap(acquireBuf()) >= pooledMin
+	}
+	if !reused {
+		t.Errorf("Marshal never returned a buffer of capacity %d to the pool", pooledMin)
+	}
+}
+
+// TestMarshalResultIndependentOfPool proves the returned slice is a copy: a later
+// Marshal reusing the pooled buffer must not mutate an earlier result. Returning
+// the pooled buffer itself would let the next encode overwrite the caller's data.
+func TestMarshalResultIndependentOfPool(t *testing.T) {
+	v := &wideString{s: strings.Repeat("x", pooledMin)}
+
+	first, err := Marshal[wideString](*v)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	want := string(first)
+
+	for i := 0; i < 64; i++ {
+		if _, err := Marshal[wideString](*v); err != nil {
+			t.Fatalf("Marshal: %v", err)
+		}
+	}
+	if string(first) != want {
+		t.Error("a later Marshal mutated an earlier result: the returned slice aliases the pool")
 	}
 }
