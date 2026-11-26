@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Governance: feature and task branches are now created from `dev` instead of
+  `main`, because the newest integrated work lives on `dev` for a long time
+  before a release promotes it to `main`, so a branch cut from `main` would start
+  from stale code. Recorded in the constitution (v3.12.0), `AGENTS.md` and the
+  README. No code or public API change.
+
 ## [0.4.2] - 2026-11-23
 
 ### Added

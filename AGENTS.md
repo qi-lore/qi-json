@@ -45,10 +45,11 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 
 ## Git and review discipline
 
-- Branching: `main` is production, `dev` is integration. Create feature/task
-  branches from the current `main` (after `git fetch` and a fast-forward
-  update) and target `dev`; only the `dev` → `main` pull request may merge into
-  `main`. Branch names follow Conventional Branch
+- Branching: `main` is production, `dev` is integration and carries the newest
+  work (integrated changes live there for a long time before a release). Create
+  feature/task branches from the current `dev` (after `git fetch` and a
+  fast-forward update) and target `dev`; only the `dev` → `main` pull request
+  may merge into `main`. Branch names follow Conventional Branch
   (https://conventionalbranch.org/).
 - Commits: strict Conventional Commits with a full body (what changed, why, and
   any non-obvious decision).
