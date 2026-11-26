@@ -131,6 +131,9 @@ never renumber, never reuse a retired identifier.
 ### Network and streaming
 
 - [X] N001 - `Writer.DumpTo(io.Writer)` and `ReadCloser` for encode streaming
+- [X] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
+- [X] N003 - Multi-value decode loop (NDJSON support)
+- [X] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
 
 ## Planned
 
@@ -141,9 +144,6 @@ never renumber, never reuse a retired identifier.
 
 ### Network and streaming
 
-- [X] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
-- [X] N003 - Multi-value decode loop (NDJSON support)
-- [ ] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
 - [ ] N005 - Formatting: `MarshalIndent`/`Indent`/`Compact`/`HTMLEscape`, `SetIndent`/`SetEscapeHTML`
 
 ### Extension hooks

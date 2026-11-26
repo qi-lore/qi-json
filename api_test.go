@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"strconv"
 	"testing"
 
 	"github.com/qi-lore/qi-json"
@@ -42,6 +43,19 @@ var (
 	_ qijson.Kind = qijson.KindObject
 	_ qijson.Kind = qijson.KindArray
 	_ qijson.Kind = qijson.KindEnd
+)
+
+// The token-level streaming surface is re-exported through the facade: Token,
+// Number and Delim are aliases of the engine's, so a token type-asserted here is
+// identical to the engine's, and Tokenizer.Token carries the engine's signature.
+var (
+	_ qijson.Token  = qijson.Number("1")
+	_ qijson.Token  = qijson.Delim('{')
+	_ scanner.Token = qijson.Number("1")
+	_ qijson.Number = scanner.Number("1")
+	_ qijson.Delim  = scanner.Delim('{')
+
+	_ func(*qijson.Tokenizer) (qijson.Token, error) = (*qijson.Tokenizer).Token
 )
 
 // These compile-time assertions pin the signature of every constructor and entry
@@ -350,6 +364,81 @@ func TestFacadeNewDecoderMultiValue(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("value %d = %+v, want %+v", i, got[i], want[i])
 		}
+	}
+}
+
+// TestFacadeTokenStream proves token-level streaming is reachable through the
+// facade alone: Token returns the qijson.Token/Number/Delim union over a nested
+// document and reports io.EOF at the end of the stream.
+func TestFacadeTokenStream(t *testing.T) {
+	tok := qijson.NewTokenizer([]byte(`{"a":[1,true,null],"b":"two"}`))
+
+	var got []string
+	for {
+		tokv, err := tok.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Token: %v", err)
+		}
+		switch v := tokv.(type) {
+		case nil:
+			got = append(got, "null")
+		case bool:
+			got = append(got, "bool:"+strconv.FormatBool(v))
+		case qijson.Delim:
+			got = append(got, "delim:"+string(rune(v)))
+		case qijson.Number:
+			got = append(got, "num:"+string(v))
+		case string:
+			got = append(got, "str:"+v)
+		default:
+			t.Fatalf("Token = %T, want a qijson token type", tokv)
+		}
+	}
+
+	want := []string{
+		"delim:{", "str:a",
+		"delim:[", "num:1", "bool:true", "null", "delim:]",
+		"str:b", "str:two",
+		"delim:}",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("Token stream = %v, want %v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("token %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// TestFacadeTokenNewDecoder proves the token stream reads several top-level
+// values (NDJSON) through the facade and reports io.EOF at the end.
+func TestFacadeTokenNewDecoder(t *testing.T) {
+	dec := qijson.NewDecoder(bytes.NewReader([]byte("1\ntrue\n")))
+
+	var got []qijson.Token
+	for {
+		tokv, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Token: %v", err)
+		}
+		got = append(got, tokv)
+	}
+
+	if len(got) != 2 {
+		t.Fatalf("Token stream = %v, want 2 tokens", got)
+	}
+	if n, ok := got[0].(qijson.Number); !ok || string(n) != "1" {
+		t.Fatalf("token 0 = %#v, want Number(\"1\")", got[0])
+	}
+	if b, ok := got[1].(bool); !ok || !b {
+		t.Fatalf("token 1 = %#v, want true", got[1])
 	}
 }
 
