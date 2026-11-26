@@ -1,5 +1,11 @@
 package scanner
 
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
 // Kind identifies the JSON token a Tokenizer is positioned on.
 type Kind uint8
 
@@ -69,6 +75,10 @@ type tokenizer struct {
 	// non-whitespace input is an "after top-level value" error.
 	read bool
 
+	// src is the refillable reader source for a NewDecoder tokenizer. It is nil
+	// for a NewTokenizer tokenizer, whose input is the fixed slice in v.data.
+	src *readerSource
+
 	// inline holds the first nestingInline frames; overflow holds deeper ones.
 	inline   [nestingInline]tokenFrame
 	overflow []tokenFrame
@@ -92,7 +102,8 @@ type tokenFrame struct {
 }
 
 // Tokenizer turns a JSON document into a stream of typed tokens. Construct one
-// with NewTokenizer; the zero value is not ready to use.
+// with NewTokenizer for a byte slice or NewDecoder for an io.Reader; the zero
+// value is not ready to use.
 //
 // The methods are pull-based: Peek reports the kind of the next value token
 // without consuming it, and the Read*/Begin*/End* methods consume it.
@@ -118,6 +129,83 @@ type Tokenizer struct {
 func NewTokenizer(data []byte) *Tokenizer {
 	t := &Tokenizer{}
 	t.state.v.data = data
+	return t
+}
+
+// readChunk is the number of bytes a reader-backed Tokenizer asks the io.Reader
+// for on each refill.
+const readChunk = 4096
+
+// errNilReader is reported by a Tokenizer built from a nil io.Reader.
+var errNilReader = errors.New("qijson: nil io.Reader")
+
+// readerSource feeds a Tokenizer from an io.Reader, refilling the Tokenizer's
+// input buffer on demand so a value may straddle a read boundary and the reader
+// may return short reads. It is not safe for concurrent use.
+type readerSource struct {
+	// r is the underlying reader. It is nil only when the caller passed nil,
+	// in which case err is set and no read is attempted.
+	r io.Reader
+
+	// scratch is the destination of each Read.
+	scratch []byte
+
+	// eof records that r returned io.EOF; no further bytes will arrive.
+	eof bool
+
+	// err is the first non-EOF read error, wrapped with context. It is sticky.
+	err error
+}
+
+// refill reads one chunk from the reader and appends it to dst. It returns the
+// extended slice and whether any bytes were appended. Once the reader is
+// exhausted, or after a read error, it returns dst unchanged and false.
+func (s *readerSource) refill(dst []byte) ([]byte, bool) {
+	if s.r == nil || s.eof || s.err != nil {
+		return dst, false
+	}
+	if s.scratch == nil {
+		s.scratch = make([]byte, readChunk)
+	}
+
+	for {
+		n, err := s.r.Read(s.scratch)
+		if n > 0 {
+			dst = append(dst, s.scratch[:n]...)
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				s.eof = true
+			} else {
+				s.err = fmt.Errorf("qijson: reading JSON input: %w", err)
+			}
+			return dst, n > 0
+		}
+		if n > 0 {
+			return dst, true
+		}
+		// A zero-byte read with no error: retry, as io.ReadAll does.
+	}
+}
+
+// NewDecoder returns a Tokenizer that reads one JSON document from r. The
+// Tokenizer pulls bytes from r on demand, refilling its internal buffer as it
+// goes, so a value may straddle a read boundary and r may return short reads.
+//
+// A read error other than io.EOF is reported, wrapped, as the Tokenizer's
+// sticky error; a nil r is reported as a nil-reader error rather than
+// panicking.
+//
+// Byte slices returned by ReadString, ReadNumber and ReadRaw alias the
+// Tokenizer's internal buffer, which grows as r is drained; a returned slice is
+// valid only until the next read method, which may append to that buffer and
+// move it. A Tokenizer is not safe for concurrent use.
+func NewDecoder(r io.Reader) *Tokenizer {
+	t := &Tokenizer{}
+	t.state.src = &readerSource{r: r}
+	if r == nil {
+		t.state.src.err = errNilReader
+	}
 	return t
 }
 
@@ -167,9 +255,36 @@ func (t *Tokenizer) Offset() int64 { return int64(t.state.i) }
 // sticky: once set it is never cleared and every later call reports it.
 func (t *Tokenizer) Err() error { return t.state.err() }
 
-// peek reports the kind of the next token without consuming it. It is the only
-// method that interprets the separator (',') and the end of a container.
+// peek reports the kind of the next token without consuming it, refilling from
+// the reader as needed. It is the only method that interprets the separator
+// (',') and the end of a container.
 func (st *tokenizer) peek() (Kind, error) {
+	for {
+		k, err := st.peekOnce()
+		if err != nil {
+			if e := st.inputErr(); e != nil {
+				return 0, e
+			}
+			if !st.needMore() {
+				return 0, err
+			}
+			st.v.failure = nil
+			st.refill()
+			continue
+		}
+		// At the top level a KindEnd may mean only that the buffer is drained:
+		// the reader may still hold trailing whitespace or a second value.
+		if k == KindEnd && st.depth == 0 && st.read && st.refill() {
+			continue
+		}
+		return k, nil
+	}
+}
+
+// peekOnce classifies the next token over the bytes already buffered. It never
+// refills, so a failure it reports at the buffer end may be a truncation that
+// peek resolves by refilling.
+func (st *tokenizer) peekOnce() (Kind, error) {
 	if st.v.failure != nil {
 		return 0, *st.v.failure
 	}
@@ -337,9 +452,9 @@ func (st *tokenizer) readNull() error {
 	if k != KindNull {
 		return st.mismatch(k, "null")
 	}
-	i := st.v.scanLiteral(st.i, "null")
-	if st.v.failure != nil {
-		return *st.v.failure
+	i, err := st.scanLiteralRefill(st.i, "null")
+	if err != nil {
+		return err
 	}
 	st.i = i
 	st.consumedValue()
@@ -360,9 +475,9 @@ func (st *tokenizer) readBool() (bool, error) {
 	if st.v.data[st.i] == 't' {
 		lit = "true"
 	}
-	i := st.v.scanLiteral(st.i, lit)
-	if st.v.failure != nil {
-		return false, *st.v.failure
+	i, err := st.scanLiteralRefill(st.i, lit)
+	if err != nil {
+		return false, err
 	}
 	st.i = i
 	st.consumedValue()
@@ -381,23 +496,43 @@ func (st *tokenizer) readString() ([]byte, error) {
 
 	key := st.atKey()
 	start := st.i
-	end := st.v.scanString(start)
-	if st.v.failure != nil {
-		return nil, *st.v.failure
+	var end int
+	for {
+		end = st.v.scanString(start)
+		if st.v.failure == nil {
+			break
+		}
+		if e := st.inputErr(); e != nil {
+			return nil, e
+		}
+		if !st.needMore() {
+			return nil, *st.v.failure
+		}
+		st.v.failure = nil
+		st.refill()
 	}
 	st.i = end
 
 	if key {
-		j := skipSpace(st.v.data, st.i)
-		if j >= len(st.v.data) {
-			st.failEnd(len(st.v.data))
-			return nil, *st.v.failure
+		// The ':' after a key may not be buffered yet.
+		for {
+			j := skipSpace(st.v.data, st.i)
+			if j < len(st.v.data) {
+				if st.v.data[j] != ':' {
+					st.fail(j, "after object key")
+					return nil, *st.v.failure
+				}
+				st.i = j + 1
+				break
+			}
+			if e := st.inputErr(); e != nil {
+				return nil, e
+			}
+			if !st.refill() {
+				st.failEnd(len(st.v.data))
+				return nil, *st.v.failure
+			}
 		}
-		if st.v.data[j] != ':' {
-			st.fail(j, "after object key")
-			return nil, *st.v.failure
-		}
-		st.i = j + 1
 		st.frame(st.depth - 1).wantKey = false
 	} else {
 		st.consumedValue()
@@ -416,9 +551,30 @@ func (st *tokenizer) readNumber() ([]byte, error) {
 	}
 
 	start := st.i
-	end := st.v.scanNumber(start)
-	if st.v.failure != nil {
-		return nil, *st.v.failure
+	var end int
+	for {
+		end = st.v.scanNumber(start)
+		if st.v.failure != nil {
+			if e := st.inputErr(); e != nil {
+				return nil, e
+			}
+			if !st.needMore() {
+				return nil, *st.v.failure
+			}
+			st.v.failure = nil
+			st.refill()
+			continue
+		}
+		// A number scanner stops at the buffer end exactly as it would at a
+		// delimiter, so a number that reaches the end of the buffered input may
+		// continue: refill and rescan until it ends inside the buffer or the
+		// reader is exhausted.
+		if end < len(st.v.data) || !st.moreInput() {
+			break
+		}
+		if !st.refill() {
+			break
+		}
 	}
 	st.i = end
 	st.consumedValue()
@@ -574,8 +730,63 @@ func (st *tokenizer) push(kind container) {
 	st.depth++
 }
 
-// err returns the sticky error, if any.
+// refill appends more input from the reader, if any. It reports whether the
+// buffer grew. A slice-backed Tokenizer (src == nil) never grows.
+func (st *tokenizer) refill() bool {
+	if st.src == nil {
+		return false
+	}
+	data, added := st.src.refill(st.v.data)
+	st.v.data = data
+	return added
+}
+
+// moreInput reports whether the reader may still supply bytes: a slice-backed
+// Tokenizer never does, and an exhausted or failed reader cannot.
+func (st *tokenizer) moreInput() bool {
+	return st.src != nil && st.src.err == nil && !st.src.eof
+}
+
+// needMore reports whether the recorded failure sits at the end of the buffered
+// input while more bytes may still arrive, so the failure is a truncation a
+// refill can resolve rather than a genuine error.
+func (st *tokenizer) needMore() bool {
+	return st.moreInput() && st.v.failure != nil && st.v.failure.at == int64(len(st.v.data))
+}
+
+// inputErr returns the sticky reader error, if any.
+func (st *tokenizer) inputErr() error {
+	if st.src == nil {
+		return nil
+	}
+	return st.src.err
+}
+
+// scanLiteralRefill scans the literal lit whose first byte is at start,
+// refilling from the reader when the literal is cut off by the buffer end.
+func (st *tokenizer) scanLiteralRefill(start int, lit string) (int, error) {
+	for {
+		end := st.v.scanLiteral(start, lit)
+		if st.v.failure == nil {
+			return end, nil
+		}
+		if e := st.inputErr(); e != nil {
+			return 0, e
+		}
+		if !st.needMore() {
+			return 0, *st.v.failure
+		}
+		st.v.failure = nil
+		st.refill()
+	}
+}
+
+// err returns the sticky error, if any: a reader error takes precedence over a
+// syntax failure, because it explains why the input stopped.
 func (st *tokenizer) err() error {
+	if st.src != nil && st.src.err != nil {
+		return st.src.err
+	}
 	if st.v.failure == nil {
 		return nil
 	}
