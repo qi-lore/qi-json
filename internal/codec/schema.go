@@ -153,10 +153,12 @@ func (s *Schema[T]) Encode(w *Writer, v *T) error {
 
 // Marshal encodes v as a JSON object. It is the counterpart to Unmarshal. The
 // returned []byte is freshly allocated and owned by the caller, who may keep and
-// modify it.
+// modify it. Internally the encoding reuses a pooled buffer, and the result is a
+// copy of it, so the returned slice never aliases that shared buffer.
 func (s *Schema[T]) Marshal(v T) ([]byte, error) {
-	var w Writer
-	if err := s.Encode(&w, &v); err != nil {
+	w := newPooledWriter()
+	defer w.release()
+	if err := s.Encode(w, &v); err != nil {
 		return nil, err
 	}
 	if w.err != nil {
@@ -165,7 +167,7 @@ func (s *Schema[T]) Marshal(v T) ([]byte, error) {
 	if !w.complete() {
 		return nil, errIncomplete
 	}
-	return w.buf, nil
+	return slices.Clone(w.buf), nil
 }
 
 // Unmarshal decodes data into a new T. data is not retained after the call.
