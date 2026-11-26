@@ -124,8 +124,9 @@ and context rules bind only when such code is added. Open gaps are tracked in
   multi-value loop, `Token` plus `Number`/`Delim`/`Token`), formatting
   (`MarshalIndent`, `Indent`, `Compact`, `HTMLEscape`, `SetIndent`,
   `SetEscapeHTML`), and the omit hooks (`Optional`/`IsDefined`, `IsZero`) plus the
-  `UnmarshalUnknown`/`MarshalUnknowns` unknown-fields proxy (constitution Article
-  VI, amended 2026-11-26; rationale:
+  `UnmarshalUnknown`/`MarshalUnknowns` unknown-fields proxy, and the encoder's
+  `Writer.BuildBytes(reuse ...[]byte)` writer-buffer reuse surface (constitution
+  Article VI, amended 2026-11-26; rationale:
   `.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`). Do not export
   anything else without a new amendment.
 - `validate(data []byte) (parseError, bool)` in `internal/scanner` is unexported
