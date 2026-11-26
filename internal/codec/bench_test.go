@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -89,6 +90,84 @@ func BenchmarkDecodeBigString(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		var v oneString
 		if err := UnmarshalInto[oneString](data, &v); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// hintSliceConfig and hintMapConfig hold the container fields whose destination
+// capacity the decoder sizes from a length hint in the input.
+type hintSliceConfig struct {
+	Tags []string
+}
+
+var hintSliceSchema = Struct(
+	Slice[hintSliceConfig, string]("tags", func(c *hintSliceConfig) *[]string { return &c.Tags }, dec((*Reader).ReadString)),
+)
+
+type hintMapConfig struct {
+	Attrs map[string]int64
+}
+
+var hintMapSchema = Struct(
+	Map[hintMapConfig, int64]("attrs", func(c *hintMapConfig) *map[string]int64 { return &c.Attrs }, dec((*Reader).ReadInt)),
+)
+
+// buildHintTagsDocument builds an object with a n-element array member of plain
+// strings.
+func buildHintTagsDocument(n int) []byte {
+	var b strings.Builder
+	b.WriteString(`{"tags":[`)
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(`"tag"`)
+	}
+	b.WriteString(`]}`)
+	return []byte(b.String())
+}
+
+// buildHintAttrsDocument builds an object with an n-member object member whose
+// values are integers.
+func buildHintAttrsDocument(n int) []byte {
+	var b strings.Builder
+	b.WriteString(`{"attrs":{`)
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteByte('"')
+		b.WriteString("k")
+		b.WriteString(strconv.Itoa(i))
+		b.WriteString(`":`)
+		b.WriteString(strconv.Itoa(i))
+	}
+	b.WriteString(`}}`)
+	return []byte(b.String())
+}
+
+func BenchmarkDecodeSliceHint(b *testing.B) {
+	data := buildHintTagsDocument(64)
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var c hintSliceConfig
+		if err := hintSliceSchema.UnmarshalInto(data, &c); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDecodeMapHint(b *testing.B) {
+	data := buildHintAttrsDocument(64)
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var c hintMapConfig
+		if err := hintMapSchema.UnmarshalInto(data, &c); err != nil {
 			b.Fatal(err)
 		}
 	}

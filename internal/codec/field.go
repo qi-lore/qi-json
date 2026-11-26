@@ -320,7 +320,7 @@ func Slice[T, E any](name string, field func(*T) *[]E, elem Codec[E]) Field[T] {
 				return errNilElementDecoder
 			}
 
-			out := make([]E, 0)
+			out := make([]E, 0, r.arrayLenHint())
 			err = r.Array(func(int) error {
 				e, err := elem.Decode(r)
 				if err != nil {
@@ -377,7 +377,7 @@ func Map[T, V any](name string, field func(*T) *map[string]V, elem Codec[V]) Fie
 				return errNilElementDecoder
 			}
 
-			m := make(map[string]V)
+			m := make(map[string]V, r.objectLenHint())
 			err = r.Object(func(key string) error {
 				e, err := elem.Decode(r)
 				if err != nil {
@@ -548,7 +548,7 @@ func decodeAny(r *Reader) (any, error) {
 	case scanner.KindNumber:
 		return r.ReadFloat()
 	case scanner.KindObject:
-		m := make(map[string]any)
+		m := make(map[string]any, r.objectLenHint())
 		err := r.Object(func(key string) error {
 			v, err := decodeAny(r)
 			if err != nil {
@@ -562,7 +562,7 @@ func decodeAny(r *Reader) (any, error) {
 		}
 		return m, nil
 	case scanner.KindArray:
-		out := make([]any, 0)
+		out := make([]any, 0, r.arrayLenHint())
 		err := r.Array(func(int) error {
 			v, err := decodeAny(r)
 			if err != nil {

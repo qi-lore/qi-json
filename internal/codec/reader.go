@@ -425,6 +425,91 @@ func (r *Reader) Path() string {
 // Offset returns the number of bytes of the input consumed so far.
 func (r *Reader) Offset() int64 { return r.tok.Offset() }
 
+// arrayLenHint returns the number of elements of the array about to be read, or
+// 0 when that cannot be determined. It is a pure look-ahead over the source
+// bytes: it never advances the tokenizer and never reports an error, so the real
+// decode still surfaces any syntax problem at the same offset.
+func (r *Reader) arrayLenHint() int {
+	return containerLenHint(r.src, r.tok.Offset(), '[', ']')
+}
+
+// objectLenHint returns the number of members of the object about to be read, or
+// 0 when that cannot be determined. Like arrayLenHint it never consumes input
+// and never reports an error.
+func (r *Reader) objectLenHint() int {
+	return containerLenHint(r.src, r.tok.Offset(), '{', '}')
+}
+
+// containerLenHint returns the number of top-level elements or members of the
+// container whose opening byte is the first non-space byte at or after start in
+// src, or 0 when src does not hold a complete container there. open and close are
+// the container's delimiters. It skips string bodies (honouring backslash
+// escapes) and tracks nested '[' and '{' depth, so only the separators at the
+// container's own level are counted. It never consumes input and never reports an
+// error: the hint only sizes an allocation, so on any doubt it returns 0 and the
+// real decode reports the problem.
+func containerLenHint(src string, start int64, open, close byte) int {
+	if start < 0 || start > int64(len(src)) {
+		return 0
+	}
+	i := skipHintSpace(src, int(start))
+	if i >= len(src) || src[i] != open {
+		return 0
+	}
+	i = skipHintSpace(src, i+1)
+	if i >= len(src) || src[i] == close {
+		return 0
+	}
+	count := 1
+	depth := 0
+	inString := false
+	for ; i < len(src); i++ {
+		c := src[i]
+		if inString {
+			switch c {
+			case '\\':
+				i++
+			case '"':
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{', '[':
+			depth++
+		case '}', ']':
+			if depth == 0 {
+				if c != close {
+					return 0
+				}
+				return count
+			}
+			depth--
+		case ',':
+			if depth == 0 {
+				count++
+			}
+		}
+	}
+	return 0
+}
+
+// skipHintSpace returns the index of the first byte of s at or after i that is
+// not JSON whitespace.
+func skipHintSpace(s string, i int) int {
+	for i < len(s) {
+		switch s[i] {
+		case ' ', '\t', '\n', '\r':
+			i++
+		default:
+			return i
+		}
+	}
+	return i
+}
+
 // checkString rejects a JSON string whose bytes are not valid UTF-8. raw is the
 // content between the quotes with escape sequences intact and contentStart is the
 // byte offset of that content in the input. Escapes are ASCII and \u decoding

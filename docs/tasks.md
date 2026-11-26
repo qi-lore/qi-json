@@ -55,6 +55,7 @@ never renumber, never reuse a retired identifier.
 - [X] D009 - Non-generic `Decode` entry point
 - [X] D010 - Decoder UTF-8 policy and pinned semantic defaults
 - [X] D011 - Decode fast path: avoid copying clean strings; bounded UTF-8 path
+- [X] D012 - Preallocate slice and map capacity from a length hint
 
 ### Encoder
 
@@ -133,10 +134,6 @@ never renumber, never reuse a retired identifier.
 
 - [X] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 - [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
-
-### Decoder
-
-- [ ] D012 - Preallocate slice and map capacity from a length hint
 
 ### Network and streaming
 
