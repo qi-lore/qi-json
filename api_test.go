@@ -311,6 +311,48 @@ func TestFacadeNewDecoder(t *testing.T) {
 	}
 }
 
+// TestFacadeNewDecoderMultiValue proves the NDJSON loop through the facade
+// alone: NewDecoder reads several top-level values from one io.Reader, each
+// value's raw bytes are decoded with Decode, and Peek reports KindEnd at the end
+// of the stream.
+func TestFacadeNewDecoderMultiValue(t *testing.T) {
+	const stream = "{\"name\":\"a\",\"port\":1}\n{\"name\":\"b\",\"port\":2}\n"
+	dec := qijson.NewDecoder(bytes.NewReader([]byte(stream)))
+
+	var got []smokeConfig
+	for {
+		k, err := dec.Peek()
+		if err != nil {
+			t.Fatalf("Peek: %v", err)
+		}
+		if k == qijson.KindEnd {
+			break
+		}
+		if k != qijson.KindObject {
+			t.Fatalf("Peek = %v, want %v", k, qijson.KindObject)
+		}
+		raw, err := dec.ReadRaw()
+		if err != nil {
+			t.Fatalf("ReadRaw: %v", err)
+		}
+		var cfg smokeConfig
+		if err := qijson.Decode(raw, &cfg); err != nil {
+			t.Fatalf("Decode(%q): %v", raw, err)
+		}
+		got = append(got, cfg)
+	}
+
+	want := []smokeConfig{{Name: "a", Port: 1}, {Name: "b", Port: 2}}
+	if len(got) != len(want) {
+		t.Fatalf("decoded %d values, want %d: %v", len(got), len(want), got)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("value %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 // TestFacadePeekKindIdentity proves a custom Field can branch on the token kind
 // through the facade: Reader.Peek returns a qijson.Kind, and a JSON null is
 // recognised by comparing against qijson.KindNull.
