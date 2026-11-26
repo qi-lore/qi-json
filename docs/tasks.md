@@ -128,11 +128,13 @@ never renumber, never reuse a retired identifier.
 ### Module, packaging and governance
 
 - [ ] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
+- [ ] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
 
 ### Encoder
 
-- [ ] E002 - Pooled reusable `Writer` buffer and `BuildBytes(reuse ...[]byte)`
-- [ ] E003 - Reuse the writer buffer inside `Marshal`
+- [ ] E002 - Pooled reusable `Writer` buffer (no new exported names)
+- [ ] E003 - Reuse the writer buffer inside `Marshal` (after E002)
+- [ ] E004 - `BuildBytes(reuse ...[]byte)` writer-buffer reuse (gated on M012)
 
 ### Decoder
 
