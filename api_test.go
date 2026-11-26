@@ -1,7 +1,9 @@
 package qijson_test
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/qi-lore/qi-json"
@@ -66,6 +68,8 @@ var (
 	_ func([]byte, qijson.Decoder) error                                                               = qijson.Decode
 	_ func(*qijson.Writer, qijson.Encoder) error                                                       = qijson.Encode
 	_ func(*qijson.Writer, ...[]byte) []byte                                                           = (*qijson.Writer).BuildBytes
+	_ func(*qijson.Writer, io.Writer) (int, error)                                                     = (*qijson.Writer).DumpTo
+	_ func(*qijson.Writer) (io.ReadCloser, error)                                                      = (*qijson.Writer).ReadCloser
 	_ func(smokeConfig) ([]byte, error)                                                                = qijson.Marshal[smokeConfig, *smokeConfig]
 	_ func([]byte) (smokeConfig, error)                                                                = qijson.Unmarshal[smokeConfig, *smokeConfig]
 	_ func([]byte, *smokeConfig) error                                                                 = qijson.UnmarshalInto[smokeConfig, *smokeConfig]
@@ -149,6 +153,45 @@ func TestFacadeBuildBytes(t *testing.T) {
 	}
 	if cap(got) != reuseCap {
 		t.Errorf("cap(got) = %d, want the reused %d", cap(got), reuseCap)
+	}
+}
+
+// TestFacadeStreamOutput proves the encode-streaming surface is reachable from
+// outside the module: DumpTo writes the document to an io.Writer and ReadCloser
+// hands it out as an io.ReadCloser.
+func TestFacadeStreamOutput(t *testing.T) {
+	want := smokeConfig{Name: "qi-json", Port: 8080}
+	const wantDoc = `{"name":"qi-json","port":8080}`
+
+	w := qijson.NewWriter()
+	if err := qijson.Encode(w, &want); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	var out bytes.Buffer
+	n, err := w.DumpTo(&out)
+	if err != nil {
+		t.Fatalf("DumpTo: %v", err)
+	}
+	if out.String() != wantDoc || n != len(wantDoc) {
+		t.Fatalf("DumpTo = (%q, %d), want (%q, %d)", out.String(), n, wantDoc, len(wantDoc))
+	}
+
+	if err := qijson.Encode(w, &want); err != nil {
+		t.Fatalf("Encode after DumpTo: %v", err)
+	}
+	rc, err := w.ReadCloser()
+	if err != nil {
+		t.Fatalf("ReadCloser: %v", err)
+	}
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if err := rc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if string(got) != wantDoc {
+		t.Fatalf("ReadCloser = %s, want %s", got, wantDoc)
 	}
 }
 

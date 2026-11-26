@@ -2,6 +2,7 @@ package codec
 
 import (
 	"errors"
+	"io"
 	"math"
 	"strconv"
 	"sync"
@@ -58,6 +59,7 @@ var (
 	errNonFinite        = errors.New("qijson: cannot encode a non-finite number")
 	errEmptyRaw         = errors.New("qijson: WriteRaw called with an empty value")
 	errIncomplete       = errors.New("qijson: encoder did not write one complete JSON value")
+	errNilDumpTarget    = errors.New("qijson: nil dump target")
 )
 
 // Writer buffers are recycled through a pool so a short-lived encode can start
@@ -157,6 +159,88 @@ func (w *Writer) BuildBytes(reuse ...[]byte) []byte {
 
 // Err returns the first error the Writer hit, or nil.
 func (w *Writer) Err() error { return w.err }
+
+// DumpTo writes the JSON built so far to out and, on success, resets the Writer
+// so the next value can be built and dumped into the same stream:
+//
+//	for _, v := range values {
+//	    // ... write one value into w ...
+//	    if _, err := w.DumpTo(conn); err != nil { /* ... */ }
+//	}
+//
+// It writes the buffered bytes directly to out without materialising a second
+// copy, and returns the number of bytes written. On a write error the Writer is
+// left untouched, so the document is not lost and the dump can be retried. A
+// Writer that already holds a sticky error dumps nothing and returns that error,
+// matching Bytes and BuildBytes. A nil out is reported as errNilDumpTarget
+// rather than panicking.
+//
+// DumpTo mutates w: it must not be called concurrently with any other Writer
+// method.
+func (w *Writer) DumpTo(out io.Writer) (int, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	if out == nil {
+		return 0, errNilDumpTarget
+	}
+	n, err := out.Write(w.buf)
+	if err != nil {
+		return n, err
+	}
+	w.Reset()
+	return n, nil
+}
+
+// ReadCloser returns an io.ReadCloser that reads the JSON built so far and, on
+// success, resets the Writer so the next value can be built immediately. It is
+// the read side of the streaming surface: hand it to a consumer that wants an
+// io.Reader (an HTTP body, io.Copy) instead of the raw bytes:
+//
+//	rc, err := w.ReadCloser()
+//	if err != nil { /* ... */ }
+//	defer rc.Close()
+//	io.Copy(conn, rc)
+//
+// The reader owns the bytes it reads: ReadCloser detaches the Writer's buffer,
+// so the reader does not alias the Writer and a later write to the Writer does
+// not corrupt the reader's data. A Writer that already holds a sticky error
+// returns (nil, err) rather than a reader. Close is a no-op that returns nil and
+// is safe to call more than once; it does not touch the Writer.
+func (w *Writer) ReadCloser() (io.ReadCloser, error) {
+	if w.err != nil {
+		return nil, w.err
+	}
+	buf := w.buf
+	w.Reset()
+	w.buf = nil
+	return &writerReader{buf: buf}, nil
+}
+
+// writerReader reads a buffer once, front to back. It owns the buffer handed to
+// it by ReadCloser, which is detached from the Writer.
+type writerReader struct {
+	buf []byte
+	off int
+}
+
+// *writerReader implements io.ReadCloser as part of its contract; this fails to
+// compile if it ever stops doing so.
+var _ io.ReadCloser = (*writerReader)(nil)
+
+// Read copies from the buffer until it is exhausted, then reports io.EOF.
+func (r *writerReader) Read(p []byte) (int, error) {
+	if r.off >= len(r.buf) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.buf[r.off:])
+	r.off += n
+	return n, nil
+}
+
+// Close is a no-op that returns nil. It is safe to call more than once and never
+// fails.
+func (r *writerReader) Close() error { return nil }
 
 // complete reports whether w holds exactly one complete top-level JSON value:
 // the single root value has been written, every container it opened has been

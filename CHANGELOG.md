@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `qijson`: `Writer` gains `DumpTo(io.Writer) (int, error)` and
+  `ReadCloser() (io.ReadCloser, error)` — the encode-streaming surface: write the
+  built document directly to an `io.Writer` without materialising a second copy,
+  or hand it out as an `io.ReadCloser`. Both reset the `Writer` on success so
+  values can be built and streamed in a loop; a `Writer` holding a sticky error
+  reports that error and streams nothing. The surface is sanctioned by the
+  constitution's Article VI amendment. (Task N001.)
+
 ### Changed
 
 - Governance: feature and task branches are now created from `dev` instead of
