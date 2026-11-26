@@ -118,9 +118,16 @@ and context rules bind only when such code is added. Open gaps are tracked in
 - `Valid(data []byte) bool` (in `internal/scanner`, re-exported as `qijson.Valid`)
   is the syntax layer's headline export — the same name and signature as
   `encoding/json.Valid`. The sanctioned public surface is exactly the `qijson`
-  decoder and encoder plus the re-exported syntax surface (`Valid`, `Kind` and
-  the tokenizer) (constitution Article VI); do not export anything else without a
-  new amendment.
+  decoder and encoder, the re-exported syntax surface (`Valid`, `Kind` and the
+  tokenizer), and the network/formatting/hooks additions: streaming
+  (`Writer.DumpTo`, `Writer.ReadCloser`, `NewDecoder(io.Reader)` with a
+  multi-value loop, `Token` plus `Number`/`Delim`/`Token`), formatting
+  (`MarshalIndent`, `Indent`, `Compact`, `HTMLEscape`, `SetIndent`,
+  `SetEscapeHTML`), and the omit hooks (`Optional`/`IsDefined`, `IsZero`) plus the
+  `UnmarshalUnknown`/`MarshalUnknowns` unknown-fields proxy (constitution Article
+  VI, amended 2026-11-26; rationale:
+  `.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`). Do not export
+  anything else without a new amendment.
 - `validate(data []byte) (parseError, bool)` in `internal/scanner` is unexported
   and returns the first failure plus whether the input is invalid. Tests assert
   messages and 1-based positions through it; `Valid` is `!failed`. The error is a
@@ -222,6 +229,8 @@ and context rules bind only when such code is added. Open gaps are tracked in
   - `.opencode/plan/2026-11-22-release-flow.md` — the release-flow governance.
   - `.opencode/plan/2026-11-22-go-version-floor.md` — the Go-floor fix.
   - `.opencode/plan/2026-11-22-tasks-registry.md` — this registry's design.
+  - `.opencode/plan/2026-11-23-roadmap-network-perf-parity.md` — the Track A
+    network/formatting/hooks roadmap behind the Article VI amendment.
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs.
   - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research.
   - `.opencode/plan/2026-11-21-json-scanner.md` — superseded state machine.

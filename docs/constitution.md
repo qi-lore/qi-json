@@ -56,14 +56,16 @@ there: it returns the first `parseError` plus whether the input is invalid, so
 diagnostics stay testable without widening the API. The facade re-exports
 `Valid`, so callers never import the syntax package directly.
 
-Three further surfaces are sanctioned (amended 2026-11-21; the delegation
+Four further surfaces are sanctioned (amended 2026-11-21; the delegation
 constructor added 2026-11-22; the scanner moved behind `internal/scanner` and
-re-exported 2026-11-22; rationale:
+re-exported 2026-11-22; the network, formatting and hooks surface added
+2026-11-26; rationale:
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
 `.opencode/plan/2026-11-21-json-encoder.md`,
 `.opencode/plan/2026-11-22-third-party-struct-fields.md`,
-`.opencode/plan/2026-11-22-scanner-consolidation.md`; the decoder/encoder
+`.opencode/plan/2026-11-22-scanner-consolidation.md`,
+`.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`; the decoder/encoder
 package was relocated to the module root and renamed `qijson` per
 `.opencode/plan/2026-11-21-package-rename.md`):
 
@@ -88,6 +90,20 @@ package was relocated to the module root and renamed `qijson` per
   `Schema.Encode`/`Schema.Marshal`, `Field.Encode`/`Field.Empty`/`Field.OmitEmpty`,
   and the element `Codec` with `NewCodec`. Like the decoder it MUST NOT import
   `encoding/json` and MUST NOT use `reflect` or `unsafe`.
+- **`qijson` network, formatting and hooks surface** — the Track A additions that
+  make the library production-complete without reflection. Streaming, both
+  directions: `Writer.DumpTo(io.Writer)` and `Writer.ReadCloser()` for encode
+  output; `NewDecoder(io.Reader)` over a refillable tokenizer source, so a caller
+  can decode several values from one stream (NDJSON); and `Token()` plus the
+  `Number`, `Delim` and `Token` types for token-level streaming. Formatting:
+  `MarshalIndent`, `Indent`, `Compact`, `HTMLEscape`, and `SetIndent` /
+  `SetEscapeHTML`. Extension hooks: `Optional` with `IsDefined() bool` and
+  `IsZero` with `IsZero() bool` as omit hooks, and the `UnmarshalUnknown` /
+  `MarshalUnknowns` round-trip proxy for unknown members. These names are the
+  sanctioned *surface*; their implementations land later under the registry tasks
+  N001, N002/N003, N004, N005, H001 and H002 (rationale:
+  `.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`, Track A items
+  A5–A10).
 - **`cmd/qi-json-gen`** — an optional, stdlib-only code generator that emits
   `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags, so callers need not hand-write the accessor closures. It is a `main`
@@ -281,4 +297,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.12.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-26
+**Version**: 3.13.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-26
