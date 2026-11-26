@@ -154,7 +154,7 @@ never renumber, never reuse a retired identifier.
 
 ### API parity
 
-- [ ] A001 - `encoding/json`-parity entry points and tag binding (gated on M010)
+- [ ] A001 - `encoding/json`-parity surface: `any`-based entry points, tag binding, `Marshaler`/`Unmarshaler`, concrete error types (gated on M010)
 
 ### Code quality
 
