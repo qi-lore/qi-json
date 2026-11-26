@@ -130,7 +130,7 @@ never renumber, never reuse a retired identifier.
 ### Module, packaging and governance
 
 - [ ] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
-- [ ] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
+- [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
 
 ### Encoder
 

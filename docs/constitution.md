@@ -59,6 +59,7 @@ diagnostics stay testable without widening the API. The facade re-exports
 Four further surfaces are sanctioned (amended 2026-11-21; the delegation
 constructor added 2026-11-22; the scanner moved behind `internal/scanner` and
 re-exported 2026-11-22; the network, formatting and hooks surface added
+2026-11-26; the `Writer.BuildBytes` writer-buffer reuse surface added
 2026-11-26; rationale:
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
@@ -88,8 +89,14 @@ package was relocated to the module root and renamed `qijson` per
   decoder: the `Encoder` interface (`EncodeJSON(*Writer) error`), `Writer` and
   `NewWriter`, the generic `Marshal` and non-generic `Encode`,
   `Schema.Encode`/`Schema.Marshal`, `Field.Encode`/`Field.Empty`/`Field.OmitEmpty`,
-  and the element `Codec` with `NewCodec`. Like the decoder it MUST NOT import
-  `encoding/json` and MUST NOT use `reflect` or `unsafe`.
+  `Writer.BuildBytes(reuse ...[]byte)`, and the element `Codec` with `NewCodec`.
+  `BuildBytes` returns the encoded document, appending into the optional
+  caller-supplied buffer to reuse its capacity; it never hands the writer's
+  pooled buffer to the caller, so the returned slice is owned by the caller and
+  the `Writer` stays reusable. It returns nil when the `Writer` holds a sticky
+  error, matching `Writer.Bytes` (implementation lands under the registry task
+  E004). Like the decoder it MUST NOT import `encoding/json` and MUST NOT
+  use `reflect` or `unsafe`.
 - **`qijson` network, formatting and hooks surface** — the Track A additions that
   make the library production-complete without reflection. Streaming, both
   directions: `Writer.DumpTo(io.Writer)` and `Writer.ReadCloser()` for encode
@@ -297,4 +304,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.13.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-26
+**Version**: 3.14.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-26
