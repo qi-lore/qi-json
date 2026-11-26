@@ -112,7 +112,8 @@ pooling (A1) == easyjson borrow E1 == perf lever L1. Merged into:
 ## Open decision points
 
 1. Approve the Article VI surface amendment for the Track A additions (M009)?
-2. Amend for parity (Track B) or decline (M010)?
+2. Amend for parity (Track B) or decline (M010)? — **Resolved 2026-11-26: declined
+   (M010)**; see the roadmap's §8 "Decision (M010): Track B declined".
 3. Prototype A-I (pooled writer) with a before/after benchmark first?
 
 ## Artifacts

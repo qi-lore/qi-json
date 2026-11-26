@@ -128,7 +128,8 @@ parity demand is proven.
 3. **A-VI** (hooks) — small, closes easyjson feature parity cheaply.
 4. **A-IV** (input stream) — the substantive streaming work.
 5. **A-V** (token + format) — ergonomics.
-6. Re-evaluate **Track B** only if stdlib-shaped syntax is a hard requirement.
+6. Re-evaluate **Track B** only if stdlib-shaped syntax is a hard requirement
+   (declined in M010 — see §8).
 
 ## 7. Risks
 
@@ -141,3 +142,29 @@ parity demand is proven.
   contract style).
 - Any Track B step reverses a core principle and must be an explicit governance
   decision, not a byproduct.
+
+## 8. Decision (M010): Track B declined
+
+**Date:** 2026-11-26. **Status:** decided — Track B (B1–B4) is declined for now;
+the no-reflect identity is preserved and Article III/VI are unchanged (a decline
+is not an amendment).
+
+**Rationale:**
+
+- Track A delivers network and production readiness without reflection, so the
+  "production ready" goal does not require stdlib-shaped syntax.
+- Demand for literal `encoding/json` syntax is unproven; no consumer has made it
+  a hard requirement.
+- Track B reverses a core principle (no reflection), costs ~3–5 engineer-months,
+  and needs an Article III/VI amendment plus a major-version bump — too much for
+  an unproven benefit.
+
+**Error inspectability (B4):** the library already ships `errors.As`/`errors.Is`-
+friendly types — `*qijson.Error` (Path, Offset, Kind, Unwrap) and
+`*qijson.TypeError` (Want, Got), plus `ErrorKind`, re-exported through the facade
+(`qijson.go`) and exercised with `errors.As` in tests. Declining B4 therefore
+costs only `encoding/json`-identical type names and shapes, not error
+inspectability.
+
+**Revisit trigger:** reopen Track B only if stdlib-shaped syntax becomes a hard
+requirement for a real consumer.

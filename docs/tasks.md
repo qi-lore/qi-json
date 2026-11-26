@@ -131,7 +131,7 @@ never renumber, never reuse a retired identifier.
 
 ### Module, packaging and governance
 
-- [ ] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
+- [X] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 - [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
 
 ### Decoder
@@ -153,7 +153,7 @@ never renumber, never reuse a retired identifier.
 
 ### API parity
 
-- [ ] A001 - `encoding/json`-parity surface: `any`-based entry points, tag binding, `Marshaler`/`Unmarshaler`, concrete error types (gated on M010)
+- [ ] A001 - `encoding/json`-parity surface: `any`-based entry points, tag binding, `Marshaler`/`Unmarshaler`, concrete error types (declined under M010; revisit only on proven demand)
 
 ### Code quality
 
