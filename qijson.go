@@ -205,8 +205,8 @@ type Reader = codec.Reader
 // nil. Read the failure with Err. Encoding into a Writer never uses reflection. A
 // Writer is not safe for concurrent use; give each goroutine its own. Its methods
 // are WriteNull, WriteBool, WriteString, WriteInt, WriteUint, WriteFloat,
-// WriteRaw, BeginObject, EndObject, BeginArray, EndArray, Key, Bytes, Reset and
-// Err.
+// WriteRaw, BeginObject, EndObject, BeginArray, EndArray, Key, Bytes, BuildBytes,
+// Reset and Err.
 type Writer = codec.Writer
 
 // NewWriter returns a new, empty Writer.

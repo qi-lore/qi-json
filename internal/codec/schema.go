@@ -167,7 +167,7 @@ func (s *Schema[T]) Marshal(v T) ([]byte, error) {
 	if !w.complete() {
 		return nil, errIncomplete
 	}
-	return slices.Clone(w.buf), nil
+	return w.BuildBytes(), nil
 }
 
 // Unmarshal decodes data into a new T. data is not retained after the call.

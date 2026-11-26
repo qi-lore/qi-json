@@ -60,6 +60,7 @@ never renumber, never reuse a retired identifier.
 - [X] E001 - Encoder: `Writer`, `Marshal`/`Encode`, `Codec[E]`, `Schema`/`Field` encode
 - [X] E002 - Pooled reusable `Writer` buffer (no new exported names)
 - [X] E003 - Reuse the writer buffer inside `Marshal` (after E002)
+- [X] E004 - `BuildBytes(reuse ...[]byte)` writer-buffer reuse
 
 ### Code generator
 
@@ -131,10 +132,6 @@ never renumber, never reuse a retired identifier.
 
 - [ ] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 - [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
-
-### Encoder
-
-- [ ] E004 - `BuildBytes(reuse ...[]byte)` writer-buffer reuse (gated on M012)
 
 ### Decoder
 
