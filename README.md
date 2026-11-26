@@ -481,9 +481,10 @@ make cover     # coverage profile and per-function output
 
 ## Contributing
 
-`main` is the production mainline and `dev` is the integration branch. Create a
-feature or task branch from the current `main` (after `git fetch` and a
-fast-forward update), name it per
+`main` is the production mainline and `dev` is the integration branch, which
+carries the newest work: integrated changes live there for a long time before a
+release. Create a feature or task branch from the current `dev` (after
+`git fetch` and a fast-forward update), name it per
 [Conventional Branch](https://conventionalbranch.org/), and open a pull request
 into `dev`. Only the `dev` → `main` pull request merges into `main`.
 

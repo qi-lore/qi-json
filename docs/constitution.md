@@ -168,9 +168,12 @@ The repository uses a two-branch integration model. CI
 ### Branching model
 
 - `main` is the production-ready mainline.
-- `dev` is the integration branch.
-- Feature and task branches MUST be created from the current `main`, after
-  `git fetch` and a fast-forward update.
+- `dev` is the integration branch, and it carries the newest work: integrated
+  changes live there for a long time before a release promotes them to `main`.
+- Feature and task branches MUST be created from the current `dev` — not `main`
+  — after `git fetch` and a fast-forward update, because the latest changes live
+  on `dev` long before they reach `main`, and a branch cut from `main` would
+  start from stale code.
 - Feature branches MUST target `dev`.
 - Only the `dev` → `main` pull request is allowed to merge into `main`.
 - Branch names MUST strictly follow Conventional Branch
@@ -278,4 +281,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.11.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.12.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-26
