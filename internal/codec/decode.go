@@ -83,7 +83,7 @@ func Decode(data []byte, v Decoder) error {
 		return errNilTarget
 	}
 
-	r := newReader(scanner.NewTokenizer(data))
+	r := newReader(scanner.NewTokenizer(data), string(data))
 	if err := v.DecodeJSON(r); err != nil {
 		return err
 	}

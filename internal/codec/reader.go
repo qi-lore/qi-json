@@ -32,6 +32,12 @@ const compsInline = 8
 type Reader struct {
 	tok *scanner.Tokenizer
 
+	// src is the document as a string the library owns: the decoder entry
+	// points copy the caller's bytes once, so a clean string value can be
+	// returned as a zero-copy substring of src. Because src is the library's
+	// own copy, a decoded string never aliases the caller's input buffer.
+	src string
+
 	// comps is the stack of path components from the document root to the value
 	// being decoded. inline backs the common case so descending does not
 	// allocate.
@@ -57,9 +63,11 @@ type pathComp struct {
 	index int
 }
 
-// newReader returns a Reader that decodes from tok.
-func newReader(tok *scanner.Tokenizer) *Reader {
-	r := &Reader{tok: tok}
+// newReader returns a Reader that decodes from tok, slicing zero-copy string
+// values out of src. src must be the document bytes as a string the library
+// owns; callers pass string(data), never a view of the caller's buffer.
+func newReader(tok *scanner.Tokenizer, src string) *Reader {
+	r := &Reader{tok: tok, src: src}
 	r.comps = r.inline[:0]
 	return r
 }
@@ -167,7 +175,7 @@ func (r *Reader) ReadString() (string, error) {
 	if err := r.checkString(raw, start+1); err != nil {
 		return "", err
 	}
-	s, err := unescape(raw)
+	s, err := r.decodeString(raw, start+1)
 	if err != nil {
 		return "", r.syntaxError(err)
 	}
@@ -178,11 +186,11 @@ func (r *Reader) ReadString() (string, error) {
 // integer (no fraction or exponent) and must fit in an int64; both violations
 // are reported as type errors.
 func (r *Reader) ReadInt() (int64, error) {
-	raw, err := r.readNumber("integer")
+	raw, start, err := r.readNumber("integer")
 	if err != nil {
 		return 0, err
 	}
-	v, perr := strconv.ParseInt(string(raw), 10, 64)
+	v, perr := strconv.ParseInt(r.src[start:start+int64(len(raw))], 10, 64)
 	if perr != nil {
 		return 0, r.numberMismatch("integer", "int64", raw, perr)
 	}
@@ -192,32 +200,35 @@ func (r *Reader) ReadInt() (int64, error) {
 // ReadFloat consumes a number and returns it as a float64. A magnitude that
 // overflows a float64 is a type error; a magnitude that underflows becomes zero.
 func (r *Reader) ReadFloat() (float64, error) {
-	raw, err := r.readNumber("number")
+	raw, start, err := r.readNumber("number")
 	if err != nil {
 		return 0, err
 	}
-	v, perr := strconv.ParseFloat(string(raw), 64)
+	v, perr := strconv.ParseFloat(r.src[start:start+int64(len(raw))], 64)
 	if perr != nil {
 		return 0, r.numberMismatch("number", "float64", raw, perr)
 	}
 	return v, nil
 }
 
-// readNumber peeks at a number token and returns its raw bytes, describing the
-// expected JSON type as want for a type error.
-func (r *Reader) readNumber(want string) ([]byte, error) {
+// readNumber peeks at a number token and returns its raw bytes and the offset of
+// its first byte in the input, describing the expected JSON type as want for a
+// type error. The offset lets a caller parse the literal as a zero-copy slice of
+// the document string the reader owns.
+func (r *Reader) readNumber(want string) ([]byte, int64, error) {
 	k, err := r.nextKind()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if k != scanner.KindNumber {
-		return nil, r.mismatch(want, k)
+		return nil, 0, r.mismatch(want, k)
 	}
+	start := r.tok.Offset()
 	raw, err := r.tok.ReadNumber()
 	if err != nil {
-		return nil, r.syntaxError(err)
+		return nil, 0, r.syntaxError(err)
 	}
-	return raw, nil
+	return raw, start, nil
 }
 
 // numberMismatch describes a number that Peek accepted but parsing rejected, as
@@ -290,7 +301,7 @@ func (r *Reader) Object(fn func(key string) error) error {
 		if err := r.checkString(raw, start+1); err != nil {
 			return err
 		}
-		key, err := unescape(raw)
+		key, err := r.decodeString(raw, start+1)
 		if err != nil {
 			return r.syntaxError(err)
 		}
@@ -579,6 +590,19 @@ func appendQuotedTo(dst []byte, key string) []byte {
 		dst = append(dst, c)
 	}
 	return append(dst, '"')
+}
+
+// decodeString decodes the content of a JSON string whose raw bytes (escape
+// sequences intact) are raw and whose first content byte sits at contentStart in
+// r.src. A string with no escape is returned as a zero-copy substring of r.src,
+// the library-owned document copy, so it carries no per-value allocation and
+// never aliases the caller's input; only an escaped string is decoded into a new
+// string.
+func (r *Reader) decodeString(raw []byte, contentStart int64) (string, error) {
+	if bytes.IndexByte(raw, '\\') < 0 {
+		return r.src[contentStart : contentStart+int64(len(raw))], nil
+	}
+	return unescape(raw)
 }
 
 // unescape decodes the JSON escape sequences in raw and returns the decoded

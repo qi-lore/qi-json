@@ -188,7 +188,7 @@ func (s *Schema[T]) UnmarshalInto(data []byte, v *T) error {
 		return errNilTarget
 	}
 
-	r := newReader(scanner.NewTokenizer(data))
+	r := newReader(scanner.NewTokenizer(data), string(data))
 	if err := s.Decode(r, v); err != nil {
 		return err
 	}
