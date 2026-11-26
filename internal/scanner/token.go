@@ -110,9 +110,11 @@ type tokenFrame struct {
 // Whitespace, commas and the ':' after an object key are consumed
 // automatically, so inside an object the stream is key, value, key, value, ...
 // and Peek reports KindEnd at the closing brace. Inside an array it is value,
-// value, ... and Peek reports KindEnd at the closing bracket. At the top level
-// Peek reports KindEnd once the single top-level value and its trailing
-// whitespace are consumed.
+// value, ... and Peek reports KindEnd at the closing bracket. At the top level a
+// NewTokenizer tokenizer reports KindEnd once the single top-level value and its
+// trailing whitespace are consumed, while a NewDecoder tokenizer reads
+// successive top-level values from the stream and reports KindEnd at the end of
+// the input.
 //
 // Byte slices returned by ReadString, ReadNumber and ReadRaw alias the input
 // passed to NewTokenizer and must not be modified.
@@ -188,9 +190,15 @@ func (s *readerSource) refill(dst []byte) ([]byte, bool) {
 	}
 }
 
-// NewDecoder returns a Tokenizer that reads one JSON document from r. The
-// Tokenizer pulls bytes from r on demand, refilling its internal buffer as it
-// goes, so a value may straddle a read boundary and r may return short reads.
+// NewDecoder returns a Tokenizer that reads one or more JSON documents from r.
+// The Tokenizer pulls bytes from r on demand, refilling its internal buffer as
+// it goes, so a value may straddle a read boundary and r may return short reads.
+//
+// Once a top-level value is complete, a following value that can begin here
+// starts the next one, so several values may be read from one stream (for
+// example newline-delimited JSON). Peek reports KindEnd at the end of the input;
+// a byte that cannot begin a value after a completed value is an "after
+// top-level value" error.
 //
 // A read error other than io.EOF is reported, wrapped, as the Tokenizer's
 // sticky error; a nil r is reported as a nil-reader error rather than
@@ -296,11 +304,19 @@ func (st *tokenizer) peekOnce() (Kind, error) {
 
 	if st.depth == 0 {
 		if st.read {
-			if i < n {
+			if i >= n {
+				return KindEnd, nil
+			}
+			// A reader-backed tokenizer reads several values from one stream
+			// (NDJSON): once a top-level value is complete, a following value
+			// that can begin here starts the next one. A slice-backed tokenizer
+			// holds a single document, and in either case a byte that cannot
+			// begin a value is an error.
+			if st.src == nil || !canBeginValue(data[i]) {
 				st.fail(i, "after top-level value")
 				return 0, *st.v.failure
 			}
-			return KindEnd, nil
+			st.read = false
 		}
 		if i >= n {
 			st.failEnd(n)
@@ -381,25 +397,39 @@ func (st *tokenizer) peekOnce() (Kind, error) {
 	return st.kindAt(i)
 }
 
+// canBeginValue reports whether c can be the first byte of a JSON value: the
+// opening byte of a container, a string quote, the first byte of a literal, or
+// the start of a number.
+func canBeginValue(c byte) bool {
+	switch c {
+	case '{', '[', '"', 't', 'f', 'n', '-':
+		return true
+	default:
+		return isDigit(c)
+	}
+}
+
 // kindAt returns the kind of the value whose first byte is at i, recording
 // "looking for beginning of value" when the byte cannot begin one.
 func (st *tokenizer) kindAt(i int) (Kind, error) {
-	switch c := st.v.data[i]; {
-	case c == '{':
-		return KindObject, nil
-	case c == '[':
-		return KindArray, nil
-	case c == '"':
-		return KindString, nil
-	case c == 't' || c == 'f':
-		return KindBool, nil
-	case c == 'n':
-		return KindNull, nil
-	case c == '-' || isDigit(c):
-		return KindNumber, nil
-	default:
+	c := st.v.data[i]
+	if !canBeginValue(c) {
 		st.fail(i, "looking for beginning of value")
 		return 0, *st.v.failure
+	}
+	switch c {
+	case '{':
+		return KindObject, nil
+	case '[':
+		return KindArray, nil
+	case '"':
+		return KindString, nil
+	case 't', 'f':
+		return KindBool, nil
+	case 'n':
+		return KindNull, nil
+	default: // '-' or a digit
+		return KindNumber, nil
 	}
 }
 

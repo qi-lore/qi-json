@@ -436,20 +436,21 @@ func Valid(data []byte) bool {
 	return scanner.Valid(data)
 }
 
-// Tokenizer turns a JSON document into a stream of typed tokens. It reads one
-// document without building Go values, which suits a minifier, a streaming
-// splitter or an analyzer that walks arbitrary documents. Construct one with
-// NewTokenizer for a byte slice or NewDecoder for an io.Reader; the zero value
-// is not ready to use.
+// Tokenizer turns a JSON document into a stream of typed tokens. It reads JSON
+// without building Go values, which suits a minifier, a streaming splitter or an
+// analyzer that walks arbitrary documents. Construct one with NewTokenizer for a
+// byte slice or NewDecoder for an io.Reader; the zero value is not ready to use.
 //
 // The methods are pull-based: Peek reports the kind of the next value token
 // without consuming it, and the Read*/Begin*/End* methods consume it.
 // Whitespace, commas and the ':' after an object key are consumed
 // automatically, so inside an object the stream is key, value, key, value, ...
 // and Peek reports KindEnd at the closing brace. Inside an array it is value,
-// value, ... and Peek reports KindEnd at the closing bracket. At the top level
-// Peek reports KindEnd once the single top-level value and its trailing
-// whitespace are consumed.
+// value, ... and Peek reports KindEnd at the closing bracket. At the top level a
+// NewTokenizer tokenizer reports KindEnd once the single top-level value and its
+// trailing whitespace are consumed, while a NewDecoder tokenizer reads
+// successive top-level values (NDJSON) and reports KindEnd at the end of the
+// stream.
 //
 // Byte slices returned by ReadString, ReadNumber and ReadRaw alias the input
 // passed to NewTokenizer and must not be modified.
@@ -466,19 +467,23 @@ func NewTokenizer(data []byte) *Tokenizer {
 	return scanner.NewTokenizer(data)
 }
 
-// NewDecoder returns a Tokenizer that reads one JSON document from r. It is the
-// streaming counterpart to NewTokenizer: instead of a byte slice, the Tokenizer
-// pulls bytes from r on demand and refills its internal buffer as it goes, so a
-// value may straddle a read boundary and r may return short reads. The Kind
-// sequence, the scalar values and the Offset values it reports for a document
-// are the same as NewTokenizer's over the same bytes.
+// NewDecoder returns a Tokenizer that reads one or more JSON documents from r.
+// It is the streaming counterpart to NewTokenizer: instead of a byte slice, the
+// Tokenizer pulls bytes from r on demand and refills its internal buffer as it
+// goes, so a value may straddle a read boundary and r may return short reads.
+// For a single document the Kind sequence, the scalar values and the Offset
+// values it reports are the same as NewTokenizer's over the same bytes.
+//
+// It reads several top-level values from one stream (NDJSON): once a value is
+// complete, a following value that can begin here starts the next one, and Peek
+// reports KindEnd at the end of the input. A byte that cannot begin a value
+// after a completed value is an "after top-level value" error.
 //
 // Ownership and lifecycle: the Tokenizer does not own r and never closes it; the
 // caller keeps r open and valid for the Tokenizer's lifetime and closes it when
 // done. The Tokenizer reads from r only while a method needs more input, and it
-// stops once the single top-level value and its trailing whitespace are
-// consumed. A Tokenizer is not safe for concurrent use: give each goroutine its
-// own, with its own reader.
+// stops once the stream is exhausted. A Tokenizer is not safe for concurrent
+// use: give each goroutine its own, with its own reader.
 //
 // Aliasing: byte slices returned by ReadString, ReadNumber and ReadRaw alias the
 // Tokenizer's internal buffer, which grows as r is drained. Unlike NewTokenizer,

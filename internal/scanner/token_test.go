@@ -549,11 +549,26 @@ func TestNewDecoderMatchesSlice(t *testing.T) {
 	}
 }
 
+// multiValueStreams are inputs a slice-backed tokenizer rejects with "after
+// top-level value" but a reader-backed tokenizer reads as several top-level
+// values (NDJSON): the byte after the first value can begin another. They are
+// covered by TestNewDecoderMultiValue, not by the single-document differential
+// test.
+var multiValueStreams = map[string]bool{
+	`{} {}`:  true,
+	`1 2`:    true,
+	`"a""b"`: true,
+}
+
 // TestNewDecoderInvalidMatchesSlice requires the reader-backed tokenizer to
 // report the same error message and 1-based position as the slice-backed one for
-// every invalid document.
+// every invalid document, except the multi-value streams (see multiValueStreams)
+// that a reader-backed tokenizer reads as several values.
 func TestNewDecoderInvalidMatchesSlice(t *testing.T) {
 	for _, tt := range invalidDocuments {
+		if multiValueStreams[tt.in] {
+			continue
+		}
 		wantErr := drive(NewTokenizer([]byte(tt.in)))
 		if wantErr == nil {
 			t.Fatalf("slice drive(%q) = nil, want an error", tt.in)
@@ -678,5 +693,107 @@ func TestNewDecoderEmptyReader(t *testing.T) {
 	}
 	if gotErr.Error() != wantErr.Error() {
 		t.Fatalf("NewDecoder drive(empty) = %q, want %q", gotErr, wantErr)
+	}
+}
+
+// readStreamValues consumes a stream of top-level values from a reader-backed
+// tokenizer and returns each value's raw bytes in order. It stops at KindEnd,
+// which marks the end of the stream, and returns the first error otherwise.
+func readStreamValues(t *Tokenizer) ([]string, error) {
+	var vals []string
+	for {
+		k, err := t.Peek()
+		if err != nil {
+			return vals, err
+		}
+		if k == KindEnd {
+			return vals, nil
+		}
+		b, err := t.ReadRaw()
+		if err != nil {
+			return vals, err
+		}
+		vals = append(vals, string(b))
+	}
+}
+
+// TestNewDecoderMultiValue requires a reader-backed tokenizer to read several
+// top-level values from one stream (NDJSON), separated by any JSON whitespace or
+// by nothing at all, and to report KindEnd at end of input. The reader hands out
+// as little as one byte per Read, so every value straddles a refill boundary.
+func TestNewDecoderMultiValue(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{`objects concatenated`, `{"a":1}{"b":2}`, []string{`{"a":1}`, `{"b":2}`}},
+		{`objects newline separated`, "{\"a\":1}\n{\"b\":2}\n", []string{`{"a":1}`, `{"b":2}`}},
+		{`scalars space separated`, `1 2 3`, []string{`1`, `2`, `3`}},
+		{`mixed values`, "[1,2]\ntrue\n\"x\"\nnull\n{}", []string{`[1,2]`, `true`, `"x"`, `null`, `{}`}},
+		{`leading and trailing whitespace`, " \n\t{ }\r\n ", []string{`{ }`}},
+		{`single value`, `{"a":1}`, []string{`{"a":1}`}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, chunk := range []int{1, 2, 3, 7, len(tt.in) + 1} {
+				tok := NewDecoder(&chunkReader{data: []byte(tt.in), chunk: chunk})
+				got, err := readStreamValues(tok)
+				if err != nil {
+					t.Fatalf("chunk=%d: readStreamValues(%q) = %v", chunk, tt.in, err)
+				}
+				if len(got) != len(tt.want) {
+					t.Fatalf("chunk=%d: read %d values from %q, want %d: %q",
+						chunk, len(got), tt.in, len(tt.want), got)
+				}
+				for i := range got {
+					if got[i] != tt.want[i] {
+						t.Fatalf("chunk=%d: value %d of %q = %q, want %q",
+							chunk, i, tt.in, got[i], tt.want[i])
+					}
+				}
+				// The stream stays exhausted: Peek reports KindEnd and Err is nil.
+				if k, err := tok.Peek(); err != nil || k != KindEnd {
+					t.Fatalf("chunk=%d: Peek() at end of %q = %v, %v, want %v, nil",
+						chunk, tt.in, k, err, KindEnd)
+				}
+				if err := tok.Err(); err != nil {
+					t.Fatalf("chunk=%d: Err() at end of %q = %v, want nil", chunk, tt.in, err)
+				}
+			}
+		})
+	}
+}
+
+// TestNewDecoderMultiValueError requires a malformed value in a stream to be
+// reported after the valid values that precede it, without being mistaken for
+// the end of the stream.
+func TestNewDecoderMultiValueError(t *testing.T) {
+	tests := []struct {
+		in      string
+		vals    int
+		problem string
+	}{
+		{`1 2 x`, 2, "after top-level value"},
+		{`{} {} x`, 2, "after top-level value"},
+		{`{"a":1}{`, 1, "unexpected end of JSON input"},
+		{`{"a":1}{"b":`, 1, "unexpected end of JSON input"},
+	}
+
+	for _, tt := range tests {
+		t.Run(strconv.Quote(tt.in), func(t *testing.T) {
+			tok := NewDecoder(&chunkReader{data: []byte(tt.in), chunk: 1})
+			got, err := readStreamValues(tok)
+			if err == nil {
+				t.Fatalf("readStreamValues(%q) = %q, nil, want an error", tt.in, got)
+			}
+			if len(got) != tt.vals {
+				t.Fatalf("readStreamValues(%q) read %d values %q, want %d", tt.in, len(got), got, tt.vals)
+			}
+			if !strings.Contains(err.Error(), tt.problem) {
+				t.Fatalf("readStreamValues(%q) error = %q, want it to contain %q", tt.in, err, tt.problem)
+			}
+		})
 	}
 }
