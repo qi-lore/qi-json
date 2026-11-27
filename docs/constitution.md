@@ -22,9 +22,18 @@ exact error messages and 1-based positions; never weaken them to make code pass.
 
 ### III. Standard Library Only
 
-No third-party dependencies. `encoding/json` MUST NOT be used anywhere in the
-module, including tests and benchmarks — writing our own scanner and decoder is
-the point of the project.
+No third-party dependencies in the shipped module. `encoding/json` MUST NOT be
+used anywhere in the shipped module, including its tests and benchmarks — writing
+our own scanner and decoder is the point of the project.
+
+The single carve-out is the `bench/` comparative benchmark module (added
+2026-11-27): a separate, non-shipped Go module with its own `go.mod`, whose only
+purpose is to benchmark qi-json against `encoding/json` and `mailru/easyjson`. It
+MAY import `encoding/json` and third-party comparison libraries. Nothing under
+`bench/` is part of the published `github.com/qi-lore/qi-json` module, the shipped
+packages MUST NOT import it, and the main module's verification gate does not
+traverse into it. Rationale:
+`.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`.
 
 ### IV. Syntax Contract
 
@@ -180,6 +189,12 @@ success path MUST stay allocation-free (`TestValidDoesNotAllocate`).
     single-pass scanner (`valid.go`, `scan.go`, `token.go`, `doc.go`); internal,
     not a public surface;
   - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
+- One further, **non-shipped** module: `bench/` (its own `go.mod`) — the
+  comparative benchmark harness (qi-json vs `encoding/json` vs `mailru/easyjson`).
+  It is not part of the published module and is the sole Article III carve-out;
+  its code is verified by its own `go test`/`go build` inside `bench/`, not by the
+  main module's verification gate. It MUST stay `gofmt`-clean, because the root
+  `gofmt -l .` scans it.
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
 
@@ -304,4 +319,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.14.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-26
+**Version**: 3.15.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-27
