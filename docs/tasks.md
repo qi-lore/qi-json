@@ -130,6 +130,7 @@ never renumber, never reuse a retired identifier.
 - [X] M014 - Constitution amendment (Documentation Ownership): the README needs a direct user instruction to edit
 - [X] M015 - Correct the README: fix the `qijson.Error` typo and normalize the benchmark table
 - [X] M016 - Simple library-usage example in a new `example/` folder, described briefly in the README
+- [X] M017 - Rework the `example/` demo to bind via `qi-json-gen` and rename `Server` to `User`
 
 ### Process and repository settings
 
