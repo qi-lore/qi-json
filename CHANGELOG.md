@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-27
+
 ### Added
 
 - `qijson`: `Writer` gains `DumpTo(io.Writer) (int, error)` and
@@ -16,14 +18,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   values can be built and streamed in a loop; a `Writer` holding a sticky error
   reports that error and streams nothing. The surface is sanctioned by the
   constitution's Article VI amendment. (Task N001.)
+- `qijson`: `NewDecoder(io.Reader) *Tokenizer`, a reader-backed tokenizer that
+  streams JSON from an `io.Reader`, pulling it in 4096-byte chunks into the
+  tokenizer's buffer. The returned slices alias that growing buffer and are valid
+  only until the next read, so callers must copy to retain them; a value that
+  straddles a read boundary is refilled and rescanned, and a non-EOF read error
+  surfaces wrapped as the tokenizer's sticky error. The slice-backed
+  `NewTokenizer([]byte)` path is unchanged. (Task N002.)
+- `qijson`: the reader-backed tokenizer reads successive top-level values from
+  one stream (NDJSON) and reports `KindEnd` at the end of the input, instead of
+  rejecting a trailing value with `after top-level value`. Only reader-backed
+  tokenizers gain multi-value semantics; `NewTokenizer([]byte)` still holds a
+  single document and rejects any trailing byte. (Task N003.)
+- `qijson`: `Tokenizer.Token() (Token, error)` plus the `Token`, `Number` and
+  `Delim` types, the single-call alternative to the pull-based `Peek`/`Read*`
+  surface. It returns the next token (`nil`, `bool`, `Number`, `string` or
+  `Delim`) and `io.EOF` once the stream is exhausted; numbers stay raw literals
+  (`Number`, never a `float64`), strings keep their escape sequences, and the
+  separators between members and elements are consumed internally. A returned
+  token is a copy and safe to retain. (Task N004.)
+- `qijson`: the formatting and escaping surface — `Indent`, `Compact`,
+  `HTMLEscape`, `MarshalIndent`, and the sticky `Writer.SetIndent` and
+  `SetEscapeHTML`. `Indent`/`Compact`/`HTMLEscape` mirror the `encoding/json`
+  signatures (`*bytes.Buffer` destination plus `src []byte`); HTML escaping stays
+  off by default, a deliberate divergence from `encoding/json`, and is enabled
+  explicitly. (Task N005.)
+- `qijson`: the omit hooks `Optional` (`IsDefined() bool`) and `IsZero`
+  (`IsZero() bool`), so a field type can decide for itself whether it carries a
+  value under `omitempty`. The generator detects them through `go/types`
+  method-set inspection and wraps the emitted `Field`'s `Empty` closure; `IsZero`
+  takes precedence over `Optional` and a pointer field is nil-guarded. Detection
+  is by method name, so any type with an `IsZero() bool` method participates.
+  (Task H001.)
+- `qijson`: the `UnmarshalUnknown`/`MarshalUnknowns` unknown-fields proxy, a
+  reflection-free, opt-in round-trip for object members that bind to no field. A
+  decode target implementing `UnmarshalUnknown` receives each unmatched member
+  (decoded name plus a copied raw JSON value it owns); an encode target
+  implementing `MarshalUnknowns` writes those members back after the declared
+  fields. `RejectUnknown` takes precedence over `UnmarshalUnknown`. (Task H002.)
+- `qijson`: `Writer.BuildBytes(reuse ...[]byte) []byte`, the writer-buffer reuse
+  surface. Unlike `Bytes` it never hands out the internal buffer: the document is
+  appended to the optional caller-supplied buffer (reusing its capacity) or to a
+  fresh one, the result is owned by the caller, and the `Writer` stays valid and
+  reusable across a `Reset`; a failed `Writer` returns `nil`. `Marshal` and
+  `Schema.Marshal` now route through it. (Task E004.)
+- Tests: a `bench/` comparative benchmark harness, a separate, non-shipped Go
+  module that benchmarks qi-json against `encoding/json` and `mailru/easyjson`
+  on identical documents (marshal and unmarshal of 1 and 100 records), so the
+  three-way numbers are reproducible. (Task Q010.)
 
 ### Changed
 
+- Performance: the encoder pools reusable `Writer` buffers (a `sync.Pool`-backed
+  buffer, 1 KiB fresh sizing and a 64 KiB retention cap) and routes `Marshal` and
+  `Schema.Marshal` through the pool, returning a freshly allocated, caller-owned
+  copy so the result never aliases the shared buffer. No exported name changed.
+  (Tasks E002, E003.)
+- Performance: the decoder builds one library-owned copy of the document and
+  returns clean strings and number literals as zero-copy substrings of it
+  (escape sequences keep the existing unescape path), and preallocates slice and
+  map capacity from a look-ahead count of the container's own separators. Decoded
+  values still never alias the caller's input buffer and the exported surface is
+  unchanged. (Tasks D011, D012.)
 - Governance: feature and task branches are now created from `dev` instead of
   `main`, because the newest integrated work lives on `dev` for a long time
   before a release promotes it to `main`, so a branch cut from `main` would start
   from stale code. Recorded in the constitution (v3.12.0), `AGENTS.md` and the
   README. No code or public API change.
+- Governance: Article VI is amended (v3.13.0) with a fourth sanctioned surface
+  covering the network/streaming, formatting and hooks identifiers above, which
+  had to be registered before their implementation tasks could land. (Task M009.)
+- Governance: the `encoding/json` parity track (Track B: `any`-based entry
+  points, cached tag binding, `Marshaler`/`Unmarshaler`, stdlib-shaped error
+  types) is declined; the no-reflection identity is preserved and Article III/VI
+  are unchanged, since a decline is not an amendment. (Task M010.)
+- Governance: Article VI is amended (v3.14.0) to register
+  `Writer.BuildBytes(reuse ...[]byte)` on the encoder surface before E004 landed.
+  (Task M012.)
+- Governance: Article III is amended (v3.15.0) to carve out the single in-repo,
+  non-shipped `bench/` comparative benchmark module; the `encoding/json` and
+  third-party-dependency prohibitions now scope to the shipped module. (Task
+  M013.)
+- Governance: the constitution gains a **Documentation Ownership** section
+  (v3.16.0) — `README.md` may be changed only on the user's direct instruction,
+  and a request to read, check or review it is not authorization to change it —
+  mirrored in `AGENTS.md`. No code or public API change. (Task M014.)
+- Documentation: `README.md` is rewritten to a concise form (531 → 119 lines),
+  correcting the `qijson.Error` reference and normalizing the benchmark table to
+  plain spaces. No code change. (Task M015.)
 
 ## [0.4.2] - 2026-11-23
 

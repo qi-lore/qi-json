@@ -123,7 +123,9 @@ never renumber, never reuse a retired identifier.
 - [X] M007 - Normalize the plan files' headers to design records
 - [X] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
 - [X] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
+- [X] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 - [X] M011 - Create feature/task branches from `dev`, not `main` (constitution v3.12.0)
+- [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
 - [X] M013 - Constitution amendment (Article III) for the in-repo `bench/` comparative benchmark module
 - [X] M014 - Constitution amendment (Documentation Ownership): the README needs a direct user instruction to edit
 - [X] M015 - Correct the README: fix the `qijson.Error` typo and normalize the benchmark table
@@ -146,11 +148,6 @@ never renumber, never reuse a retired identifier.
 - [X] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
 
 ## Planned
-
-### Module, packaging and governance
-
-- [X] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
-- [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
 
 ### API parity
 
