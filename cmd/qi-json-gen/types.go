@@ -144,6 +144,64 @@ func qijsonMethod(fn *types.Func, want string) bool {
 	return types.Identical(sig.Results().At(0).Type(), types.Universe.Lookup("error").Type())
 }
 
+// omitHook returns the emptiness closure that applies a field's omit hook when
+// its declared type implements qijson.IsZero or qijson.Optional, and ok=false
+// when it implements neither. IsZero takes precedence over Optional. A pointer
+// field is guarded against nil, so a nil pointer is treated as empty without
+// calling the hook on a nil receiver.
+//
+// The decision is read from go/types: a value field is addressable (the owner is
+// a pointer), so a pointer-receiver hook on the value type is reachable and is
+// considered; a pointer field uses the pointer type's own method set. Detection
+// is best-effort, so a type the checker could not resolve falls back to the
+// default zero/nil check.
+func (g *gen) omitHook(owner, fname string, expr ast.Expr) (string, bool) {
+	if g.info == nil {
+		return "", false
+	}
+	t := g.info.TypeOf(expr)
+	if t == nil {
+		return "", false
+	}
+	access := "v." + fname
+	guard := ""
+	if _, isPtr := t.(*types.Pointer); isPtr {
+		guard = access + " == nil || "
+	} else {
+		t = types.NewPointer(t)
+	}
+	switch {
+	case hasBoolMethod(t, "IsZero"):
+		g.needEmpty = true
+		return fmt.Sprintf("func(v *%s) bool { return %s%s.IsZero() }", owner, guard, access), true
+	case hasBoolMethod(t, "IsDefined"):
+		g.needEmpty = true
+		return fmt.Sprintf("func(v *%s) bool { return %s!%s.IsDefined() }", owner, guard, access), true
+	default:
+		return "", false
+	}
+}
+
+// hasBoolMethod reports whether t's method set has a method named name with the
+// signature func() bool, the shape qijson's omit hooks require.
+func hasBoolMethod(t types.Type, name string) bool {
+	ms := types.NewMethodSet(t)
+	for i := 0; i < ms.Len(); i++ {
+		fn, ok := ms.At(i).Obj().(*types.Func)
+		if !ok || fn.Name() != name {
+			continue
+		}
+		sig, ok := fn.Type().(*types.Signature)
+		if !ok || sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			continue
+		}
+		if b, ok := sig.Results().At(0).Type().(*types.Basic); ok && b.Kind() == types.Bool {
+			return true
+		}
+	}
+	return false
+}
+
 // The public facade package and the engine it re-exports. A method written as
 // DecodeJSON(*qijson.Reader) type-checks either as an alias to the engine type
 // or as the engine type itself, depending on how the toolchain materializes

@@ -259,6 +259,41 @@ func TestGeneratedForeignOverride(t *testing.T) {
 	}
 }
 
+// TestGeneratedOmitHooks proves the generated schema honours the Optional and
+// IsZero omit hooks end to end: omission follows the hook, not the underlying
+// zero value, and a hook type without omitempty is always written.
+func TestGeneratedOmitHooks(t *testing.T) {
+	// Stamp(0) is not "empty" for its hook (only negatives are) and Tag("") is
+	// defined, so both are written; Plain(0) is omitted by the default check and
+	// Keep has no omitempty, so it is always written.
+	data, err := qijson.Marshal[Hooks](Hooks{})
+	if err != nil {
+		t.Fatalf("Marshal(zero): %v", err)
+	}
+	if got, want := string(data), `{"stamp":0,"tag":"","keep":0}`; got != want {
+		t.Errorf("Marshal(zero) = %s, want %s", got, want)
+	}
+
+	// Stamp(-1) and Tag("none") are empty by their hooks; Plain(0) is empty by
+	// the default check; Keep is always written.
+	data, err = qijson.Marshal[Hooks](Hooks{Stamp: -1, Tag: "none", Keep: -2})
+	if err != nil {
+		t.Fatalf("Marshal(empty-by-hook): %v", err)
+	}
+	if got, want := string(data), `{"keep":-2}`; got != want {
+		t.Errorf("Marshal(empty-by-hook) = %s, want %s", got, want)
+	}
+
+	// Every field carries a value; nothing is omitted.
+	data, err = qijson.Marshal[Hooks](Hooks{Stamp: 7, Tag: "x", Plain: 3})
+	if err != nil {
+		t.Fatalf("Marshal(populated): %v", err)
+	}
+	if got, want := string(data), `{"stamp":7,"tag":"x","plain":3,"keep":0}`; got != want {
+		t.Errorf("Marshal(populated) = %s, want %s", got, want)
+	}
+}
+
 // TestGeneratedStrict checks that a -strict schema rejects unknown and duplicate
 // members end to end.
 func TestGeneratedStrict(t *testing.T) {

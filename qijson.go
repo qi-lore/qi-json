@@ -319,6 +319,29 @@ func Struct[T any](fields ...Field[T]) *Schema[T] {
 // shared.
 type Field[T any] = codec.Field[T]
 
+// Optional is implemented by a field type that decides for itself whether it
+// carries a value. Under `omitempty` a field whose declared type implements
+// Optional is omitted exactly when its IsDefined method reports false; a field
+// not marked for omission is always written. The generator wires this hook into
+// the field's emptiness check; a hand-written Field may call IsDefined from its
+// Empty closure instead.
+//
+// A field type satisfies Optional through a value receiver or a pointer
+// receiver: it is enough that the type or a pointer to it has the method.
+type Optional = codec.Optional
+
+// IsZero is implemented by a field type that defines its own notion of
+// emptiness. Under `omitempty` a field whose declared type implements IsZero is
+// omitted exactly when its IsZero method reports true; a field not marked for
+// omission is always written. When a type implements both IsZero and Optional,
+// IsZero takes precedence. The generator wires this hook into the field's
+// emptiness check; a hand-written Field may call IsZero from its Empty closure
+// instead.
+//
+// A field type satisfies IsZero through a value receiver or a pointer receiver:
+// it is enough that the type or a pointer to it has the method.
+type IsZero = codec.IsZero
+
 // String binds a JSON string member to a *string field of T. A JSON null leaves
 // the field unchanged.
 func String[T any](name string, field func(*T) *string) Field[T] {

@@ -102,6 +102,24 @@ var (
 	_ func([]byte, *smokeConfig) error                                                                 = qijson.UnmarshalInto[smokeConfig, *smokeConfig]
 )
 
+// The omit hooks are re-exported through the facade as aliases of the engine
+// interfaces, so a type implementing qijson.IsZero or qijson.Optional satisfies
+// the engine interface too. A drift in either interface fails the build.
+type omitOptional string
+
+func (o omitOptional) IsDefined() bool { return o != "" }
+
+type omitIsZero int64
+
+func (z omitIsZero) IsZero() bool { return z == 0 }
+
+var (
+	_ qijson.Optional = omitOptional("")
+	_ qijson.IsZero   = omitIsZero(0)
+	_ codec.Optional  = omitOptional("")
+	_ codec.IsZero    = omitIsZero(0)
+)
+
 // smokeConfig is a minimal type bound through the facade only: its schema, its
 // methods and the field closures all name qijson, never codec.
 type smokeConfig struct {
@@ -271,6 +289,44 @@ func TestFacadeFieldLiteral(t *testing.T) {
 	}
 	if got := string(data); got != `{"n":-7}` {
 		t.Fatalf("Marshal = %s", got)
+	}
+}
+
+// TestFacadeOmitHooks proves the omit-hook interfaces are usable from outside
+// the module: a hand-written Field whose Empty calls IsZero or IsDefined omits
+// the member exactly when the hook says so, which is what generated code emits.
+func TestFacadeOmitHooks(t *testing.T) {
+	type cfg struct {
+		Zip omitIsZero
+		Opt omitOptional
+	}
+	schema := qijson.Struct(
+		qijson.Field[cfg]{
+			Name:   "zip",
+			Encode: func(w *qijson.Writer, c *cfg) error { return w.WriteInt(int64(c.Zip)) },
+			Empty:  func(c *cfg) bool { return c.Zip.IsZero() },
+		}.OmitEmpty(),
+		qijson.Field[cfg]{
+			Name:   "opt",
+			Encode: func(w *qijson.Writer, c *cfg) error { return w.WriteString(string(c.Opt)) },
+			Empty:  func(c *cfg) bool { return !c.Opt.IsDefined() },
+		}.OmitEmpty(),
+	)
+
+	data, err := schema.Marshal(cfg{})
+	if err != nil {
+		t.Fatalf("Marshal(empty): %v", err)
+	}
+	if got := string(data); got != `{}` {
+		t.Fatalf("Marshal(empty) = %s, want {}", got)
+	}
+
+	data, err = schema.Marshal(cfg{Zip: 5, Opt: "x"})
+	if err != nil {
+		t.Fatalf("Marshal(full): %v", err)
+	}
+	if got := string(data); got != `{"zip":5,"opt":"x"}` {
+		t.Fatalf("Marshal(full) = %s, want {\"zip\":5,\"opt\":\"x\"}", got)
 	}
 }
 

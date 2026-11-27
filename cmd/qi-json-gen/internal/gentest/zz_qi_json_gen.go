@@ -428,6 +428,84 @@ func (v *Nums) EncodeJSON(w *qijson.Writer) error {
 	return numsSchema.Encode(w, v)
 }
 
+var hooksSchema = qijson.Struct[Hooks](
+	qiEmpty(qijson.Field[Hooks]{Name: "stamp", Decode: func(r *qijson.Reader, v *Hooks) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == qijson.KindNull {
+			return r.ReadNull()
+		}
+		n, err := r.ReadInt()
+		if err != nil {
+			return err
+		}
+		if int64(Stamp(n)) != n {
+			return qiRangeError(r, "Stamp")
+		}
+		v.Stamp = Stamp(n)
+		return nil
+	},
+		Encode: func(w *qijson.Writer, v *Hooks) error {
+			return w.WriteInt(int64(v.Stamp))
+		},
+		Empty: func(v *Hooks) bool { return v.Stamp == 0 },
+	}, func(v *Hooks) bool { return v.Stamp.IsZero() }).OmitEmpty(),
+	qiEmpty(qijson.Field[Hooks]{Name: "tag", Decode: func(r *qijson.Reader, v *Hooks) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == qijson.KindNull {
+			return r.ReadNull()
+		}
+		s, err := r.ReadString()
+		if err != nil {
+			return err
+		}
+		v.Tag = Tag(s)
+		return nil
+	},
+		Encode: func(w *qijson.Writer, v *Hooks) error {
+			return w.WriteString(string(v.Tag))
+		},
+		Empty: func(v *Hooks) bool { return v.Tag == "" },
+	}, func(v *Hooks) bool { return !v.Tag.IsDefined() }).OmitEmpty(),
+	qijson.Int[Hooks]("plain", func(v *Hooks) *int64 { return &v.Plain }).OmitEmpty(),
+	qijson.Field[Hooks]{Name: "keep", Decode: func(r *qijson.Reader, v *Hooks) error {
+		k, err := r.Peek()
+		if err != nil {
+			return err
+		}
+		if k == qijson.KindNull {
+			return r.ReadNull()
+		}
+		n, err := r.ReadInt()
+		if err != nil {
+			return err
+		}
+		if int64(Stamp(n)) != n {
+			return qiRangeError(r, "Stamp")
+		}
+		v.Keep = Stamp(n)
+		return nil
+	},
+		Encode: func(w *qijson.Writer, v *Hooks) error {
+			return w.WriteInt(int64(v.Keep))
+		},
+		Empty: func(v *Hooks) bool { return v.Keep == 0 },
+	},
+)
+
+func (v *Hooks) DecodeJSON(r *qijson.Reader) error {
+	return hooksSchema.Decode(r, v)
+}
+
+func (v *Hooks) EncodeJSON(w *qijson.Writer) error {
+	return hooksSchema.Encode(w, v)
+}
+
 var xtypesInnerSchema = qijson.Struct[xtypes.Inner](
 	qijson.Int[xtypes.Inner]("code", func(v *xtypes.Inner) *int64 { return &v.Code }),
 )
@@ -657,4 +735,9 @@ func qiRangeError(r *qijson.Reader, want string) error {
 		Kind:   qijson.KindType,
 		Err:    &qijson.TypeError{Want: want, Got: "number out of range"},
 	}
+}
+
+func qiEmpty[T any](f qijson.Field[T], empty func(*T) bool) qijson.Field[T] {
+	f.Empty = empty
+	return f
 }
