@@ -342,6 +342,37 @@ type Optional = codec.Optional
 // it is enough that the type or a pointer to it has the method.
 type IsZero = codec.IsZero
 
+// UnmarshalUnknown is implemented by a decode target that wants to receive the
+// object members no field matches, instead of seeing them ignored. During
+// Schema.Decode the decoder calls UnmarshalUnknown once per unmatched member:
+// name is the member name, decoded from any JSON escape sequences, and raw is the
+// member value as its exact JSON bytes, passed as a copy the callee owns and may
+// retain. A non-nil error aborts the decode and is returned unchanged.
+//
+// RejectUnknown takes precedence: when a Schema has both, an unmatched member is
+// reported as an unknown-field error and UnmarshalUnknown is not called. Known
+// members bind to their fields as usual, and a duplicate known member follows the
+// RejectDuplicate policy independently.
+//
+// A target satisfies UnmarshalUnknown through a value receiver or a pointer
+// receiver; it is discovered by a type assertion on the decode target, so no
+// reflection is involved. Pair it with MarshalUnknowns to round-trip the captured
+// members back on encode.
+type UnmarshalUnknown = codec.UnmarshalUnknown
+
+// MarshalUnknowns is implemented by an encode target that holds members captured
+// by UnmarshalUnknown and wants them written back. During Schema.Encode the
+// encoder calls MarshalUnknowns once, after the declared fields and while the
+// object is still open, so the implementation writes each extra member with
+// Writer.Key followed by a value. The extra members follow the declared fields,
+// in the order the implementation writes them. A non-nil error aborts the encode
+// and is returned unchanged.
+//
+// A target satisfies MarshalUnknowns through a value receiver or a pointer
+// receiver; it is discovered by a type assertion on the encode target, so no
+// reflection is involved.
+type MarshalUnknowns = codec.MarshalUnknowns
+
 // String binds a JSON string member to a *string field of T. A JSON null leaves
 // the field unchanged.
 func String[T any](name string, field func(*T) *string) Field[T] {

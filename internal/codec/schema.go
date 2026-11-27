@@ -67,8 +67,10 @@ func Struct[T any](fields ...Field[T]) *Schema[T] {
 }
 
 // RejectUnknown returns s configured to fail on an object member that no field
-// matches. By default such members are ignored. It mutates s, so it must not run
-// concurrently with any use of s or with RejectDuplicate.
+// matches. By default such members are ignored, or captured when the target
+// implements UnmarshalUnknown; RejectUnknown takes precedence over that hook. It
+// mutates s, so it must not run concurrently with any use of s or with
+// RejectDuplicate.
 func (s *Schema[T]) RejectUnknown() *Schema[T] {
 	s.rejectUnknown = true
 	return s
@@ -83,8 +85,10 @@ func (s *Schema[T]) RejectDuplicate() *Schema[T] {
 }
 
 // Decode reads one JSON object from r and stores its members into v. A member
-// that no field matches is ignored unless RejectUnknown was set; a member that
-// repeats is overwritten unless RejectDuplicate was set.
+// that no field matches is ignored, unless RejectUnknown was set (it becomes an
+// error) or v implements UnmarshalUnknown (it is captured instead); RejectUnknown
+// takes precedence. A member that repeats is overwritten unless RejectDuplicate
+// was set.
 //
 // A nil v is a programming error reported as errNilTarget rather than a panic,
 // matching the other decode entry points.
@@ -96,6 +100,10 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 		return errNilTarget
 	}
 
+	// Discover the unknown-member hook once, before the member loop. A target
+	// that does not implement it leaves uu nil and keeps the skip path.
+	uu, _ := any(v).(UnmarshalUnknown)
+
 	var seen []bool
 	if s.rejectDuplicate {
 		seen = make([]bool, len(s.fields))
@@ -106,6 +114,9 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 		if f == nil {
 			if s.rejectUnknown {
 				return r.unknownField(raw)
+			}
+			if uu != nil {
+				return r.captureUnknown(uu, raw)
 			}
 			return r.Skip()
 		}
@@ -126,6 +137,9 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 
 // Encode writes v as a JSON object to w, emitting members in declaration order.
 // A field whose OmitEmpty is set and whose Empty reports true is skipped.
+//
+// After the declared fields, if v implements MarshalUnknowns its extra members
+// are written into the same object, in the order the implementation writes them.
 func (s *Schema[T]) Encode(w *Writer, v *T) error {
 	if s.buildErr != nil {
 		return s.buildErr
@@ -145,6 +159,11 @@ func (s *Schema[T]) Encode(w *Writer, v *T) error {
 			return err
 		}
 		if err := f.Encode(w, v); err != nil {
+			return err
+		}
+	}
+	if mu, ok := any(v).(MarshalUnknowns); ok {
+		if err := mu.MarshalUnknowns(w); err != nil {
 			return err
 		}
 	}
