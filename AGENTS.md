@@ -81,6 +81,13 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   `go install github.com/qi-lore/qi-json/cmd/qi-json-gen@vX.Y.Z` (see the README's
   "Installing the generator"). There are no prebuilt release artifacts.
 
+## Documentation ownership
+
+- `README.md` is owned by the user. Do not edit it, reformat it, or add anything
+  to it without a direct, explicit instruction from the user: a request to read,
+  check or review the README is not an authorization to change it. Any change to
+  `README.md` requires the user's direct instruction beforehand.
+
 ## Task tracking
 
 - `docs/tasks.md` is the single source of truth for task state: one line per task,

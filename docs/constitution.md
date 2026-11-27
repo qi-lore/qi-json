@@ -313,10 +313,18 @@ operation blocks, so the goroutine and context rules bind only when such code is
 added. Where the current code does not yet meet a rule, the gap is a refactoring
 task tracked in `docs/tasks.md`.
 
+## Documentation Ownership
+
+`README.md` is owned by the user. An agent MUST NOT edit it, reformat it, or add
+anything to it without a direct, explicit instruction from the user: a request to
+read, check or review the README is not an authorization to change it. Any change
+to `README.md` requires the user's direct instruction beforehand, so the file is
+never modified on an agent's own initiative.
+
 ## Governance
 
 This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.15.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-27
+**Version**: 3.16.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-27
