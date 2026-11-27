@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-27
+
+### Changed
+
+- The `example/` demo now binds its struct through the `qi-json-gen` code
+  generator instead of hand-written accessor closures, and its type is renamed
+  from `Server` to `User` with user-shaped fields
+  (`name`/`age`/`verified`/`rating`). (Task M017.)
+
 ## [0.5.3] - 2026-11-27
 
 ### Added
