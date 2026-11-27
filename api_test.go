@@ -1,7 +1,10 @@
 package qijson_test
 
 import (
+	"bytes"
 	"errors"
+	"io"
+	"strconv"
 	"testing"
 
 	"github.com/qi-lore/qi-json"
@@ -26,11 +29,12 @@ var (
 // are aliases of the internal scanner's, and the seven Kind constants are
 // values of that type, so Reader.Peek's result compares equal to them.
 var (
-	_ scanner.Kind                   = qijson.KindNull
-	_ qijson.Kind                    = scanner.KindEnd
-	_ *scanner.Tokenizer             = (*qijson.Tokenizer)(nil)
-	_ func([]byte) bool              = qijson.Valid
-	_ func([]byte) *qijson.Tokenizer = qijson.NewTokenizer
+	_ scanner.Kind                      = qijson.KindNull
+	_ qijson.Kind                       = scanner.KindEnd
+	_ *scanner.Tokenizer                = (*qijson.Tokenizer)(nil)
+	_ func([]byte) bool                 = qijson.Valid
+	_ func([]byte) *qijson.Tokenizer    = qijson.NewTokenizer
+	_ func(io.Reader) *qijson.Tokenizer = qijson.NewDecoder
 
 	_ qijson.Kind = qijson.KindNull
 	_ qijson.Kind = qijson.KindBool
@@ -39,6 +43,31 @@ var (
 	_ qijson.Kind = qijson.KindObject
 	_ qijson.Kind = qijson.KindArray
 	_ qijson.Kind = qijson.KindEnd
+)
+
+// The token-level streaming surface is re-exported through the facade: Token,
+// Number and Delim are aliases of the engine's, so a token type-asserted here is
+// identical to the engine's, and Tokenizer.Token carries the engine's signature.
+var (
+	_ qijson.Token  = qijson.Number("1")
+	_ qijson.Token  = qijson.Delim('{')
+	_ scanner.Token = qijson.Number("1")
+	_ qijson.Number = scanner.Number("1")
+	_ qijson.Delim  = scanner.Delim('{')
+
+	_ func(*qijson.Tokenizer) (qijson.Token, error) = (*qijson.Tokenizer).Token
+)
+
+// The formatting surface is re-exported through the facade: the four package
+// functions and the two Writer configuration methods. The signatures are pinned
+// so a drift in the public API fails the build.
+var (
+	_ func(*bytes.Buffer, []byte, string, string) error = qijson.Indent
+	_ func(*bytes.Buffer, []byte) error                 = qijson.Compact
+	_ func(*bytes.Buffer, []byte)                       = qijson.HTMLEscape
+	_ func(smokeConfig, string, string) ([]byte, error) = qijson.MarshalIndent[smokeConfig, *smokeConfig]
+	_ func(*qijson.Writer, string, string)              = (*qijson.Writer).SetIndent
+	_ func(*qijson.Writer, bool)                        = (*qijson.Writer).SetEscapeHTML
 )
 
 // These compile-time assertions pin the signature of every constructor and entry
@@ -65,9 +94,71 @@ var (
 	_ func() *qijson.Writer                                                                            = qijson.NewWriter
 	_ func([]byte, qijson.Decoder) error                                                               = qijson.Decode
 	_ func(*qijson.Writer, qijson.Encoder) error                                                       = qijson.Encode
+	_ func(*qijson.Writer, ...[]byte) []byte                                                           = (*qijson.Writer).BuildBytes
+	_ func(*qijson.Writer, io.Writer) (int, error)                                                     = (*qijson.Writer).DumpTo
+	_ func(*qijson.Writer) (io.ReadCloser, error)                                                      = (*qijson.Writer).ReadCloser
 	_ func(smokeConfig) ([]byte, error)                                                                = qijson.Marshal[smokeConfig, *smokeConfig]
 	_ func([]byte) (smokeConfig, error)                                                                = qijson.Unmarshal[smokeConfig, *smokeConfig]
 	_ func([]byte, *smokeConfig) error                                                                 = qijson.UnmarshalInto[smokeConfig, *smokeConfig]
+)
+
+// The omit hooks are re-exported through the facade as aliases of the engine
+// interfaces, so a type implementing qijson.IsZero or qijson.Optional satisfies
+// the engine interface too. A drift in either interface fails the build.
+type omitOptional string
+
+func (o omitOptional) IsDefined() bool { return o != "" }
+
+type omitIsZero int64
+
+func (z omitIsZero) IsZero() bool { return z == 0 }
+
+var (
+	_ qijson.Optional = omitOptional("")
+	_ qijson.IsZero   = omitIsZero(0)
+	_ codec.Optional  = omitOptional("")
+	_ codec.IsZero    = omitIsZero(0)
+)
+
+// The unknown-member hooks are re-exported through the facade as aliases of the
+// engine interfaces, so a type implementing qijson.UnmarshalUnknown or
+// qijson.MarshalUnknowns satisfies the engine interface too. A drift in either
+// interface or method signature fails the build.
+type rawMember struct {
+	name string
+	raw  []byte
+}
+
+type unknownOwner struct {
+	A     int64
+	extra []rawMember
+}
+
+func (v *unknownOwner) UnmarshalUnknown(name string, raw []byte) error {
+	v.extra = append(v.extra, rawMember{name: name, raw: raw})
+	return nil
+}
+
+func (v *unknownOwner) MarshalUnknowns(w *qijson.Writer) error {
+	for _, m := range v.extra {
+		if err := w.Key(m.name); err != nil {
+			return err
+		}
+		if err := w.WriteRaw(m.raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var (
+	_ qijson.UnmarshalUnknown = (*unknownOwner)(nil)
+	_ qijson.MarshalUnknowns  = (*unknownOwner)(nil)
+	_ codec.UnmarshalUnknown  = (*unknownOwner)(nil)
+	_ codec.MarshalUnknowns   = (*unknownOwner)(nil)
+
+	_ func(*unknownOwner, string, []byte) error = (*unknownOwner).UnmarshalUnknown
+	_ func(*unknownOwner, *qijson.Writer) error = (*unknownOwner).MarshalUnknowns
 )
 
 // smokeConfig is a minimal type bound through the facade only: its schema, its
@@ -125,6 +216,71 @@ func TestFacadeRoundTrip(t *testing.T) {
 	}
 }
 
+// TestFacadeBuildBytes proves the writer-buffer reuse surface is reachable from
+// outside the module: BuildBytes returns a caller-owned copy of the document and
+// reuses the capacity of a supplied buffer.
+func TestFacadeBuildBytes(t *testing.T) {
+	want := smokeConfig{Name: "qi-json", Port: 8080}
+	w := qijson.NewWriter()
+	if err := qijson.Encode(w, &want); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+
+	doc := w.BuildBytes()
+	if wantDoc := `{"name":"qi-json","port":8080}`; string(doc) != wantDoc {
+		t.Fatalf("BuildBytes = %s, want %s", doc, wantDoc)
+	}
+
+	const reuseCap = 4096
+	buf := make([]byte, 0, reuseCap)
+	got := w.BuildBytes(buf)
+	if string(got) != string(doc) {
+		t.Fatalf("BuildBytes(reuse) = %s, want %s", got, doc)
+	}
+	if cap(got) != reuseCap {
+		t.Errorf("cap(got) = %d, want the reused %d", cap(got), reuseCap)
+	}
+}
+
+// TestFacadeStreamOutput proves the encode-streaming surface is reachable from
+// outside the module: DumpTo writes the document to an io.Writer and ReadCloser
+// hands it out as an io.ReadCloser.
+func TestFacadeStreamOutput(t *testing.T) {
+	want := smokeConfig{Name: "qi-json", Port: 8080}
+	const wantDoc = `{"name":"qi-json","port":8080}`
+
+	w := qijson.NewWriter()
+	if err := qijson.Encode(w, &want); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	var out bytes.Buffer
+	n, err := w.DumpTo(&out)
+	if err != nil {
+		t.Fatalf("DumpTo: %v", err)
+	}
+	if out.String() != wantDoc || n != len(wantDoc) {
+		t.Fatalf("DumpTo = (%q, %d), want (%q, %d)", out.String(), n, wantDoc, len(wantDoc))
+	}
+
+	if err := qijson.Encode(w, &want); err != nil {
+		t.Fatalf("Encode after DumpTo: %v", err)
+	}
+	rc, err := w.ReadCloser()
+	if err != nil {
+		t.Fatalf("ReadCloser: %v", err)
+	}
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if err := rc.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if string(got) != wantDoc {
+		t.Fatalf("ReadCloser = %s, want %s", got, wantDoc)
+	}
+}
+
 // TestFacadeErrorIdentity proves a *qijson.Error crosses the alias boundary, so
 // errors.As and errors.Is behave as they did before the engine moved.
 func TestFacadeErrorIdentity(t *testing.T) {
@@ -177,6 +333,69 @@ func TestFacadeFieldLiteral(t *testing.T) {
 	}
 }
 
+// TestFacadeOmitHooks proves the omit-hook interfaces are usable from outside
+// the module: a hand-written Field whose Empty calls IsZero or IsDefined omits
+// the member exactly when the hook says so, which is what generated code emits.
+func TestFacadeOmitHooks(t *testing.T) {
+	type cfg struct {
+		Zip omitIsZero
+		Opt omitOptional
+	}
+	schema := qijson.Struct(
+		qijson.Field[cfg]{
+			Name:   "zip",
+			Encode: func(w *qijson.Writer, c *cfg) error { return w.WriteInt(int64(c.Zip)) },
+			Empty:  func(c *cfg) bool { return c.Zip.IsZero() },
+		}.OmitEmpty(),
+		qijson.Field[cfg]{
+			Name:   "opt",
+			Encode: func(w *qijson.Writer, c *cfg) error { return w.WriteString(string(c.Opt)) },
+			Empty:  func(c *cfg) bool { return !c.Opt.IsDefined() },
+		}.OmitEmpty(),
+	)
+
+	data, err := schema.Marshal(cfg{})
+	if err != nil {
+		t.Fatalf("Marshal(empty): %v", err)
+	}
+	if got := string(data); got != `{}` {
+		t.Fatalf("Marshal(empty) = %s, want {}", got)
+	}
+
+	data, err = schema.Marshal(cfg{Zip: 5, Opt: "x"})
+	if err != nil {
+		t.Fatalf("Marshal(full): %v", err)
+	}
+	if got := string(data); got != `{"zip":5,"opt":"x"}` {
+		t.Fatalf("Marshal(full) = %s, want {\"zip\":5,\"opt\":\"x\"}", got)
+	}
+}
+
+// TestFacadeUnknownMembers proves the unknown-member hooks are usable from
+// outside the module: a type implementing qijson.UnmarshalUnknown captures the
+// members no field matches, and one implementing qijson.MarshalUnknowns writes
+// them back, so a document round-trips through the facade alone.
+func TestFacadeUnknownMembers(t *testing.T) {
+	schema := qijson.Struct(
+		qijson.Int[unknownOwner]("a", func(v *unknownOwner) *int64 { return &v.A }),
+	)
+	const in = `{"a":1,"b":"x","c":[1,2,3]}`
+	var got unknownOwner
+	if err := schema.UnmarshalInto([]byte(in), &got); err != nil {
+		t.Fatalf("UnmarshalInto: %v", err)
+	}
+	if got.A != 1 || len(got.extra) != 2 {
+		t.Fatalf("decoded %+v, want A=1 and two captured members", got)
+	}
+	out, err := schema.Marshal(got)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(out) != in {
+		t.Fatalf("round trip = %s, want %s", out, in)
+	}
+}
+
 // TestFacadeScannerSurface proves the re-exported syntax engine works through
 // the facade alone: Valid validates, and the tokenizer walks a document and
 // reports the Kind constants the facade publishes.
@@ -209,6 +428,198 @@ func TestFacadeScannerSurface(t *testing.T) {
 	}
 	if err := tok.EndArray(); err != nil {
 		t.Fatalf("EndArray: %v", err)
+	}
+}
+
+// TestFacadeNewDecoder proves the reader-backed tokenizer is reachable through
+// the facade: NewDecoder reads a document from an io.Reader and reports the
+// same Kind constants as the slice-backed tokenizer.
+func TestFacadeNewDecoder(t *testing.T) {
+	tok := qijson.NewDecoder(bytes.NewReader([]byte(`[1,"two"]`)))
+	if err := tok.BeginArray(); err != nil {
+		t.Fatalf("BeginArray: %v", err)
+	}
+	for i, want := range []qijson.Kind{qijson.KindNumber, qijson.KindString, qijson.KindEnd} {
+		k, err := tok.Peek()
+		if err != nil {
+			t.Fatalf("Peek #%d: %v", i, err)
+		}
+		if k != want {
+			t.Fatalf("Peek #%d = %v, want %v", i, k, want)
+		}
+		if want == qijson.KindEnd {
+			break
+		}
+		if err := tok.Skip(); err != nil {
+			t.Fatalf("Skip #%d: %v", i, err)
+		}
+	}
+	if err := tok.EndArray(); err != nil {
+		t.Fatalf("EndArray: %v", err)
+	}
+}
+
+// TestFacadeNewDecoderMultiValue proves the NDJSON loop through the facade
+// alone: NewDecoder reads several top-level values from one io.Reader, each
+// value's raw bytes are decoded with Decode, and Peek reports KindEnd at the end
+// of the stream.
+func TestFacadeNewDecoderMultiValue(t *testing.T) {
+	const stream = "{\"name\":\"a\",\"port\":1}\n{\"name\":\"b\",\"port\":2}\n"
+	dec := qijson.NewDecoder(bytes.NewReader([]byte(stream)))
+
+	var got []smokeConfig
+	for {
+		k, err := dec.Peek()
+		if err != nil {
+			t.Fatalf("Peek: %v", err)
+		}
+		if k == qijson.KindEnd {
+			break
+		}
+		if k != qijson.KindObject {
+			t.Fatalf("Peek = %v, want %v", k, qijson.KindObject)
+		}
+		raw, err := dec.ReadRaw()
+		if err != nil {
+			t.Fatalf("ReadRaw: %v", err)
+		}
+		var cfg smokeConfig
+		if err := qijson.Decode(raw, &cfg); err != nil {
+			t.Fatalf("Decode(%q): %v", raw, err)
+		}
+		got = append(got, cfg)
+	}
+
+	want := []smokeConfig{{Name: "a", Port: 1}, {Name: "b", Port: 2}}
+	if len(got) != len(want) {
+		t.Fatalf("decoded %d values, want %d: %v", len(got), len(want), got)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("value %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+// TestFacadeTokenStream proves token-level streaming is reachable through the
+// facade alone: Token returns the qijson.Token/Number/Delim union over a nested
+// document and reports io.EOF at the end of the stream.
+func TestFacadeTokenStream(t *testing.T) {
+	tok := qijson.NewTokenizer([]byte(`{"a":[1,true,null],"b":"two"}`))
+
+	var got []string
+	for {
+		tokv, err := tok.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Token: %v", err)
+		}
+		switch v := tokv.(type) {
+		case nil:
+			got = append(got, "null")
+		case bool:
+			got = append(got, "bool:"+strconv.FormatBool(v))
+		case qijson.Delim:
+			got = append(got, "delim:"+string(rune(v)))
+		case qijson.Number:
+			got = append(got, "num:"+string(v))
+		case string:
+			got = append(got, "str:"+v)
+		default:
+			t.Fatalf("Token = %T, want a qijson token type", tokv)
+		}
+	}
+
+	want := []string{
+		"delim:{", "str:a",
+		"delim:[", "num:1", "bool:true", "null", "delim:]",
+		"str:b", "str:two",
+		"delim:}",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("Token stream = %v, want %v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("token %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// TestFacadeTokenNewDecoder proves the token stream reads several top-level
+// values (NDJSON) through the facade and reports io.EOF at the end.
+func TestFacadeTokenNewDecoder(t *testing.T) {
+	dec := qijson.NewDecoder(bytes.NewReader([]byte("1\ntrue\n")))
+
+	var got []qijson.Token
+	for {
+		tokv, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Token: %v", err)
+		}
+		got = append(got, tokv)
+	}
+
+	if len(got) != 2 {
+		t.Fatalf("Token stream = %v, want 2 tokens", got)
+	}
+	if n, ok := got[0].(qijson.Number); !ok || string(n) != "1" {
+		t.Fatalf("token 0 = %#v, want Number(\"1\")", got[0])
+	}
+	if b, ok := got[1].(bool); !ok || !b {
+		t.Fatalf("token 1 = %#v, want true", got[1])
+	}
+}
+
+// TestFacadeFormatting proves the formatting surface is reachable through the
+// facade alone: Indent, Compact, HTMLEscape, MarshalIndent and the two Writer
+// configuration methods all work from outside the module.
+func TestFacadeFormatting(t *testing.T) {
+	var indented bytes.Buffer
+	if err := qijson.Indent(&indented, []byte(`{"a":1}`), "", "  "); err != nil {
+		t.Fatalf("Indent: %v", err)
+	}
+	if got := indented.String(); got != "{\n  \"a\": 1\n}" {
+		t.Fatalf("Indent = %q", got)
+	}
+
+	var compact bytes.Buffer
+	if err := qijson.Compact(&compact, []byte("{ \"a\" : 1 }")); err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if got := compact.String(); got != `{"a":1}` {
+		t.Fatalf("Compact = %q", got)
+	}
+
+	var escaped bytes.Buffer
+	qijson.HTMLEscape(&escaped, []byte(`"<"`))
+	if got := escaped.String(); got != `"\u003c"` {
+		t.Fatalf("HTMLEscape = %q", got)
+	}
+
+	data, err := qijson.MarshalIndent[smokeConfig](smokeConfig{Name: "a", Port: 1}, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent: %v", err)
+	}
+	wantDoc := "{\n  \"name\": \"a\",\n  \"port\": 1\n}"
+	if got := string(data); got != wantDoc {
+		t.Fatalf("MarshalIndent = %q, want %q", got, wantDoc)
+	}
+
+	w := qijson.NewWriter()
+	w.SetIndent("", "  ")
+	w.SetEscapeHTML(true)
+	if err := qijson.Encode(w, &smokeConfig{Name: "<x>", Port: 1}); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	wantCfg := "{\n  \"name\": \"\\u003cx\\u003e\",\n  \"port\": 1\n}"
+	if got := string(w.Bytes()); got != wantCfg {
+		t.Fatalf("Encode = %q, want %q", got, wantCfg)
 	}
 }
 

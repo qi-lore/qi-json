@@ -22,9 +22,18 @@ exact error messages and 1-based positions; never weaken them to make code pass.
 
 ### III. Standard Library Only
 
-No third-party dependencies. `encoding/json` MUST NOT be used anywhere in the
-module, including tests and benchmarks — writing our own scanner and decoder is
-the point of the project.
+No third-party dependencies in the shipped module. `encoding/json` MUST NOT be
+used anywhere in the shipped module, including its tests and benchmarks — writing
+our own scanner and decoder is the point of the project.
+
+The single carve-out is the `bench/` comparative benchmark module (added
+2026-11-27): a separate, non-shipped Go module with its own `go.mod`, whose only
+purpose is to benchmark qi-json against `encoding/json` and `mailru/easyjson`. It
+MAY import `encoding/json` and third-party comparison libraries. Nothing under
+`bench/` is part of the published `github.com/qi-lore/qi-json` module, the shipped
+packages MUST NOT import it, and the main module's verification gate does not
+traverse into it. Rationale:
+`.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`.
 
 ### IV. Syntax Contract
 
@@ -56,14 +65,17 @@ there: it returns the first `parseError` plus whether the input is invalid, so
 diagnostics stay testable without widening the API. The facade re-exports
 `Valid`, so callers never import the syntax package directly.
 
-Three further surfaces are sanctioned (amended 2026-11-21; the delegation
+Four further surfaces are sanctioned (amended 2026-11-21; the delegation
 constructor added 2026-11-22; the scanner moved behind `internal/scanner` and
-re-exported 2026-11-22; rationale:
+re-exported 2026-11-22; the network, formatting and hooks surface added
+2026-11-26; the `Writer.BuildBytes` writer-buffer reuse surface added
+2026-11-26; rationale:
 `.opencode/plan/2026-11-21-json-decoder.md`,
 `.opencode/plan/2026-11-21-json-codegen.md`,
 `.opencode/plan/2026-11-21-json-encoder.md`,
 `.opencode/plan/2026-11-22-third-party-struct-fields.md`,
-`.opencode/plan/2026-11-22-scanner-consolidation.md`; the decoder/encoder
+`.opencode/plan/2026-11-22-scanner-consolidation.md`,
+`.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`; the decoder/encoder
 package was relocated to the module root and renamed `qijson` per
 `.opencode/plan/2026-11-21-package-rename.md`):
 
@@ -86,8 +98,28 @@ package was relocated to the module root and renamed `qijson` per
   decoder: the `Encoder` interface (`EncodeJSON(*Writer) error`), `Writer` and
   `NewWriter`, the generic `Marshal` and non-generic `Encode`,
   `Schema.Encode`/`Schema.Marshal`, `Field.Encode`/`Field.Empty`/`Field.OmitEmpty`,
-  and the element `Codec` with `NewCodec`. Like the decoder it MUST NOT import
-  `encoding/json` and MUST NOT use `reflect` or `unsafe`.
+  `Writer.BuildBytes(reuse ...[]byte)`, and the element `Codec` with `NewCodec`.
+  `BuildBytes` returns the encoded document, appending into the optional
+  caller-supplied buffer to reuse its capacity; it never hands the writer's
+  pooled buffer to the caller, so the returned slice is owned by the caller and
+  the `Writer` stays reusable. It returns nil when the `Writer` holds a sticky
+  error, matching `Writer.Bytes` (implementation lands under the registry task
+  E004). Like the decoder it MUST NOT import `encoding/json` and MUST NOT
+  use `reflect` or `unsafe`.
+- **`qijson` network, formatting and hooks surface** — the Track A additions that
+  make the library production-complete without reflection. Streaming, both
+  directions: `Writer.DumpTo(io.Writer)` and `Writer.ReadCloser()` for encode
+  output; `NewDecoder(io.Reader)` over a refillable tokenizer source, so a caller
+  can decode several values from one stream (NDJSON); and `Token()` plus the
+  `Number`, `Delim` and `Token` types for token-level streaming. Formatting:
+  `MarshalIndent`, `Indent`, `Compact`, `HTMLEscape`, and `SetIndent` /
+  `SetEscapeHTML`. Extension hooks: `Optional` with `IsDefined() bool` and
+  `IsZero` with `IsZero() bool` as omit hooks, and the `UnmarshalUnknown` /
+  `MarshalUnknowns` round-trip proxy for unknown members. These names are the
+  sanctioned *surface*; their implementations land later under the registry tasks
+  N001, N002/N003, N004, N005, H001 and H002 (rationale:
+  `.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`, Track A items
+  A5–A10).
 - **`cmd/qi-json-gen`** — an optional, stdlib-only code generator that emits
   `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags, so callers need not hand-write the accessor closures. It is a `main`
@@ -157,6 +189,12 @@ success path MUST stay allocation-free (`TestValidDoesNotAllocate`).
     single-pass scanner (`valid.go`, `scan.go`, `token.go`, `doc.go`); internal,
     not a public surface;
   - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
+- One further, **non-shipped** module: `bench/` (its own `go.mod`) — the
+  comparative benchmark harness (qi-json vs `encoding/json` vs `mailru/easyjson`).
+  It is not part of the published module and is the sole Article III carve-out;
+  its code is verified by its own `go test`/`go build` inside `bench/`, not by the
+  main module's verification gate. It MUST stay `gofmt`-clean, because the root
+  `gofmt -l .` scans it.
 - New packages, files beyond the current layout, exported identifiers, or
   dependencies require an amendment to this constitution.
 
@@ -168,9 +206,12 @@ The repository uses a two-branch integration model. CI
 ### Branching model
 
 - `main` is the production-ready mainline.
-- `dev` is the integration branch.
-- Feature and task branches MUST be created from the current `main`, after
-  `git fetch` and a fast-forward update.
+- `dev` is the integration branch, and it carries the newest work: integrated
+  changes live there for a long time before a release promotes them to `main`.
+- Feature and task branches MUST be created from the current `dev` — not `main`
+  — after `git fetch` and a fast-forward update, because the latest changes live
+  on `dev` long before they reach `main`, and a branch cut from `main` would
+  start from stale code.
 - Feature branches MUST target `dev`.
 - Only the `dev` → `main` pull request is allowed to merge into `main`.
 - Branch names MUST strictly follow Conventional Branch
@@ -272,10 +313,18 @@ operation blocks, so the goroutine and context rules bind only when such code is
 added. Where the current code does not yet meet a rule, the gap is a refactoring
 task tracked in `docs/tasks.md`.
 
+## Documentation Ownership
+
+`README.md` is owned by the user. An agent MUST NOT edit it, reformat it, or add
+anything to it without a direct, explicit instruction from the user: a request to
+read, check or review the README is not an authorization to change it. Any change
+to `README.md` requires the user's direct instruction beforehand, so the file is
+never modified on an agent's own initiative.
+
 ## Governance
 
 This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.11.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-22
+**Version**: 3.16.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-27

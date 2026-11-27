@@ -11,7 +11,7 @@ import (
 	"github.com/qi-lore/qi-json/cmd/qi-json-gen/internal/gentest/xtypes"
 )
 
-//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=Config,Point,Nums
+//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=Config,Point,Nums,Hooks
 //go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=Overridden -foreign=xtypes.Inner=overriddenInnerSchema -o zz_qi_json_gen_foreign.go
 //go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -strict -type=Strict -o zz_qi_json_gen_strict.go
 
@@ -95,6 +95,32 @@ type Strict struct {
 // owns, emitted into zz_qi_json_gen_foreign.go rather than synthesized.
 type Overridden struct {
 	Inner xtypes.Inner `json:"inner"`
+}
+
+// Stamp is a named scalar whose omit hook marks negative values as empty, so an
+// omitempty Stamp field is omitted exactly when it is negative, not when it is
+// the underlying zero.
+type Stamp int64
+
+// IsZero reports whether s is empty for the omitempty hook.
+func (s Stamp) IsZero() bool { return s < 0 }
+
+// Tag is a named scalar whose omit hook marks the sentinel "none" as undefined,
+// so an omitempty Tag field is omitted exactly when it is "none", not when it is
+// the underlying empty string.
+type Tag string
+
+// IsDefined reports whether t carries a value for the omitempty hook.
+func (t Tag) IsDefined() bool { return t != "none" }
+
+// Hooks exercises the Optional and IsZero omit hooks end to end: Stamp and Tag
+// are omitted by their hooks, Plain by the default zero check, and Keep (no
+// omitempty) is always written.
+type Hooks struct {
+	Stamp Stamp `json:"stamp,omitempty"`
+	Tag   Tag   `json:"tag,omitempty"`
+	Plain int64 `json:"plain,omitempty"`
+	Keep  Stamp `json:"keep"`
 }
 
 // overriddenInnerSchema is the caller-supplied schema -foreign points the

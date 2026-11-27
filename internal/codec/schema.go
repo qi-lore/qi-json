@@ -67,8 +67,10 @@ func Struct[T any](fields ...Field[T]) *Schema[T] {
 }
 
 // RejectUnknown returns s configured to fail on an object member that no field
-// matches. By default such members are ignored. It mutates s, so it must not run
-// concurrently with any use of s or with RejectDuplicate.
+// matches. By default such members are ignored, or captured when the target
+// implements UnmarshalUnknown; RejectUnknown takes precedence over that hook. It
+// mutates s, so it must not run concurrently with any use of s or with
+// RejectDuplicate.
 func (s *Schema[T]) RejectUnknown() *Schema[T] {
 	s.rejectUnknown = true
 	return s
@@ -83,8 +85,10 @@ func (s *Schema[T]) RejectDuplicate() *Schema[T] {
 }
 
 // Decode reads one JSON object from r and stores its members into v. A member
-// that no field matches is ignored unless RejectUnknown was set; a member that
-// repeats is overwritten unless RejectDuplicate was set.
+// that no field matches is ignored, unless RejectUnknown was set (it becomes an
+// error) or v implements UnmarshalUnknown (it is captured instead); RejectUnknown
+// takes precedence. A member that repeats is overwritten unless RejectDuplicate
+// was set.
 //
 // A nil v is a programming error reported as errNilTarget rather than a panic,
 // matching the other decode entry points.
@@ -96,6 +100,10 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 		return errNilTarget
 	}
 
+	// Discover the unknown-member hook once, before the member loop. A target
+	// that does not implement it leaves uu nil and keeps the skip path.
+	uu, _ := any(v).(UnmarshalUnknown)
+
 	var seen []bool
 	if s.rejectDuplicate {
 		seen = make([]bool, len(s.fields))
@@ -106,6 +114,9 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 		if f == nil {
 			if s.rejectUnknown {
 				return r.unknownField(raw)
+			}
+			if uu != nil {
+				return r.captureUnknown(uu, raw)
 			}
 			return r.Skip()
 		}
@@ -126,6 +137,9 @@ func (s *Schema[T]) Decode(r *Reader, v *T) error {
 
 // Encode writes v as a JSON object to w, emitting members in declaration order.
 // A field whose OmitEmpty is set and whose Empty reports true is skipped.
+//
+// After the declared fields, if v implements MarshalUnknowns its extra members
+// are written into the same object, in the order the implementation writes them.
 func (s *Schema[T]) Encode(w *Writer, v *T) error {
 	if s.buildErr != nil {
 		return s.buildErr
@@ -148,15 +162,22 @@ func (s *Schema[T]) Encode(w *Writer, v *T) error {
 			return err
 		}
 	}
+	if mu, ok := any(v).(MarshalUnknowns); ok {
+		if err := mu.MarshalUnknowns(w); err != nil {
+			return err
+		}
+	}
 	return w.EndObject()
 }
 
 // Marshal encodes v as a JSON object. It is the counterpart to Unmarshal. The
 // returned []byte is freshly allocated and owned by the caller, who may keep and
-// modify it.
+// modify it. Internally the encoding reuses a pooled buffer, and the result is a
+// copy of it, so the returned slice never aliases that shared buffer.
 func (s *Schema[T]) Marshal(v T) ([]byte, error) {
-	var w Writer
-	if err := s.Encode(&w, &v); err != nil {
+	w := newPooledWriter()
+	defer w.release()
+	if err := s.Encode(w, &v); err != nil {
 		return nil, err
 	}
 	if w.err != nil {
@@ -165,7 +186,7 @@ func (s *Schema[T]) Marshal(v T) ([]byte, error) {
 	if !w.complete() {
 		return nil, errIncomplete
 	}
-	return w.buf, nil
+	return w.BuildBytes(), nil
 }
 
 // Unmarshal decodes data into a new T. data is not retained after the call.
@@ -186,7 +207,7 @@ func (s *Schema[T]) UnmarshalInto(data []byte, v *T) error {
 		return errNilTarget
 	}
 
-	r := newReader(scanner.NewTokenizer(data))
+	r := newReader(scanner.NewTokenizer(data), string(data))
 	if err := s.Decode(r, v); err != nil {
 		return err
 	}

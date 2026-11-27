@@ -17,8 +17,10 @@ A from-scratch JSON library with four Go packages:
   `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags. No `reflect`/`unsafe`; it targets only the exported `qijson` surface.
 
-The module root is the `qijson` package. No third-party dependencies. `make` wraps the
-common tasks. `docs/tasks.md` is the single source of truth for task state;
+The module root is the `qijson` package. No third-party dependencies in the
+shipped module (the `bench/` comparative benchmark module is a separate,
+non-shipped module and the sole exception). `make` wraps the common tasks.
+`docs/tasks.md` is the single source of truth for task state;
 `docs/constitution.md` governs changes. Plan files under `.opencode/plan/` hold
 design rationale and history only.
 
@@ -45,10 +47,11 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
 
 ## Git and review discipline
 
-- Branching: `main` is production, `dev` is integration. Create feature/task
-  branches from the current `main` (after `git fetch` and a fast-forward
-  update) and target `dev`; only the `dev` → `main` pull request may merge into
-  `main`. Branch names follow Conventional Branch
+- Branching: `main` is production, `dev` is integration and carries the newest
+  work (integrated changes live there for a long time before a release). Create
+  feature/task branches from the current `dev` (after `git fetch` and a
+  fast-forward update) and target `dev`; only the `dev` → `main` pull request
+  may merge into `main`. Branch names follow Conventional Branch
   (https://conventionalbranch.org/).
 - Commits: strict Conventional Commits with a full body (what changed, why, and
   any non-obvious decision).
@@ -77,6 +80,13 @@ Shortcut: `make verify` runs steps 1–4 in order and stops at the first failure
   `qi-json-gen` generator with
   `go install github.com/qi-lore/qi-json/cmd/qi-json-gen@vX.Y.Z` (see the README's
   "Installing the generator"). There are no prebuilt release artifacts.
+
+## Documentation ownership
+
+- `README.md` is owned by the user. Do not edit it, reformat it, or add anything
+  to it without a direct, explicit instruction from the user: a request to read,
+  check or review the README is not an authorization to change it. Any change to
+  `README.md` requires the user's direct instruction beforehand.
 
 ## Task tracking
 
@@ -117,9 +127,17 @@ and context rules bind only when such code is added. Open gaps are tracked in
 - `Valid(data []byte) bool` (in `internal/scanner`, re-exported as `qijson.Valid`)
   is the syntax layer's headline export — the same name and signature as
   `encoding/json.Valid`. The sanctioned public surface is exactly the `qijson`
-  decoder and encoder plus the re-exported syntax surface (`Valid`, `Kind` and
-  the tokenizer) (constitution Article VI); do not export anything else without a
-  new amendment.
+  decoder and encoder, the re-exported syntax surface (`Valid`, `Kind` and the
+  tokenizer), and the network/formatting/hooks additions: streaming
+  (`Writer.DumpTo`, `Writer.ReadCloser`, `NewDecoder(io.Reader)` with a
+  multi-value loop, `Token` plus `Number`/`Delim`/`Token`), formatting
+  (`MarshalIndent`, `Indent`, `Compact`, `HTMLEscape`, `SetIndent`,
+  `SetEscapeHTML`), and the omit hooks (`Optional`/`IsDefined`, `IsZero`) plus the
+  `UnmarshalUnknown`/`MarshalUnknowns` unknown-fields proxy, and the encoder's
+  `Writer.BuildBytes(reuse ...[]byte)` writer-buffer reuse surface (constitution
+  Article VI, amended 2026-11-26; rationale:
+  `.opencode/plan/2026-11-23-roadmap-network-perf-parity.md`). Do not export
+  anything else without a new amendment.
 - `validate(data []byte) (parseError, bool)` in `internal/scanner` is unexported
   and returns the first failure plus whether the input is invalid. Tests assert
   messages and 1-based positions through it; `Valid` is `!failed`. The error is a
@@ -169,8 +187,11 @@ and context rules bind only when such code is added. Open gaps are tracked in
   `encoding/json` and MUST NOT use `reflect` or `unsafe`.
   Generation must be deterministic (sort all emitted collections) so the drift
   guard passes. Plan: `.opencode/plan/2026-11-21-json-codegen.md`.
-- Never use `encoding/json`, including in tests or benchmarks (hard requirement
-  in the constitution, Article III); tests are hand-built tables.
+- Never use `encoding/json` in the shipped module, including in its tests or
+  benchmarks (hard requirement in the constitution, Article III); tests are
+  hand-built tables. The `bench/` comparative benchmark module is the sole
+  exception: a separate, non-shipped module that may import `encoding/json` and
+  `mailru/easyjson`.
 
 ## Contract details that are easy to break
 
@@ -221,6 +242,8 @@ and context rules bind only when such code is added. Open gaps are tracked in
   - `.opencode/plan/2026-11-22-release-flow.md` — the release-flow governance.
   - `.opencode/plan/2026-11-22-go-version-floor.md` — the Go-floor fix.
   - `.opencode/plan/2026-11-22-tasks-registry.md` — this registry's design.
+  - `.opencode/plan/2026-11-23-roadmap-network-perf-parity.md` — the Track A
+    network/formatting/hooks roadmap behind the Article VI amendment.
   - `.opencode/plan/user-scenarios.md` — end-to-end user walkthroughs.
   - `.opencode/plan/2026-11-21-json-unmarshal-research.md` — decoder research.
   - `.opencode/plan/2026-11-21-json-scanner.md` — superseded state machine.

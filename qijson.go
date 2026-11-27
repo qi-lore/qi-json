@@ -20,6 +20,9 @@ package qijson
 // path, github.com/qi-lore/qi-json.
 
 import (
+	"bytes"
+	"io"
+
 	"github.com/qi-lore/qi-json/internal/codec"
 	"github.com/qi-lore/qi-json/internal/scanner"
 )
@@ -152,6 +155,76 @@ func Marshal[T any, PT interface {
 	return codec.Marshal[T, PT](v)
 }
 
+// MarshalIndent encodes v as JSON and returns a pretty-printed form of it. prefix
+// begins every new line and indent is repeated once per level of nesting, so
+// MarshalIndent(v, "", "  ") indents each level by two spaces:
+//
+//	data, err := qijson.MarshalIndent[Config](cfg, "", "  ")
+//
+// It mirrors Marshal's constraint — the pointer type *T must implement Encoder —
+// and, like Marshal, it leaves HTML escaping off. An empty object or array stays
+// on one line as "{}" or "[]", and no newline follows the final token.
+//
+// The returned []byte is freshly allocated and owned by the caller; it does not
+// alias v. On an encoding failure MarshalIndent returns (nil, err) and writes
+// nothing. It is safe for concurrent use.
+func MarshalIndent[T any, PT interface {
+	*T
+	Encoder
+}](v T, prefix, indent string) ([]byte, error) {
+	return codec.MarshalIndent[T, PT](v, prefix, indent)
+}
+
+// Indent appends a pretty-printed form of the JSON text in src to dst. prefix
+// begins every new line and indent is repeated once per level of nesting. Inside a
+// container each element or member starts on its own line, a ':' is followed by a
+// single space, and an empty object or array stays on one line as "{}" or "[]".
+// No newline is written after the final token. The bytes inside JSON strings are
+// preserved verbatim; only insignificant whitespace is normalised.
+//
+// On malformed input Indent appends nothing and returns a *Error (Kind KindSyntax)
+// that records the byte offset where the input became invalid. src is not retained
+// after the call.
+//
+// Indent is a pure function of its arguments and holds no state, so it is safe for
+// concurrent use. Because it appends to dst, callers must not share one
+// *bytes.Buffer across goroutines.
+func Indent(dst *bytes.Buffer, src []byte, prefix, indent string) error {
+	return codec.Indent(dst, src, prefix, indent)
+}
+
+// Compact appends the JSON text in src to dst with all insignificant whitespace
+// removed, so the result is a single compact line. Whitespace inside JSON strings
+// is part of the string and is preserved.
+//
+// On malformed input Compact appends nothing and returns a *Error (Kind KindSyntax)
+// that records the byte offset where the input became invalid. src is not retained
+// after the call.
+//
+// Compact is a pure function of its arguments and holds no state, so it is safe
+// for concurrent use. Because it appends to dst, callers must not share one
+// *bytes.Buffer across goroutines.
+func Compact(dst *bytes.Buffer, src []byte) error {
+	return codec.Compact(dst, src)
+}
+
+// HTMLEscape appends the JSON text in src to dst with the HTML-sensitive bytes
+// replaced: '<' becomes \u003c, '>' becomes \u003e, '&' becomes \u0026, U+2028
+// becomes \u2028 and U+2029 becomes \u2029. Every other byte is copied unchanged.
+// The replacements are the ones encoding/json applies so a document can be
+// embedded in an HTML <script> element.
+//
+// HTMLEscape never fails and has no error return: it copies its input rather than
+// validating it, so it does not report malformed JSON. src is not retained after
+// the call.
+//
+// HTMLEscape is a pure function of its arguments and holds no state, so it is safe
+// for concurrent use. Because it appends to dst, callers must not share one
+// *bytes.Buffer across goroutines.
+func HTMLEscape(dst *bytes.Buffer, src []byte) {
+	codec.HTMLEscape(dst, src)
+}
+
 // Encode encodes v into w. It is the non-generic counterpart to Marshal for a
 // caller that already holds an Encoder or wants to reuse a Writer:
 //
@@ -205,8 +278,10 @@ type Reader = codec.Reader
 // nil. Read the failure with Err. Encoding into a Writer never uses reflection. A
 // Writer is not safe for concurrent use; give each goroutine its own. Its methods
 // are WriteNull, WriteBool, WriteString, WriteInt, WriteUint, WriteFloat,
-// WriteRaw, BeginObject, EndObject, BeginArray, EndArray, Key, Bytes, Reset and
-// Err.
+// WriteRaw, BeginObject, EndObject, BeginArray, EndArray, Key, Bytes, BuildBytes,
+// DumpTo, ReadCloser, Reset, SetIndent, SetEscapeHTML and Err. By default the
+// document is compact and HTML escaping is off; SetIndent and SetEscapeHTML
+// configure those styles and are sticky across Reset.
 type Writer = codec.Writer
 
 // NewWriter returns a new, empty Writer.
@@ -243,6 +318,60 @@ func Struct[T any](fields ...Field[T]) *Schema[T] {
 // it is safe to share exactly when the target its closures read and write is not
 // shared.
 type Field[T any] = codec.Field[T]
+
+// Optional is implemented by a field type that decides for itself whether it
+// carries a value. Under `omitempty` a field whose declared type implements
+// Optional is omitted exactly when its IsDefined method reports false; a field
+// not marked for omission is always written. The generator wires this hook into
+// the field's emptiness check; a hand-written Field may call IsDefined from its
+// Empty closure instead.
+//
+// A field type satisfies Optional through a value receiver or a pointer
+// receiver: it is enough that the type or a pointer to it has the method.
+type Optional = codec.Optional
+
+// IsZero is implemented by a field type that defines its own notion of
+// emptiness. Under `omitempty` a field whose declared type implements IsZero is
+// omitted exactly when its IsZero method reports true; a field not marked for
+// omission is always written. When a type implements both IsZero and Optional,
+// IsZero takes precedence. The generator wires this hook into the field's
+// emptiness check; a hand-written Field may call IsZero from its Empty closure
+// instead.
+//
+// A field type satisfies IsZero through a value receiver or a pointer receiver:
+// it is enough that the type or a pointer to it has the method.
+type IsZero = codec.IsZero
+
+// UnmarshalUnknown is implemented by a decode target that wants to receive the
+// object members no field matches, instead of seeing them ignored. During
+// Schema.Decode the decoder calls UnmarshalUnknown once per unmatched member:
+// name is the member name, decoded from any JSON escape sequences, and raw is the
+// member value as its exact JSON bytes, passed as a copy the callee owns and may
+// retain. A non-nil error aborts the decode and is returned unchanged.
+//
+// RejectUnknown takes precedence: when a Schema has both, an unmatched member is
+// reported as an unknown-field error and UnmarshalUnknown is not called. Known
+// members bind to their fields as usual, and a duplicate known member follows the
+// RejectDuplicate policy independently.
+//
+// A target satisfies UnmarshalUnknown through a value receiver or a pointer
+// receiver; it is discovered by a type assertion on the decode target, so no
+// reflection is involved. Pair it with MarshalUnknowns to round-trip the captured
+// members back on encode.
+type UnmarshalUnknown = codec.UnmarshalUnknown
+
+// MarshalUnknowns is implemented by an encode target that holds members captured
+// by UnmarshalUnknown and wants them written back. During Schema.Encode the
+// encoder calls MarshalUnknowns once, after the declared fields and while the
+// object is still open, so the implementation writes each extra member with
+// Writer.Key followed by a value. The extra members follow the declared fields,
+// in the order the implementation writes them. A non-nil error aborts the encode
+// and is returned unchanged.
+//
+// A target satisfies MarshalUnknowns through a value receiver or a pointer
+// receiver; it is discovered by a type assertion on the encode target, so no
+// reflection is involved.
+type MarshalUnknowns = codec.MarshalUnknowns
 
 // String binds a JSON string member to a *string field of T. A JSON null leaves
 // the field unchanged.
@@ -424,6 +553,23 @@ const (
 	KindEnd = scanner.KindEnd
 )
 
+// Token is one token of a JSON document, as returned by Tokenizer.Token: nil for
+// null, a bool for true or false, a Number for a number, a string for a string
+// value or object key, and a Delim for an object or array delimiter. It is an
+// alias of the syntax engine's token union, so a token produced by Token and
+// type-asserted here is identical to the engine's.
+type Token = scanner.Token
+
+// Number is a JSON number literal, held as its raw bytes exactly as they appear
+// in the input. Token returns a Number rather than a float64 so the literal is
+// preserved with full precision; convert it with strconv when a numeric value is
+// needed.
+type Number = scanner.Number
+
+// Delim is a JSON delimiter: one of '{', '}', '[' or ']'. Token returns it to
+// mark the opening and closing of an object or array.
+type Delim = scanner.Delim
+
 // Valid reports whether data is a syntactically valid JSON text. It is a single
 // pass over data: it walks with an index, scans strings, numbers, whitespace and
 // literals in bulk, and keeps an explicit stack of open containers. It does not
@@ -434,22 +580,29 @@ func Valid(data []byte) bool {
 	return scanner.Valid(data)
 }
 
-// Tokenizer turns a JSON document into a stream of typed tokens. It reads one
-// document without building Go values, which suits a minifier, a streaming
-// splitter or an analyzer that walks arbitrary documents. Construct one with
-// NewTokenizer; the zero value is not ready to use.
+// Tokenizer turns a JSON document into a stream of typed tokens. It reads JSON
+// without building Go values, which suits a minifier, a streaming splitter or an
+// analyzer that walks arbitrary documents. Construct one with NewTokenizer for a
+// byte slice or NewDecoder for an io.Reader; the zero value is not ready to use.
 //
 // The methods are pull-based: Peek reports the kind of the next value token
-// without consuming it, and the Read*/Begin*/End* methods consume it.
+// without consuming it, and the Read*/Begin*/End* methods consume it. Token is
+// the single-call alternative: it returns the next token as a Token (nil, bool,
+// Number, string or Delim) and io.EOF at the end of the stream.
 // Whitespace, commas and the ':' after an object key are consumed
 // automatically, so inside an object the stream is key, value, key, value, ...
 // and Peek reports KindEnd at the closing brace. Inside an array it is value,
-// value, ... and Peek reports KindEnd at the closing bracket. At the top level
-// Peek reports KindEnd once the single top-level value and its trailing
-// whitespace are consumed.
+// value, ... and Peek reports KindEnd at the closing bracket. At the top level a
+// NewTokenizer tokenizer reports KindEnd once the single top-level value and its
+// trailing whitespace are consumed, while a NewDecoder tokenizer reads
+// successive top-level values (NDJSON) and reports KindEnd at the end of the
+// stream.
 //
 // Byte slices returned by ReadString, ReadNumber and ReadRaw alias the input
-// passed to NewTokenizer and must not be modified.
+// passed to NewTokenizer and must not be modified. A string or Number returned
+// by Token is instead a copy: escape sequences are left intact (the syntax layer
+// does not unescape) and the value is independent of the Tokenizer, so it is
+// safe to retain.
 //
 // A Tokenizer must not be copied after first use, and it is not safe for
 // concurrent use: give each goroutine its own.
@@ -461,4 +614,40 @@ type Tokenizer = scanner.Tokenizer
 // aliases data.
 func NewTokenizer(data []byte) *Tokenizer {
 	return scanner.NewTokenizer(data)
+}
+
+// NewDecoder returns a Tokenizer that reads one or more JSON documents from r.
+// It is the streaming counterpart to NewTokenizer: instead of a byte slice, the
+// Tokenizer pulls bytes from r on demand and refills its internal buffer as it
+// goes, so a value may straddle a read boundary and r may return short reads.
+// For a single document the Kind sequence, the scalar values and the Offset
+// values it reports are the same as NewTokenizer's over the same bytes.
+//
+// It reads several top-level values from one stream (NDJSON): once a value is
+// complete, a following value that can begin here starts the next one, and Peek
+// reports KindEnd at the end of the input. A byte that cannot begin a value
+// after a completed value is an "after top-level value" error.
+//
+// Ownership and lifecycle: the Tokenizer does not own r and never closes it; the
+// caller keeps r open and valid for the Tokenizer's lifetime and closes it when
+// done. The Tokenizer reads from r only while a method needs more input, and it
+// stops once the stream is exhausted. A Tokenizer is not safe for concurrent
+// use: give each goroutine its own, with its own reader.
+//
+// Aliasing: byte slices returned by ReadString, ReadNumber and ReadRaw alias the
+// Tokenizer's internal buffer, which grows as r is drained. Unlike NewTokenizer,
+// where a returned slice aliases the caller's data and stays valid for the
+// Tokenizer's lifetime, a slice returned here is valid only until the next read
+// method, which may append to the buffer and move it. Copy the bytes to keep
+// them. A string or Number returned by Token is a copy and is always safe to
+// retain.
+//
+// Token reports io.EOF once every value in the stream has been consumed.
+//
+// Errors: a read error from r other than io.EOF is returned, wrapped, as the
+// Tokenizer's sticky error; a syntax error is reported exactly as NewTokenizer
+// reports it for the same bytes. A nil r yields a nil-reader error rather than a
+// panic.
+func NewDecoder(r io.Reader) *Tokenizer {
+	return scanner.NewDecoder(r)
 }

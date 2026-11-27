@@ -1,6 +1,8 @@
 package codec
 
-import "errors"
+import (
+	"errors"
+)
 
 // Encoder is implemented by types that encode themselves to JSON. An encoder
 // writes exactly one JSON value to w. The usual implementation binds a Schema
@@ -32,13 +34,15 @@ var errNilWriter = errors.New("qijson: nil Writer")
 // Schema.
 //
 // The returned []byte is freshly allocated and owned by the caller; it does not
-// alias v.
+// alias v. Internally the encoding reuses a pooled buffer, and the result is a
+// copy of it, so the returned slice never aliases that shared buffer.
 func Marshal[T any, PT interface {
 	*T
 	Encoder
 }](v T) ([]byte, error) {
-	var w Writer
-	if err := PT(&v).EncodeJSON(&w); err != nil {
+	w := newPooledWriter()
+	defer w.release()
+	if err := PT(&v).EncodeJSON(w); err != nil {
 		return nil, err
 	}
 	if w.err != nil {
@@ -47,7 +51,7 @@ func Marshal[T any, PT interface {
 	if !w.complete() {
 		return nil, errIncomplete
 	}
-	return w.buf, nil
+	return w.BuildBytes(), nil
 }
 
 // Encode encodes v into w. It is the non-generic counterpart to Marshal for a

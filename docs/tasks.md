@@ -19,7 +19,7 @@ never renumber, never reuse a retired identifier.
 
 | Prefix | Area |
 |---|---|
-| `S` | Scanner and syntax layer (`scanner/`) |
+| `S` | Scanner and syntax layer (`internal/scanner/`) |
 | `D` | Decoder (`internal/codec/`, decode path) |
 | `E` | Encoder (`internal/codec/`, encode path) |
 | `G` | Code generator (`cmd/qi-json-gen/`) |
@@ -28,6 +28,9 @@ never renumber, never reuse a retired identifier.
 | `Q` | Code quality |
 | `M` | Module, packaging and governance |
 | `P` | Process and repository settings |
+| `N` | Network and streaming (`io` adapters, multi-value, token stream) |
+| `H` | Encoding/decoding extension hooks |
+| `A` | `encoding/json` parity surface (gated; needs an Article III/VI amendment) |
 
 ## Completed
 
@@ -51,10 +54,15 @@ never renumber, never reuse a retired identifier.
 - [X] D008 - README documentation for the decoder
 - [X] D009 - Non-generic `Decode` entry point
 - [X] D010 - Decoder UTF-8 policy and pinned semantic defaults
+- [X] D011 - Decode fast path: avoid copying clean strings; bounded UTF-8 path
+- [X] D012 - Preallocate slice and map capacity from a length hint
 
 ### Encoder
 
 - [X] E001 - Encoder: `Writer`, `Marshal`/`Encode`, `Codec[E]`, `Schema`/`Field` encode
+- [X] E002 - Pooled reusable `Writer` buffer (no new exported names)
+- [X] E003 - Reuse the writer buffer inside `Marshal` (after E002)
+- [X] E004 - `BuildBytes(reuse ...[]byte)` writer-buffer reuse
 
 ### Code generator
 
@@ -102,6 +110,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q007 - Make the `Marshal` completeness guard hold against an empty `WriteRaw`
 - [X] Q008 - Return a sentinel instead of panicking on a nil nested `Schema` in `Object`
 - [X] Q009 - Enforce unique field names in `Struct`
+- [X] Q010 - External comparative benchmark harness (qi-json vs stdlib vs easyjson)
 
 ### Module, packaging and governance
 
@@ -112,11 +121,34 @@ never renumber, never reuse a retired identifier.
 - [X] M005 - Release flow governance (constitution v3.6.0)
 - [X] M006 - Retire `docs/task.md` and introduce the task registry (constitution v3.9.0)
 - [X] M007 - Normalize the plan files' headers to design records
+- [X] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
+- [X] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
+- [X] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
+- [X] M011 - Create feature/task branches from `dev`, not `main` (constitution v3.12.0)
+- [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
+- [X] M013 - Constitution amendment (Article III) for the in-repo `bench/` comparative benchmark module
+- [X] M014 - Constitution amendment (Documentation Ownership): the README needs a direct user instruction to edit
+- [X] M015 - Correct the README: fix the `qijson.Error` typo and normalize the benchmark table
 
 ### Process and repository settings
 
 - [X] P001 - Protect `main` and `dev` with branch protection and the `verify` check
 
+### Network and streaming
+
+- [X] N001 - `Writer.DumpTo(io.Writer)` and `ReadCloser` for encode streaming
+- [X] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
+- [X] N003 - Multi-value decode loop (NDJSON support)
+- [X] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
+- [X] N005 - Formatting: `MarshalIndent`/`Indent`/`Compact`/`HTMLEscape`, `SetIndent`/`SetEscapeHTML`
+
+### Extension hooks
+
+- [X] H001 - `Optional`/`IsZero` omit hooks
+- [X] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
+
 ## Planned
 
-- [ ] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
+### API parity
+
+- [ ] A001 - `encoding/json`-parity surface: `any`-based entry points, tag binding, `Marshaler`/`Unmarshaler`, concrete error types (declined under M010; revisit only on proven demand)

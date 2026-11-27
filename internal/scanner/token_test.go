@@ -1,6 +1,8 @@
 package scanner
 
 import (
+	"errors"
+	"io"
 	"strconv"
 	"strings"
 	"testing"
@@ -368,5 +370,430 @@ func TestTokenizerErrIsSticky(t *testing.T) {
 	}
 	if err := tok.Err(); err == nil {
 		t.Fatal("second Err() = nil, want the sticky error")
+	}
+}
+
+// chunkReader hands out at most chunk bytes per Read, so a document can be
+// forced to straddle a refill boundary at every value.
+type chunkReader struct {
+	data  []byte
+	chunk int
+	pos   int
+}
+
+func (r *chunkReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.data) {
+		return 0, io.EOF
+	}
+	n := r.chunk
+	if n > len(p) {
+		n = len(p)
+	}
+	if n > len(r.data)-r.pos {
+		n = len(r.data) - r.pos
+	}
+	copy(p, r.data[r.pos:r.pos+n])
+	r.pos += n
+	return n, nil
+}
+
+// errReader yields its data, then fails with err instead of returning io.EOF.
+type errReader struct {
+	data []byte
+	pos  int
+	err  error
+}
+
+func (r *errReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.data) {
+		return 0, r.err
+	}
+	n := copy(p, r.data[r.pos:])
+	r.pos += n
+	return n, nil
+}
+
+// traceOp is one recorded tokenizer step: the token kind, a detail string (the
+// scalar content or an object key) and the Offset at which the step was taken.
+type traceOp struct {
+	kind   Kind
+	detail string
+	offset int64
+}
+
+// traceValue walks one value with the typed readers, recording every step. It
+// descends into composites so the whole document is exercised.
+func traceValue(t *Tokenizer, tr *[]traceOp) error {
+	k, err := t.Peek()
+	if err != nil {
+		return err
+	}
+	*tr = append(*tr, traceOp{kind: k, offset: t.Offset()})
+	last := func() *traceOp { return &(*tr)[len(*tr)-1] }
+
+	switch k {
+	case KindNull:
+		return t.ReadNull()
+	case KindBool:
+		v, err := t.ReadBool()
+		if err != nil {
+			return err
+		}
+		last().detail = strconv.FormatBool(v)
+		return nil
+	case KindString:
+		s, err := t.ReadString()
+		if err != nil {
+			return err
+		}
+		last().detail = string(s)
+		return nil
+	case KindNumber:
+		n, err := t.ReadNumber()
+		if err != nil {
+			return err
+		}
+		last().detail = string(n)
+		return nil
+	case KindObject:
+		if err := t.BeginObject(); err != nil {
+			return err
+		}
+		for {
+			kk, err := t.Peek()
+			if err != nil {
+				return err
+			}
+			if kk == KindEnd {
+				return t.EndObject()
+			}
+			*tr = append(*tr, traceOp{kind: kk, offset: t.Offset()})
+			key, err := t.ReadString()
+			if err != nil {
+				return err
+			}
+			last().detail = string(key)
+			if err := traceValue(t, tr); err != nil {
+				return err
+			}
+		}
+	case KindArray:
+		if err := t.BeginArray(); err != nil {
+			return err
+		}
+		for {
+			kk, err := t.Peek()
+			if err != nil {
+				return err
+			}
+			if kk == KindEnd {
+				return t.EndArray()
+			}
+			if err := traceValue(t, tr); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// traceDoc walks a whole document and records the closing KindEnd, so the
+// returned trace covers the trailing offset too.
+func traceDoc(t *Tokenizer) ([]traceOp, error) {
+	var tr []traceOp
+	if err := traceValue(t, &tr); err != nil {
+		return tr, err
+	}
+	k, err := t.Peek()
+	if err != nil {
+		return tr, err
+	}
+	return append(tr, traceOp{kind: k, offset: t.Offset()}), nil
+}
+
+func traceEqual(a, b []traceOp) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestNewDecoderMatchesSlice drives every valid document through both the
+// slice-backed and the reader-backed tokenizer and requires identical Kind
+// sequences, scalar values and offsets. The reader hands out as little as one
+// byte per Read, so every value straddles a refill boundary.
+func TestNewDecoderMatchesSlice(t *testing.T) {
+	for _, in := range validDocuments {
+		want, err := traceDoc(NewTokenizer([]byte(in)))
+		if err != nil {
+			t.Fatalf("slice trace(%q) = %v", in, err)
+		}
+		for _, chunk := range []int{1, 2, 3, 5, 7, len(in) + 1} {
+			tok := NewDecoder(&chunkReader{data: []byte(in), chunk: chunk})
+			got, err := traceDoc(tok)
+			if err != nil {
+				t.Fatalf("NewDecoder trace(%q, chunk=%d) = %v", in, chunk, err)
+			}
+			if !traceEqual(got, want) {
+				t.Fatalf("NewDecoder trace(%q, chunk=%d):\n got %v\nwant %v", in, chunk, got, want)
+			}
+			if off := tok.Offset(); off != int64(len(in)) {
+				t.Fatalf("Offset(%q, chunk=%d) = %d, want %d", in, chunk, off, len(in))
+			}
+		}
+	}
+}
+
+// multiValueStreams are inputs a slice-backed tokenizer rejects with "after
+// top-level value" but a reader-backed tokenizer reads as several top-level
+// values (NDJSON): the byte after the first value can begin another. They are
+// covered by TestNewDecoderMultiValue, not by the single-document differential
+// test.
+var multiValueStreams = map[string]bool{
+	`{} {}`:  true,
+	`1 2`:    true,
+	`"a""b"`: true,
+}
+
+// TestNewDecoderInvalidMatchesSlice requires the reader-backed tokenizer to
+// report the same error message and 1-based position as the slice-backed one for
+// every invalid document, except the multi-value streams (see multiValueStreams)
+// that a reader-backed tokenizer reads as several values.
+func TestNewDecoderInvalidMatchesSlice(t *testing.T) {
+	for _, tt := range invalidDocuments {
+		if multiValueStreams[tt.in] {
+			continue
+		}
+		wantErr := drive(NewTokenizer([]byte(tt.in)))
+		if wantErr == nil {
+			t.Fatalf("slice drive(%q) = nil, want an error", tt.in)
+		}
+		want, ok := wantErr.(parseError)
+		if !ok {
+			t.Fatalf("slice drive(%q) error type = %T, want parseError", tt.in, wantErr)
+		}
+
+		for _, chunk := range []int{1, 2, 3, 5} {
+			tok := NewDecoder(&chunkReader{data: []byte(tt.in), chunk: chunk})
+			gotErr := drive(tok)
+			if gotErr == nil {
+				t.Fatalf("NewDecoder drive(%q, chunk=%d) = nil, want %v", tt.in, chunk, want)
+			}
+			got, ok := gotErr.(parseError)
+			if !ok {
+				t.Fatalf("NewDecoder drive(%q, chunk=%d) error type = %T, want parseError", tt.in, chunk, gotErr)
+			}
+			if got.at != want.at || got.problem != want.problem {
+				t.Fatalf("NewDecoder drive(%q, chunk=%d) = {%d %q}, want {%d %q}",
+					tt.in, chunk, got.at, got.problem, want.at, want.problem)
+			}
+		}
+	}
+}
+
+// TestNewDecoderReadRawMatchesSlice requires ReadRaw over a reader to return the
+// same raw bytes and final offset as over a slice.
+func TestNewDecoderReadRawMatchesSlice(t *testing.T) {
+	for _, in := range validDocuments {
+		wantTok := NewTokenizer([]byte(in))
+		want, err := wantTok.ReadRaw()
+		if err != nil {
+			t.Fatalf("slice ReadRaw(%q) = %v", in, err)
+		}
+
+		for _, chunk := range []int{1, 2, 3} {
+			tok := NewDecoder(&chunkReader{data: []byte(in), chunk: chunk})
+			got, err := tok.ReadRaw()
+			if err != nil {
+				t.Fatalf("NewDecoder ReadRaw(%q, chunk=%d) = %v", in, chunk, err)
+			}
+			if string(got) != string(want) {
+				t.Fatalf("NewDecoder ReadRaw(%q, chunk=%d) = %q, want %q", in, chunk, got, want)
+			}
+			if tok.Offset() != wantTok.Offset() {
+				t.Fatalf("NewDecoder ReadRaw(%q, chunk=%d) Offset = %d, want %d",
+					in, chunk, tok.Offset(), wantTok.Offset())
+			}
+		}
+	}
+}
+
+// TestNewDecoderReaderError requires a non-EOF read error to surface, wrapped,
+// instead of being mistaken for end of input.
+func TestNewDecoderReaderError(t *testing.T) {
+	boom := errors.New("boom")
+	tok := NewDecoder(&errReader{data: []byte(`{"a":1`), err: boom})
+
+	if err := drive(tok); !errors.Is(err, boom) {
+		t.Fatalf("drive() = %v, want it to wrap boom", err)
+	}
+	if err := tok.Err(); !errors.Is(err, boom) {
+		t.Fatalf("Err() = %v, want it to wrap boom", err)
+	}
+}
+
+// TestNewDecoderNilReader requires a nil reader to be reported, not to panic.
+func TestNewDecoderNilReader(t *testing.T) {
+	tok := NewDecoder(nil)
+	if _, err := tok.Peek(); err == nil {
+		t.Fatal("Peek() with a nil reader = nil, want an error")
+	}
+}
+
+// TestNewDecoderManyRefills drives a document far larger than one refill chunk
+// through a one-byte reader, exercising many refills.
+func TestNewDecoderManyRefills(t *testing.T) {
+	const in = `{"a":[1,2,3],"b":{"c":true},"d":null,"e":"x"}`
+
+	want, err := traceDoc(NewTokenizer([]byte(in)))
+	if err != nil {
+		t.Fatalf("slice trace = %v", err)
+	}
+
+	tok := NewDecoder(&chunkReader{data: []byte(in), chunk: 1})
+	got, err := traceDoc(tok)
+	if err != nil {
+		t.Fatalf("NewDecoder trace = %v", err)
+	}
+	if !traceEqual(got, want) {
+		t.Fatalf("NewDecoder trace:\n got %v\nwant %v", got, want)
+	}
+
+	// A large document that needs several 4096-byte refills must still tokenize
+	// identically to the slice-backed tokenizer.
+	big := buildArrayDocument(2000)
+	wantBig, err := traceDoc(NewTokenizer(big))
+	if err != nil {
+		t.Fatalf("slice big trace = %v", err)
+	}
+	gotBig, err := traceDoc(NewDecoder(&chunkReader{data: big, chunk: 997}))
+	if err != nil {
+		t.Fatalf("NewDecoder big trace = %v", err)
+	}
+	if !traceEqual(gotBig, wantBig) {
+		t.Fatal("NewDecoder big trace differs from the slice-backed trace")
+	}
+}
+
+// TestNewDecoderEmptyReader requires an empty reader to report the same
+// end-of-input error as an empty slice.
+func TestNewDecoderEmptyReader(t *testing.T) {
+	wantErr := drive(NewTokenizer(nil))
+	if wantErr == nil {
+		t.Fatal("slice drive(nil) = nil, want an error")
+	}
+	gotErr := drive(NewDecoder(&chunkReader{data: nil, chunk: 1}))
+	if gotErr == nil {
+		t.Fatalf("NewDecoder drive(empty) = nil, want %v", wantErr)
+	}
+	if gotErr.Error() != wantErr.Error() {
+		t.Fatalf("NewDecoder drive(empty) = %q, want %q", gotErr, wantErr)
+	}
+}
+
+// readStreamValues consumes a stream of top-level values from a reader-backed
+// tokenizer and returns each value's raw bytes in order. It stops at KindEnd,
+// which marks the end of the stream, and returns the first error otherwise.
+func readStreamValues(t *Tokenizer) ([]string, error) {
+	var vals []string
+	for {
+		k, err := t.Peek()
+		if err != nil {
+			return vals, err
+		}
+		if k == KindEnd {
+			return vals, nil
+		}
+		b, err := t.ReadRaw()
+		if err != nil {
+			return vals, err
+		}
+		vals = append(vals, string(b))
+	}
+}
+
+// TestNewDecoderMultiValue requires a reader-backed tokenizer to read several
+// top-level values from one stream (NDJSON), separated by any JSON whitespace or
+// by nothing at all, and to report KindEnd at end of input. The reader hands out
+// as little as one byte per Read, so every value straddles a refill boundary.
+func TestNewDecoderMultiValue(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{`objects concatenated`, `{"a":1}{"b":2}`, []string{`{"a":1}`, `{"b":2}`}},
+		{`objects newline separated`, "{\"a\":1}\n{\"b\":2}\n", []string{`{"a":1}`, `{"b":2}`}},
+		{`scalars space separated`, `1 2 3`, []string{`1`, `2`, `3`}},
+		{`mixed values`, "[1,2]\ntrue\n\"x\"\nnull\n{}", []string{`[1,2]`, `true`, `"x"`, `null`, `{}`}},
+		{`leading and trailing whitespace`, " \n\t{ }\r\n ", []string{`{ }`}},
+		{`single value`, `{"a":1}`, []string{`{"a":1}`}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, chunk := range []int{1, 2, 3, 7, len(tt.in) + 1} {
+				tok := NewDecoder(&chunkReader{data: []byte(tt.in), chunk: chunk})
+				got, err := readStreamValues(tok)
+				if err != nil {
+					t.Fatalf("chunk=%d: readStreamValues(%q) = %v", chunk, tt.in, err)
+				}
+				if len(got) != len(tt.want) {
+					t.Fatalf("chunk=%d: read %d values from %q, want %d: %q",
+						chunk, len(got), tt.in, len(tt.want), got)
+				}
+				for i := range got {
+					if got[i] != tt.want[i] {
+						t.Fatalf("chunk=%d: value %d of %q = %q, want %q",
+							chunk, i, tt.in, got[i], tt.want[i])
+					}
+				}
+				// The stream stays exhausted: Peek reports KindEnd and Err is nil.
+				if k, err := tok.Peek(); err != nil || k != KindEnd {
+					t.Fatalf("chunk=%d: Peek() at end of %q = %v, %v, want %v, nil",
+						chunk, tt.in, k, err, KindEnd)
+				}
+				if err := tok.Err(); err != nil {
+					t.Fatalf("chunk=%d: Err() at end of %q = %v, want nil", chunk, tt.in, err)
+				}
+			}
+		})
+	}
+}
+
+// TestNewDecoderMultiValueError requires a malformed value in a stream to be
+// reported after the valid values that precede it, without being mistaken for
+// the end of the stream.
+func TestNewDecoderMultiValueError(t *testing.T) {
+	tests := []struct {
+		in      string
+		vals    int
+		problem string
+	}{
+		{`1 2 x`, 2, "after top-level value"},
+		{`{} {} x`, 2, "after top-level value"},
+		{`{"a":1}{`, 1, "unexpected end of JSON input"},
+		{`{"a":1}{"b":`, 1, "unexpected end of JSON input"},
+	}
+
+	for _, tt := range tests {
+		t.Run(strconv.Quote(tt.in), func(t *testing.T) {
+			tok := NewDecoder(&chunkReader{data: []byte(tt.in), chunk: 1})
+			got, err := readStreamValues(tok)
+			if err == nil {
+				t.Fatalf("readStreamValues(%q) = %q, nil, want an error", tt.in, got)
+			}
+			if len(got) != tt.vals {
+				t.Fatalf("readStreamValues(%q) read %d values %q, want %d", tt.in, len(got), got, tt.vals)
+			}
+			if !strings.Contains(err.Error(), tt.problem) {
+				t.Fatalf("readStreamValues(%q) error = %q, want it to contain %q", tt.in, err, tt.problem)
+			}
+		})
 	}
 }
