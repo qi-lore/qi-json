@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-27
+
+### Added
+
+- A runnable usage example under `example/`: a `package main` that validates a
+  document with `Valid`, decodes it into a struct with `Unmarshal`, and
+  re-encodes it with `Marshal`. The README describes it briefly. (Task M016.)
+
 ## [0.5.2] - 2026-11-27
 
 ### Added

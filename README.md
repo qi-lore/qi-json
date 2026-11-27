@@ -8,7 +8,7 @@ import "github.com/qi-lore/qi-json"
 
 Requires Go 1.24+.
 
-## Version `v0.5.2`
+## Version `v0.5.3`
 
 ## Why
 
@@ -55,6 +55,16 @@ err := qijson.Decode(data, &cfg)
 
 ```go
 b, err := qijson.Marshal(cfg)
+```
+
+## Example
+
+A runnable end-to-end example lives in `example/`. It validates the input with
+`Valid`, decodes it into a struct with `Unmarshal`, and re-encodes the result
+with `Marshal`. Run it with:
+
+```bash
+go run ./example
 ```
 
 ## Syntax-only checks
@@ -110,7 +120,7 @@ make bench    # benchmarks
 ```
 
 ## Status
-Current release: `v0.5.2`. The decoder and encoder are complete and benchmarked, but the API may still change before `1.0`.
+Current release: `v0.5.3`. The decoder and encoder are complete and benchmarked, but the API may still change before `1.0`.
 
 ## License
 
