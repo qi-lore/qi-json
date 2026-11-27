@@ -120,6 +120,47 @@ var (
 	_ codec.IsZero    = omitIsZero(0)
 )
 
+// The unknown-member hooks are re-exported through the facade as aliases of the
+// engine interfaces, so a type implementing qijson.UnmarshalUnknown or
+// qijson.MarshalUnknowns satisfies the engine interface too. A drift in either
+// interface or method signature fails the build.
+type rawMember struct {
+	name string
+	raw  []byte
+}
+
+type unknownOwner struct {
+	A     int64
+	extra []rawMember
+}
+
+func (v *unknownOwner) UnmarshalUnknown(name string, raw []byte) error {
+	v.extra = append(v.extra, rawMember{name: name, raw: raw})
+	return nil
+}
+
+func (v *unknownOwner) MarshalUnknowns(w *qijson.Writer) error {
+	for _, m := range v.extra {
+		if err := w.Key(m.name); err != nil {
+			return err
+		}
+		if err := w.WriteRaw(m.raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var (
+	_ qijson.UnmarshalUnknown = (*unknownOwner)(nil)
+	_ qijson.MarshalUnknowns  = (*unknownOwner)(nil)
+	_ codec.UnmarshalUnknown  = (*unknownOwner)(nil)
+	_ codec.MarshalUnknowns   = (*unknownOwner)(nil)
+
+	_ func(*unknownOwner, string, []byte) error = (*unknownOwner).UnmarshalUnknown
+	_ func(*unknownOwner, *qijson.Writer) error = (*unknownOwner).MarshalUnknowns
+)
+
 // smokeConfig is a minimal type bound through the facade only: its schema, its
 // methods and the field closures all name qijson, never codec.
 type smokeConfig struct {
@@ -327,6 +368,31 @@ func TestFacadeOmitHooks(t *testing.T) {
 	}
 	if got := string(data); got != `{"zip":5,"opt":"x"}` {
 		t.Fatalf("Marshal(full) = %s, want {\"zip\":5,\"opt\":\"x\"}", got)
+	}
+}
+
+// TestFacadeUnknownMembers proves the unknown-member hooks are usable from
+// outside the module: a type implementing qijson.UnmarshalUnknown captures the
+// members no field matches, and one implementing qijson.MarshalUnknowns writes
+// them back, so a document round-trips through the facade alone.
+func TestFacadeUnknownMembers(t *testing.T) {
+	schema := qijson.Struct(
+		qijson.Int[unknownOwner]("a", func(v *unknownOwner) *int64 { return &v.A }),
+	)
+	const in = `{"a":1,"b":"x","c":[1,2,3]}`
+	var got unknownOwner
+	if err := schema.UnmarshalInto([]byte(in), &got); err != nil {
+		t.Fatalf("UnmarshalInto: %v", err)
+	}
+	if got.A != 1 || len(got.extra) != 2 {
+		t.Fatalf("decoded %+v, want A=1 and two captured members", got)
+	}
+	out, err := schema.Marshal(got)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(out) != in {
+		t.Fatalf("round trip = %s, want %s", out, in)
 	}
 }
 

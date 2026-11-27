@@ -139,6 +139,7 @@ never renumber, never reuse a retired identifier.
 ### Extension hooks
 
 - [X] H001 - `Optional`/`IsZero` omit hooks
+- [X] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
 
 ## Planned
 
@@ -146,10 +147,6 @@ never renumber, never reuse a retired identifier.
 
 - [X] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 - [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
-
-### Extension hooks
-
-- [ ] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
 
 ### API parity
 
