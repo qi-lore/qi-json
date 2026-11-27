@@ -178,7 +178,7 @@ success path MUST stay allocation-free (`TestValidDoesNotAllocate`).
   (`go 1.24.0`), required because the facade re-exports generic types through
   generic type aliases; its `toolchain` line (`go1.27.3`) names the toolchain
   used to develop the project and is ignored by consumers.
-- Four packages under module `github.com/qi-lore/qi-json` (the module root is a
+- Five packages under module `github.com/qi-lore/qi-json` (the module root is a
   package):
   - `.` (module root) — `qijson`, the public facade: it re-exports the semantic
     layer (decode and encode) and the syntax layer (`Valid`, `Kind` and the
@@ -188,7 +188,11 @@ success path MUST stay allocation-free (`TestValidDoesNotAllocate`).
   - `internal/scanner/` — the syntax engine: `Valid` and the tokenizer over the
     single-pass scanner (`valid.go`, `scan.go`, `token.go`, `doc.go`); internal,
     not a public surface;
-  - `cmd/qi-json-gen/` — the optional code generator (stdlib only).
+  - `cmd/qi-json-gen/` — the optional code generator (stdlib only);
+  - `example/` — a runnable, **non-shipped** usage example (`package main`,
+    not importable and not part of the public surface) demonstrating the
+    decode→encode round-trip; it is verified by the module's normal gate.
+    (Added 2026-11-27; task M016.)
 - One further, **non-shipped** module: `bench/` (its own `go.mod`) — the
   comparative benchmark harness (qi-json vs `encoding/json` vs `mailru/easyjson`).
   It is not part of the published module and is the sole Article III carve-out;
@@ -327,4 +331,4 @@ This constitution supersedes ad-hoc workflow preferences. Amendments update this
 file and `AGENTS.md` together. If code and tests disagree, the tests are the
 contract: resolve the discrepancy against the tests, then update both.
 
-**Version**: 3.16.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-27
+**Version**: 3.17.0 | **Ratified**: 2026-11-21 | **Last Amended**: 2026-11-27
