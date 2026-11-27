@@ -129,6 +129,7 @@ never renumber, never reuse a retired identifier.
 - [X] M013 - Constitution amendment (Article III) for the in-repo `bench/` comparative benchmark module
 - [X] M014 - Constitution amendment (Documentation Ownership): the README needs a direct user instruction to edit
 - [X] M015 - Correct the README: fix the `qijson.Error` typo and normalize the benchmark table
+- [X] M016 - Simple library-usage example in a new `example/` folder, described briefly in the README
 
 ### Process and repository settings
 

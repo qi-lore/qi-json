@@ -1,6 +1,6 @@
 # AGENTS.md — qi-json
 
-A from-scratch JSON library with four Go packages:
+A from-scratch JSON library with five Go packages:
 
 - `.` (import `github.com/qi-lore/qi-json`, package `qijson`) — the single public
   import path. The facade of the reflection-free semantic layer (the decoder and
@@ -16,6 +16,9 @@ A from-scratch JSON library with four Go packages:
 - `cmd/qi-json-gen` — the optional, stdlib-only code generator that emits
   `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags. No `reflect`/`unsafe`; it targets only the exported `qijson` surface.
+- `example/` — a runnable, non-shipped usage example (`package main`, not
+  importable and not part of the public surface) demonstrating the decode→encode
+  round-trip; run it with `go run ./example`.
 
 The module root is the `qijson` package. No third-party dependencies in the
 shipped module (the `bench/` comparative benchmark module is a separate,

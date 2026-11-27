@@ -57,6 +57,16 @@ err := qijson.Decode(data, &cfg)
 b, err := qijson.Marshal(cfg)
 ```
 
+## Example
+
+A runnable end-to-end example lives in `example/`. It validates the input with
+`Valid`, decodes it into a struct with `Unmarshal`, and re-encodes the result
+with `Marshal`. Run it with:
+
+```bash
+go run ./example
+```
+
 ## Syntax-only checks
 
 ```go
