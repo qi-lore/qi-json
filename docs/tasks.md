@@ -110,6 +110,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q007 - Make the `Marshal` completeness guard hold against an empty `WriteRaw`
 - [X] Q008 - Return a sentinel instead of panicking on a nil nested `Schema` in `Object`
 - [X] Q009 - Enforce unique field names in `Struct`
+- [X] Q010 - External comparative benchmark harness (qi-json vs stdlib vs easyjson)
 
 ### Module, packaging and governance
 
@@ -152,7 +153,3 @@ never renumber, never reuse a retired identifier.
 ### API parity
 
 - [ ] A001 - `encoding/json`-parity surface: `any`-based entry points, tag binding, `Marshaler`/`Unmarshaler`, concrete error types (declined under M010; revisit only on proven demand)
-
-### Code quality
-
-- [ ] Q010 - External comparative benchmark harness (qi-json vs stdlib vs easyjson)
