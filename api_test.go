@@ -58,6 +58,18 @@ var (
 	_ func(*qijson.Tokenizer) (qijson.Token, error) = (*qijson.Tokenizer).Token
 )
 
+// The formatting surface is re-exported through the facade: the four package
+// functions and the two Writer configuration methods. The signatures are pinned
+// so a drift in the public API fails the build.
+var (
+	_ func(*bytes.Buffer, []byte, string, string) error = qijson.Indent
+	_ func(*bytes.Buffer, []byte) error                 = qijson.Compact
+	_ func(*bytes.Buffer, []byte)                       = qijson.HTMLEscape
+	_ func(smokeConfig, string, string) ([]byte, error) = qijson.MarshalIndent[smokeConfig, *smokeConfig]
+	_ func(*qijson.Writer, string, string)              = (*qijson.Writer).SetIndent
+	_ func(*qijson.Writer, bool)                        = (*qijson.Writer).SetEscapeHTML
+)
+
 // These compile-time assertions pin the signature of every constructor and entry
 // point. They are the facade's surface contract: a changed parameter, result or
 // type parameter fails the build rather than silently changing the public API.
@@ -439,6 +451,53 @@ func TestFacadeTokenNewDecoder(t *testing.T) {
 	}
 	if b, ok := got[1].(bool); !ok || !b {
 		t.Fatalf("token 1 = %#v, want true", got[1])
+	}
+}
+
+// TestFacadeFormatting proves the formatting surface is reachable through the
+// facade alone: Indent, Compact, HTMLEscape, MarshalIndent and the two Writer
+// configuration methods all work from outside the module.
+func TestFacadeFormatting(t *testing.T) {
+	var indented bytes.Buffer
+	if err := qijson.Indent(&indented, []byte(`{"a":1}`), "", "  "); err != nil {
+		t.Fatalf("Indent: %v", err)
+	}
+	if got := indented.String(); got != "{\n  \"a\": 1\n}" {
+		t.Fatalf("Indent = %q", got)
+	}
+
+	var compact bytes.Buffer
+	if err := qijson.Compact(&compact, []byte("{ \"a\" : 1 }")); err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if got := compact.String(); got != `{"a":1}` {
+		t.Fatalf("Compact = %q", got)
+	}
+
+	var escaped bytes.Buffer
+	qijson.HTMLEscape(&escaped, []byte(`"<"`))
+	if got := escaped.String(); got != `"\u003c"` {
+		t.Fatalf("HTMLEscape = %q", got)
+	}
+
+	data, err := qijson.MarshalIndent[smokeConfig](smokeConfig{Name: "a", Port: 1}, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent: %v", err)
+	}
+	wantDoc := "{\n  \"name\": \"a\",\n  \"port\": 1\n}"
+	if got := string(data); got != wantDoc {
+		t.Fatalf("MarshalIndent = %q, want %q", got, wantDoc)
+	}
+
+	w := qijson.NewWriter()
+	w.SetIndent("", "  ")
+	w.SetEscapeHTML(true)
+	if err := qijson.Encode(w, &smokeConfig{Name: "<x>", Port: 1}); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	wantCfg := "{\n  \"name\": \"\\u003cx\\u003e\",\n  \"port\": 1\n}"
+	if got := string(w.Bytes()); got != wantCfg {
+		t.Fatalf("Encode = %q, want %q", got, wantCfg)
 	}
 }
 

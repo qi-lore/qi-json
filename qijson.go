@@ -20,6 +20,7 @@ package qijson
 // path, github.com/qi-lore/qi-json.
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/qi-lore/qi-json/internal/codec"
@@ -154,6 +155,76 @@ func Marshal[T any, PT interface {
 	return codec.Marshal[T, PT](v)
 }
 
+// MarshalIndent encodes v as JSON and returns a pretty-printed form of it. prefix
+// begins every new line and indent is repeated once per level of nesting, so
+// MarshalIndent(v, "", "  ") indents each level by two spaces:
+//
+//	data, err := qijson.MarshalIndent[Config](cfg, "", "  ")
+//
+// It mirrors Marshal's constraint — the pointer type *T must implement Encoder —
+// and, like Marshal, it leaves HTML escaping off. An empty object or array stays
+// on one line as "{}" or "[]", and no newline follows the final token.
+//
+// The returned []byte is freshly allocated and owned by the caller; it does not
+// alias v. On an encoding failure MarshalIndent returns (nil, err) and writes
+// nothing. It is safe for concurrent use.
+func MarshalIndent[T any, PT interface {
+	*T
+	Encoder
+}](v T, prefix, indent string) ([]byte, error) {
+	return codec.MarshalIndent[T, PT](v, prefix, indent)
+}
+
+// Indent appends a pretty-printed form of the JSON text in src to dst. prefix
+// begins every new line and indent is repeated once per level of nesting. Inside a
+// container each element or member starts on its own line, a ':' is followed by a
+// single space, and an empty object or array stays on one line as "{}" or "[]".
+// No newline is written after the final token. The bytes inside JSON strings are
+// preserved verbatim; only insignificant whitespace is normalised.
+//
+// On malformed input Indent appends nothing and returns a *Error (Kind KindSyntax)
+// that records the byte offset where the input became invalid. src is not retained
+// after the call.
+//
+// Indent is a pure function of its arguments and holds no state, so it is safe for
+// concurrent use. Because it appends to dst, callers must not share one
+// *bytes.Buffer across goroutines.
+func Indent(dst *bytes.Buffer, src []byte, prefix, indent string) error {
+	return codec.Indent(dst, src, prefix, indent)
+}
+
+// Compact appends the JSON text in src to dst with all insignificant whitespace
+// removed, so the result is a single compact line. Whitespace inside JSON strings
+// is part of the string and is preserved.
+//
+// On malformed input Compact appends nothing and returns a *Error (Kind KindSyntax)
+// that records the byte offset where the input became invalid. src is not retained
+// after the call.
+//
+// Compact is a pure function of its arguments and holds no state, so it is safe
+// for concurrent use. Because it appends to dst, callers must not share one
+// *bytes.Buffer across goroutines.
+func Compact(dst *bytes.Buffer, src []byte) error {
+	return codec.Compact(dst, src)
+}
+
+// HTMLEscape appends the JSON text in src to dst with the HTML-sensitive bytes
+// replaced: '<' becomes \u003c, '>' becomes \u003e, '&' becomes \u0026, U+2028
+// becomes \u2028 and U+2029 becomes \u2029. Every other byte is copied unchanged.
+// The replacements are the ones encoding/json applies so a document can be
+// embedded in an HTML <script> element.
+//
+// HTMLEscape never fails and has no error return: it copies its input rather than
+// validating it, so it does not report malformed JSON. src is not retained after
+// the call.
+//
+// HTMLEscape is a pure function of its arguments and holds no state, so it is safe
+// for concurrent use. Because it appends to dst, callers must not share one
+// *bytes.Buffer across goroutines.
+func HTMLEscape(dst *bytes.Buffer, src []byte) {
+	codec.HTMLEscape(dst, src)
+}
+
 // Encode encodes v into w. It is the non-generic counterpart to Marshal for a
 // caller that already holds an Encoder or wants to reuse a Writer:
 //
@@ -208,7 +279,9 @@ type Reader = codec.Reader
 // Writer is not safe for concurrent use; give each goroutine its own. Its methods
 // are WriteNull, WriteBool, WriteString, WriteInt, WriteUint, WriteFloat,
 // WriteRaw, BeginObject, EndObject, BeginArray, EndArray, Key, Bytes, BuildBytes,
-// DumpTo, ReadCloser, Reset and Err.
+// DumpTo, ReadCloser, Reset, SetIndent, SetEscapeHTML and Err. By default the
+// document is compact and HTML escaping is off; SetIndent and SetEscapeHTML
+// configure those styles and are sticky across Reset.
 type Writer = codec.Writer
 
 // NewWriter returns a new, empty Writer.

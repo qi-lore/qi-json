@@ -134,6 +134,7 @@ never renumber, never reuse a retired identifier.
 - [X] N002 - `NewDecoder(io.Reader)` with a refillable tokenizer source
 - [X] N003 - Multi-value decode loop (NDJSON support)
 - [X] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
+- [X] N005 - Formatting: `MarshalIndent`/`Indent`/`Compact`/`HTMLEscape`, `SetIndent`/`SetEscapeHTML`
 
 ## Planned
 
@@ -141,10 +142,6 @@ never renumber, never reuse a retired identifier.
 
 - [X] M010 - Decide `encoding/json` parity: amend Article III/VI or decline
 - [X] M012 - Constitution amendment (Article VI) for the `BuildBytes` writer-buffer reuse surface
-
-### Network and streaming
-
-- [ ] N005 - Formatting: `MarshalIndent`/`Indent`/`Compact`/`HTMLEscape`, `SetIndent`/`SetEscapeHTML`
 
 ### Extension hooks
 
