@@ -125,6 +125,8 @@ never renumber, never reuse a retired identifier.
 - [X] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
 - [X] M011 - Create feature/task branches from `dev`, not `main` (constitution v3.12.0)
 - [X] M013 - Constitution amendment (Article III) for the in-repo `bench/` comparative benchmark module
+- [X] M014 - Constitution amendment (Documentation Ownership): the README needs a direct user instruction to edit
+- [X] M015 - Correct the README: fix the `qijson.Error` typo and normalize the benchmark table
 
 ### Process and repository settings
 
