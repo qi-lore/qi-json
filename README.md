@@ -518,6 +518,7 @@ branch name, the target branch and the commit messages of each pull request.
 internal/codec/          the engine: Reader, Writer, Schema, field constructors, entry points, errors, fuzz tests (package codec)
 internal/scanner/        Valid, the tokenizer, benchmarks and differential tests
 cmd/qi-json-gen/         the code generator and its end-to-end fixture
+bench/                   comparative benchmark harness (qi-json vs encoding/json vs easyjson); a separate, non-shipped module
 docs/tasks.md            the task registry: single source of truth for task state
 docs/constitution.md     governing rules and the sanctioned public surface
 .opencode/plan/          design rationale and history (no task state)

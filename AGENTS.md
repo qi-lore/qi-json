@@ -17,8 +17,10 @@ A from-scratch JSON library with four Go packages:
   `qijson` `Schema` values and `DecodeJSON`/`EncodeJSON` methods from struct
   tags. No `reflect`/`unsafe`; it targets only the exported `qijson` surface.
 
-The module root is the `qijson` package. No third-party dependencies. `make` wraps the
-common tasks. `docs/tasks.md` is the single source of truth for task state;
+The module root is the `qijson` package. No third-party dependencies in the
+shipped module (the `bench/` comparative benchmark module is a separate,
+non-shipped module and the sole exception). `make` wraps the common tasks.
+`docs/tasks.md` is the single source of truth for task state;
 `docs/constitution.md` governs changes. Plan files under `.opencode/plan/` hold
 design rationale and history only.
 
@@ -178,8 +180,11 @@ and context rules bind only when such code is added. Open gaps are tracked in
   `encoding/json` and MUST NOT use `reflect` or `unsafe`.
   Generation must be deterministic (sort all emitted collections) so the drift
   guard passes. Plan: `.opencode/plan/2026-11-21-json-codegen.md`.
-- Never use `encoding/json`, including in tests or benchmarks (hard requirement
-  in the constitution, Article III); tests are hand-built tables.
+- Never use `encoding/json` in the shipped module, including in its tests or
+  benchmarks (hard requirement in the constitution, Article III); tests are
+  hand-built tables. The `bench/` comparative benchmark module is the sole
+  exception: a separate, non-shipped module that may import `encoding/json` and
+  `mailru/easyjson`.
 
 ## Contract details that are easy to break
 

@@ -123,6 +123,7 @@ never renumber, never reuse a retired identifier.
 - [X] M008 - Correct the README repository layout (`scanner/` → `internal/scanner/`)
 - [X] M009 - Constitution amendment (Article VI) for the network, formatting and hooks surface
 - [X] M011 - Create feature/task branches from `dev`, not `main` (constitution v3.12.0)
+- [X] M013 - Constitution amendment (Article III) for the in-repo `bench/` comparative benchmark module
 
 ### Process and repository settings
 
