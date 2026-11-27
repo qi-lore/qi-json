@@ -1,7 +1,7 @@
 // Command example is a minimal, runnable demonstration of the qi-json
 // decode-then-encode round-trip. It defines a small struct with scalar fields,
-// binds a qijson.Schema to it, and decodes and re-encodes an inline JSON
-// document. Run it with:
+// binds a qijson schema to it through the qi-json-gen code generator, and
+// decodes and re-encodes an inline JSON document. Run it with:
 //
 //	go run ./example
 package main
@@ -13,69 +13,48 @@ import (
 	"github.com/qi-lore/qi-json"
 )
 
-// Server is a small JSON object with scalar fields only. It implements
-// qijson.Decoder and qijson.Encoder by delegating to serverSchema.
-type Server struct {
-	Host   string
-	Port   int64
-	Secure bool
-	Weight float64
+// User is a small JSON object with scalar fields. Its qijson binding — the
+// schema plus the DecodeJSON and EncodeJSON methods — is emitted by qi-json-gen
+// into zz_qi_json_gen.go, so this file declares no accessor closures by hand.
+//
+//go:generate go run github.com/qi-lore/qi-json/cmd/qi-json-gen -type=User
+type User struct {
+	Name     string  `json:"name"`
+	Age      int64   `json:"age"`
+	Verified bool    `json:"verified"`
+	Rating   float64 `json:"rating"`
 }
 
-// serverSchema binds Server's JSON object members to its fields. Members are
-// written in this declaration order, so the re-encoded form is stable.
-var serverSchema = qijson.Struct(
-	qijson.String[Server]("host", func(s *Server) *string { return &s.Host }),
-	qijson.Int[Server]("port", func(s *Server) *int64 { return &s.Port }),
-	qijson.Bool[Server]("secure", func(s *Server) *bool { return &s.Secure }),
-	qijson.Float[Server]("weight", func(s *Server) *float64 { return &s.Weight }),
-)
-
-// DecodeJSON decodes one JSON object from r into s.
-func (s *Server) DecodeJSON(r *qijson.Reader) error {
-	return serverSchema.Decode(r, s)
-}
-
-// EncodeJSON encodes s as one JSON object to w.
-func (s *Server) EncodeJSON(w *qijson.Writer) error {
-	return serverSchema.Encode(w, s)
-}
-
-// roundTrip checks the syntax of doc, decodes it into a Server, and re-encodes
-// the result. It returns the decoded value and the canonical JSON. It is the
+// roundTrip checks the syntax of doc, decodes it into a User, and re-encodes the
+// result. It returns the decoded value and the canonical JSON. It is the
 // testable core of the example.
-func roundTrip(doc []byte) (Server, []byte, error) {
+func roundTrip(doc []byte) (User, []byte, error) {
 	if !qijson.Valid(doc) {
-		return Server{}, nil, fmt.Errorf("example: input is not valid JSON")
+		return User{}, nil, fmt.Errorf("example: input is not valid JSON")
 	}
 
-	srv, err := qijson.Unmarshal[Server](doc)
+	user, err := qijson.Unmarshal[User](doc)
 	if err != nil {
-		return Server{}, nil, err
+		return User{}, nil, err
 	}
 
-	out, err := qijson.Marshal[Server](srv)
+	out, err := qijson.Marshal[User](user)
 	if err != nil {
-		return Server{}, nil, err
+		return User{}, nil, err
 	}
 
-	return srv, out, nil
+	return user, out, nil
 }
 
 func main() {
-	const doc = `{
-		"host": "db.internal",
-		"port": 5432,
-		"secure": true,
-		"weight": 0.75
-	}`
+	const doc = `{"name":"Ada Lovelace","age":36,"verified":true,"rating":4.5}`
 
-	srv, out, err := roundTrip([]byte(doc))
+	user, out, err := roundTrip([]byte(doc))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "example:", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("decoded:  host=%s port=%d secure=%t weight=%g\n", srv.Host, srv.Port, srv.Secure, srv.Weight)
+	fmt.Printf("decoded:  name=%s age=%d verified=%t rating=%g\n", user.Name, user.Age, user.Verified, user.Rating)
 	fmt.Printf("encoded:  %s\n", out)
 }
