@@ -70,6 +70,43 @@ func (f Field[T]) OmitEmpty() Field[T] {
 	return f
 }
 
+// Optional is implemented by a field type that decides for itself whether it
+// carries a value. Under `omitempty` a field whose type implements Optional is
+// omitted exactly when its IsDefined method reports false; a field not marked
+// for omission is always written.
+//
+// Optional is the named contract for the decision a Field supplies through its
+// Empty closure: a hand-written Field may encode the same rule inline, or call
+// IsDefined from Empty.
+//
+// A field type implements Optional through a value receiver or a pointer
+// receiver; the interface is satisfied when either the type or a pointer to it
+// has the method.
+type Optional interface {
+	// IsDefined reports whether the field carries a value to encode. When it
+	// returns false the field is omitted.
+	IsDefined() bool
+}
+
+// IsZero is implemented by a field type that defines its own notion of
+// emptiness. Under `omitempty` a field whose type implements IsZero is omitted
+// exactly when its IsZero method reports true; a field not marked for omission
+// is always written. When a type implements both IsZero and Optional, IsZero
+// takes precedence.
+//
+// IsZero is the named contract for the decision a Field supplies through its
+// Empty closure, the counterpart to Optional for a value whose "zero" is not the
+// Go zero value.
+//
+// A field type implements IsZero through a value receiver or a pointer receiver;
+// the interface is satisfied when either the type or a pointer to it has the
+// method.
+type IsZero interface {
+	// IsZero reports whether the field is empty to encode. When it returns true
+	// the field is omitted.
+	IsZero() bool
+}
+
 // scalar builds a Field for a value field of type E. A JSON null leaves the
 // field unchanged, which is zero for a freshly decoded value.
 func scalar[T, E any](name string, set func(*T) *E, read func(*Reader) (E, error), write func(*Writer, E) error, empty func(*T) bool) Field[T] {

@@ -136,6 +136,10 @@ never renumber, never reuse a retired identifier.
 - [X] N004 - `Token()` streaming with `Number`/`Delim`/`Token` types
 - [X] N005 - Formatting: `MarshalIndent`/`Indent`/`Compact`/`HTMLEscape`, `SetIndent`/`SetEscapeHTML`
 
+### Extension hooks
+
+- [X] H001 - `Optional`/`IsZero` omit hooks
+
 ## Planned
 
 ### Module, packaging and governance
@@ -145,7 +149,6 @@ never renumber, never reuse a retired identifier.
 
 ### Extension hooks
 
-- [ ] H001 - `Optional`/`IsZero` omit hooks
 - [ ] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
 
 ### API parity

@@ -169,6 +169,56 @@ type Config struct {
 	}
 }
 
+// TestGenerateOmitHooks covers the omit hooks: an omitempty field whose type
+// implements IsZero or Optional replaces the default emptiness check with the
+// hook call, while a field implementing neither keeps the default and a hook
+// type not marked omitempty is left untouched.
+func TestGenerateOmitHooks(t *testing.T) {
+	dir := writePkg(t, `package example
+
+type Stamp int64
+func (s Stamp) IsZero() bool { return s < 0 }
+
+type Nick string
+func (n Nick) IsDefined() bool { return n != "none" }
+
+type Plain int64
+
+type Config struct {
+	Stamp Stamp `+"`json:\"stamp,omitempty\"`"+`
+	Nick  Nick  `+"`json:\"nick,omitempty\"`"+`
+	Plain Plain `+"`json:\"plain,omitempty\"`"+`
+	Keep  Stamp `+"`json:\"keep\"`"+`
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+	want := []string{
+		"func qiEmpty[T any](f qijson.Field[T], empty func(*T) bool) qijson.Field[T] {",
+		`qiEmpty(qijson.Field[Config]{Name: "stamp",`,
+		`func(v *Config) bool { return v.Stamp.IsZero() }`,
+		`qiEmpty(qijson.Field[Config]{Name: "nick",`,
+		`func(v *Config) bool { return !v.Nick.IsDefined() }`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+	if strings.Contains(src, `qiEmpty(qijson.Field[Config]{Name: "plain"`) {
+		t.Errorf("Plain implements no hook and must keep the default empty check:\n%s", src)
+	}
+	if !strings.Contains(src, `Empty: func(v *Config) bool { return v.Plain == 0 }`) {
+		t.Errorf("Plain field lost its default empty closure:\n%s", src)
+	}
+	if strings.Contains(src, `qiEmpty(qijson.Field[Config]{Name: "keep"`) {
+		t.Errorf("Keep is not omitempty and must not use the hook:\n%s", src)
+	}
+}
+
 func TestGenerateSkipped(t *testing.T) {
 	dir := writePkg(t, `package example
 
@@ -734,7 +784,7 @@ func TestGenerateErrors(t *testing.T) {
 // equal what the generator produces from its source.
 func TestGeneratedFixtureUpToDate(t *testing.T) {
 	const dir = "internal/gentest"
-	got, err := generate(dir, []string{"Config", "Point", "Nums"})
+	got, err := generate(dir, []string{"Config", "Point", "Nums", "Hooks"})
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
