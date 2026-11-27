@@ -27,6 +27,10 @@ import (
 // value) sets a sticky error: the remaining calls are no-ops and Bytes returns
 // nil. Read the failure with Err. Encoding into a Writer never uses reflection. A
 // Writer is not safe for concurrent use; give each goroutine its own.
+//
+// By default the document is compact and HTML bytes are not escaped. SetIndent
+// selects an indented form and SetEscapeHTML turns on HTML escaping; both are
+// sticky across Reset.
 type Writer struct {
 	buf []byte
 	err error
@@ -40,6 +44,16 @@ type Writer struct {
 
 	// wroteRoot records that the single top-level value has been written.
 	wroteRoot bool
+
+	// prefix and indent configure pretty-printing: prefix begins each new line
+	// and indent is repeated once per level of nesting. Indentation is off when
+	// both are empty, which is the default. They persist across Reset.
+	prefix string
+	indent string
+
+	// escapeHTML makes WriteString and Key escape the HTML-sensitive bytes.
+	// It is off by default. It persists across Reset.
+	escapeHTML bool
 }
 
 // writerFrame is one open object or array.
@@ -111,13 +125,42 @@ func (w *Writer) release() {
 func NewWriter() *Writer { return &Writer{} }
 
 // Reset clears the buffer and any error so the Writer can be reused. It keeps
-// the allocated buffer and frame stack.
+// the allocated buffer and frame stack, and it keeps the indentation and HTML
+// escaping configuration set by SetIndent and SetEscapeHTML.
 func (w *Writer) Reset() {
 	w.buf = w.buf[:0]
 	w.err = nil
 	w.stack = w.stack[:0]
 	w.pendingKey = false
 	w.wroteRoot = false
+}
+
+// SetIndent configures the Writer to emit an indented document. prefix begins
+// every new line and indent is repeated once per level of nesting, so
+// SetIndent("", "  ") indents each level by two spaces. An empty object or array
+// stays on one line as "{}" or "[]", a ':' is followed by one space, and no
+// newline follows the final token. SetIndent("", "") disables indentation and
+// restores the compact default.
+//
+// The setting is sticky: it survives Reset and the implicit reset that DumpTo and
+// ReadCloser perform, so one Writer keeps its style document after document. Only
+// another SetIndent call changes it. SetIndent must not be called concurrently
+// with any other Writer method.
+func (w *Writer) SetIndent(prefix, indent string) {
+	w.prefix = prefix
+	w.indent = indent
+}
+
+// SetEscapeHTML controls whether WriteString and Key escape the HTML-sensitive
+// bytes: '<', '>', '&' and the characters U+2028 and U+2029 become \u escapes.
+// The default is off, so those bytes pass through literally; turning it on matches
+// the escaping encoding/json applies when a document is embedded in a web page.
+//
+// The setting is sticky: it survives Reset and the implicit reset that DumpTo and
+// ReadCloser perform. Only another SetEscapeHTML call changes it. SetEscapeHTML
+// must not be called concurrently with any other Writer method.
+func (w *Writer) SetEscapeHTML(on bool) {
+	w.escapeHTML = on
 }
 
 // Bytes returns the JSON written so far, or nil if the Writer has failed. The
@@ -284,7 +327,26 @@ func (w *Writer) beginValue() error {
 	if top.count > 0 {
 		w.buf = append(w.buf, ',')
 	}
+	if w.indenting() {
+		w.writeNewlineIndent(len(w.stack))
+	}
 	return nil
+}
+
+// indenting reports whether the Writer is configured to emit an indented
+// document. Indentation is off only when both prefix and indent are empty.
+func (w *Writer) indenting() bool {
+	return w.prefix != "" || w.indent != ""
+}
+
+// writeNewlineIndent appends the line break that precedes a token at the given
+// depth: a newline, then the prefix, then the indent repeated depth times.
+func (w *Writer) writeNewlineIndent(depth int) {
+	w.buf = append(w.buf, '\n')
+	w.buf = append(w.buf, w.prefix...)
+	for ; depth > 0; depth-- {
+		w.buf = append(w.buf, w.indent...)
+	}
 }
 
 // endValue records that a value was written in its container.
@@ -322,13 +384,14 @@ func (w *Writer) WriteBool(v bool) error {
 
 // WriteString writes a JSON string. It escapes the characters JSON requires and
 // leaves everything else, including multi-byte UTF-8, as-is. An invalid UTF-8
-// byte is replaced with U+FFFD, so encoding never fails on a string. Unlike
-// encoding/json it does not escape '<', '>', or '&'.
+// byte is replaced with U+FFFD, so encoding never fails on a string. By default
+// it does not escape '<', '>', or '&'; SetEscapeHTML(true) turns that escaping
+// on.
 func (w *Writer) WriteString(v string) error {
 	if err := w.beginValue(); err != nil {
 		return err
 	}
-	w.buf = appendQuoted(w.buf, v)
+	w.buf = appendQuoted(w.buf, v, w.escapeHTML)
 	w.endValue()
 	return nil
 }
@@ -412,7 +475,11 @@ func (w *Writer) EndObject() error {
 	if w.pendingKey {
 		return w.fail(errKeyWithoutValue)
 	}
+	count := w.stack[len(w.stack)-1].count
 	w.stack = w.stack[:len(w.stack)-1]
+	if w.indenting() && count > 0 {
+		w.writeNewlineIndent(len(w.stack))
+	}
 	w.buf = append(w.buf, '}')
 	return nil
 }
@@ -436,7 +503,11 @@ func (w *Writer) EndArray() error {
 	if len(w.stack) == 0 || w.stack[len(w.stack)-1].object {
 		return w.fail(errEndWithoutBegin)
 	}
+	count := w.stack[len(w.stack)-1].count
 	w.stack = w.stack[:len(w.stack)-1]
+	if w.indenting() && count > 0 {
+		w.writeNewlineIndent(len(w.stack))
+	}
 	w.buf = append(w.buf, ']')
 	return nil
 }
@@ -457,8 +528,15 @@ func (w *Writer) Key(name string) error {
 	if top.count > 0 {
 		w.buf = append(w.buf, ',')
 	}
-	w.buf = appendQuoted(w.buf, name)
-	w.buf = append(w.buf, ':')
+	if w.indenting() {
+		w.writeNewlineIndent(len(w.stack))
+	}
+	w.buf = appendQuoted(w.buf, name, w.escapeHTML)
+	if w.indenting() {
+		w.buf = append(w.buf, ':', ' ')
+	} else {
+		w.buf = append(w.buf, ':')
+	}
 	w.pendingKey = true
 	return nil
 }
@@ -468,14 +546,16 @@ const hexDigits = "0123456789abcdef"
 
 // appendQuoted appends s as a JSON string literal. It escapes '"', '\\' and the
 // control bytes using the short escapes where JSON defines one, and replaces
-// each invalid UTF-8 byte with U+FFFD. It does not HTML-escape.
-func appendQuoted(dst []byte, s string) []byte {
+// each invalid UTF-8 byte with U+FFFD. When escapeHTML is true it also escapes
+// '<', '>', '&' and the characters U+2028 and U+2029 as \u escapes; the ASCII
+// ones fall through to appendEscapedByte's generic \u00XX form.
+func appendQuoted(dst []byte, s string, escapeHTML bool) []byte {
 	dst = append(dst, '"')
 	start := 0
 	for i := 0; i < len(s); {
 		b := s[i]
 		if b < utf8.RuneSelf {
-			if b >= 0x20 && b != '"' && b != '\\' {
+			if b >= 0x20 && b != '"' && b != '\\' && (!escapeHTML || !htmlSensitive(b)) {
 				i++
 				continue
 			}
@@ -493,10 +573,27 @@ func appendQuoted(dst []byte, s string) []byte {
 			start = i
 			continue
 		}
+		if escapeHTML && (r == '\u2028' || r == '\u2029') {
+			dst = append(dst, s[start:i]...)
+			if r == '\u2028' {
+				dst = append(dst, `\u2028`...)
+			} else {
+				dst = append(dst, `\u2029`...)
+			}
+			i += size
+			start = i
+			continue
+		}
 		i += size
 	}
 	dst = append(dst, s[start:]...)
 	return append(dst, '"')
+}
+
+// htmlSensitive reports whether b is one of the ASCII bytes the encoder escapes
+// when HTML escaping is on: '<', '>' or '&'.
+func htmlSensitive(b byte) bool {
+	return b == '<' || b == '>' || b == '&'
 }
 
 // appendEscapedByte appends one ASCII byte that must be escaped.
