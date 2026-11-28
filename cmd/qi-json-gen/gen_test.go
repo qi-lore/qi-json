@@ -217,6 +217,57 @@ type Config struct {
 	if strings.Contains(src, `qiEmpty(qijson.Field[Config]{Name: "keep"`) {
 		t.Errorf("Keep is not omitempty and must not use the hook:\n%s", src)
 	}
+	if strings.Contains(src, `Empty: func(v *Config) bool { return v.Keep == 0 }`) {
+		t.Errorf("Keep is not omitempty and must not carry an Empty closure:\n%s", src)
+	}
+}
+
+// TestGenerateEmptyOnlyForOmitEmpty guards the gating directly: the Empty
+// closure is emitted only for an omitempty field. The runtime consults
+// Field.Empty solely when the field is omitempty (see Schema.Encode), so a
+// non-omitempty field carrying it would be dead code. Each non-omitempty field
+// has an omitempty twin to prove the twin keeps its closure.
+func TestGenerateEmptyOnlyForOmitEmpty(t *testing.T) {
+	dir := writePkg(t, `package example
+
+type Status string
+type Port int16
+
+type Config struct {
+	Named    Status `+"`json:\"named\"`"+`
+	Optional Status `+"`json:\"optional,omitempty\"`"+`
+	Plain    Port   `+"`json:\"plain\"`"+`
+	Opt      Port   `+"`json:\"opt,omitempty\"`"+`
+}
+`)
+	got, err := generate(dir, []string{"Config"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	src := string(got)
+
+	// The omitempty fields keep their Empty closure and chain OmitEmpty.
+	want := []string{
+		`qijson.Field[Config]{Name: "optional"`,
+		`Empty: func(v *Config) bool { return v.Optional == "" }`,
+		`qijson.Field[Config]{Name: "opt"`,
+		`Empty: func(v *Config) bool { return v.Opt == 0 }`,
+	}
+	for _, w := range want {
+		if !strings.Contains(src, w) {
+			t.Errorf("omitempty field missing %q\n---\n%s", w, src)
+		}
+	}
+
+	// The non-omitempty twins must not carry the dead Empty closure.
+	for _, bad := range []string{
+		`Empty: func(v *Config) bool { return v.Named == "" }`,
+		`Empty: func(v *Config) bool { return v.Plain == 0 }`,
+	} {
+		if strings.Contains(src, bad) {
+			t.Errorf("non-omitempty field must not carry an Empty closure: %q\n---\n%s", bad, src)
+		}
+	}
 }
 
 func TestGenerateSkipped(t *testing.T) {
@@ -349,13 +400,11 @@ type Config struct {
 		`qijson.Field[Config]{Name: "status"`,
 		`v.Status = Status(s)`,
 		`return w.WriteString(string(v.Status))`,
-		`Empty: func(v *Config) bool { return v.Status == "" }`,
 		`qijson.Field[Config]{Name: "prev"`,
 		`v.Prev = &e`,
 		`qijson.Slice[Config, Status]("statuses", func(v *Config) *[]Status { return &v.Statuses }, qijson.NewCodec(qiDecodeStatus, qiEncodeStatus))`,
 		`qijson.Field[Config]{Name: "mode"`,
 		`v.Mode = Mode(b)`,
-		`Empty: func(v *Config) bool { return v.Mode == false }`,
 		`qijson.Map[Config, Mode]("modes", func(v *Config) *map[string]Mode { return &v.Modes }, qijson.NewCodec(qiDecodeMode, qiEncodeMode))`,
 		`v.Alias = Alias(s)`,
 		`func qiDecodeStatus(r *qijson.Reader) (Status, error) {`,
@@ -367,6 +416,17 @@ type Config struct {
 	for _, w := range want {
 		if !strings.Contains(src, w) {
 			t.Errorf("generated source missing %q\n---\n%s", w, src)
+		}
+	}
+	// Status, Prev and Mode are not omitempty, so their schemas must not carry
+	// the dead Empty closure the runtime only consults for omitempty fields.
+	for _, bad := range []string{
+		`Empty: func(v *Config) bool { return v.Status == "" }`,
+		`Empty: func(v *Config) bool { return v.Prev == nil }`,
+		`Empty: func(v *Config) bool { return v.Mode == false }`,
+	} {
+		if strings.Contains(src, bad) {
+			t.Errorf("non-omitempty field must not carry an Empty closure: %q\n---\n%s", bad, src)
 		}
 	}
 	assertNoScannerImport(t, src)

@@ -90,3 +90,30 @@ Production changes: `cmd/qi-json-gen/main.go` and `example/main.go` were
 refactored so `main()` is a thin wrapper over a testable `run(...)`;
 `cmd/qi-json-gen/internal/gentest/xtypes/xtypes.go` was extended as a test
 fixture. All other changes are tests.
+
+## 7. Follow-up: quit emitting dead Empty closures
+
+The documented follow-up from Q011 is now done. The generator previously emitted
+the `Empty:` field of a generated `qijson.Field{...}` literal unconditionally,
+but `internal/codec/schema.go` (`Schema.Encode`) consults `Field.Empty` only when
+the field is `omitempty` — so the `Empty:` closures emitted on non-`omitempty`
+fields were dead code. This was the root cause of the `gentest` fixture sitting at
+92.3%.
+
+Fix: a transient `gen.omitEmpty` flag is set per field in `fieldCodecs` and
+`renderForeignSchema`, and the three emission sites (`scalarClosure` and
+`writeEmpty`/`numericCodec` in `cmd/qi-json-gen/gen.go`, `schemaPtrCodec` in
+`cmd/qi-json-gen/foreign.go`) now emit `Empty:` only when it is set. Output for
+`omitempty` fields is byte-identical; non-`omitempty` fields no longer carry the
+closure.
+
+Regenerated `cmd/qi-json-gen/internal/gentest/zz_qi_json_gen.go`: 20 -> 5 `Empty:`
+closures, and the 5 are all `omitempty`. `zz_qi_json_gen_foreign.go`,
+`zz_qi_json_gen_strict.go` and `example/zz_qi_json_gen.go` were unchanged.
+
+`gen_test.go`: the non-`omitempty` `Status`/`Prev`/`Mode` assertions flipped to
+absence, a `Keep` absence check added, and a new `TestGenerateEmptyOnlyForOmitEmpty`
+added.
+
+Result: `make verify` green; `go generate ./...` idempotent;
+`cmd/qi-json-gen/internal/gentest` coverage 92.3% -> 95.8%; total 98.2%.
