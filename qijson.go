@@ -31,14 +31,15 @@ import (
 // the input the failure happened and wraps the underlying cause so callers can
 // inspect it with errors.As and errors.Unwrap. A *Error returned by this package
 // is immutable: its fields may be read, including from another goroutine, but
-// never written. It implements error; Unwrap returns the cause.
+// never written. Its methods are Error and Unwrap.
 type Error = codec.Error
 
 // TypeError describes a JSON value whose type does not match the target. A
-// returned *TypeError is immutable.
+// returned *TypeError is immutable. Its method is Error.
 type TypeError = codec.TypeError
 
-// ErrorKind classifies a decode error. String returns a short name for the kind.
+// ErrorKind classifies a decode error. Its method is String, which returns a
+// short name for the kind.
 type ErrorKind = codec.ErrorKind
 
 const (
@@ -56,7 +57,10 @@ const (
 	// in strict mode.
 	KindDuplicateField = codec.KindDuplicateField
 
-	// KindDepth reports input that nests deeper than the configured limit.
+	// KindDepth reports input that nests deeper than the decoder's fixed
+	// nesting limit. The limit matches the Go standard library: encoding/json
+	// defines maxNestingDepth = 10000 and rejects deeper input with "exceeded
+	// max depth".
 	KindDepth = codec.KindDepth
 )
 
@@ -71,6 +75,8 @@ const (
 //	func (c *Config) DecodeJSON(r *qijson.Reader) error {
 //	    return configSchema.Decode(r, c)
 //	}
+//
+// Its method is DecodeJSON.
 type Decoder = codec.Decoder
 
 // Unmarshal decodes data into a new T. The pointer type *T must implement
@@ -134,6 +140,8 @@ func Decode(data []byte, v Decoder) error {
 //	func (c *Config) EncodeJSON(w *qijson.Writer) error {
 //	    return configSchema.Encode(w, c)
 //	}
+//
+// Its method is EncodeJSON.
 type Encoder = codec.Encoder
 
 // Marshal encodes v as JSON. The pointer type *T must implement Encoder, which
@@ -276,12 +284,12 @@ type Reader = codec.Reader
 // A mistake (a Key outside an object, an unbalanced End, a second top-level
 // value) sets a sticky error: the remaining calls are no-ops and Bytes returns
 // nil. Read the failure with Err. Encoding into a Writer never uses reflection. A
-// Writer is not safe for concurrent use; give each goroutine its own. Its methods
-// are WriteNull, WriteBool, WriteString, WriteInt, WriteUint, WriteFloat,
-// WriteRaw, BeginObject, EndObject, BeginArray, EndArray, Key, Bytes, BuildBytes,
-// DumpTo, ReadCloser, Reset, SetIndent, SetEscapeHTML and Err. By default the
-// document is compact and HTML escaping is off; SetIndent and SetEscapeHTML
-// configure those styles and are sticky across Reset.
+// Writer is not safe for concurrent use; give each goroutine its own. By default
+// the document is compact and HTML escaping is off; SetIndent and SetEscapeHTML
+// configure those styles and are sticky across Reset. Its methods are WriteNull,
+// WriteBool, WriteString, WriteInt, WriteUint, WriteFloat, WriteRaw, BeginObject,
+// EndObject, BeginArray, EndArray, Key, Bytes, BuildBytes, DumpTo, ReadCloser,
+// Reset, SetIndent, SetEscapeHTML and Err.
 type Writer = codec.Writer
 
 // NewWriter returns a new, empty Writer.
@@ -316,7 +324,7 @@ func Struct[T any](fields ...Field[T]) *Schema[T] {
 //
 // A Field is a plain value holding closures and carries no state of its own, so
 // it is safe to share exactly when the target its closures read and write is not
-// shared.
+// shared. Its method is OmitEmpty.
 type Field[T any] = codec.Field[T]
 
 // Optional is implemented by a field type that decides for itself whether it
@@ -327,7 +335,8 @@ type Field[T any] = codec.Field[T]
 // Empty closure instead.
 //
 // A field type satisfies Optional through a value receiver or a pointer
-// receiver: it is enough that the type or a pointer to it has the method.
+// receiver: it is enough that the type or a pointer to it has the method. Its
+// method is IsDefined.
 type Optional = codec.Optional
 
 // IsZero is implemented by a field type that defines its own notion of
@@ -339,7 +348,8 @@ type Optional = codec.Optional
 // instead.
 //
 // A field type satisfies IsZero through a value receiver or a pointer receiver:
-// it is enough that the type or a pointer to it has the method.
+// it is enough that the type or a pointer to it has the method. Its method is
+// IsZero.
 type IsZero = codec.IsZero
 
 // UnmarshalUnknown is implemented by a decode target that wants to receive the
@@ -357,7 +367,7 @@ type IsZero = codec.IsZero
 // A target satisfies UnmarshalUnknown through a value receiver or a pointer
 // receiver; it is discovered by a type assertion on the decode target, so no
 // reflection is involved. Pair it with MarshalUnknowns to round-trip the captured
-// members back on encode.
+// members back on encode. Its method is UnmarshalUnknown.
 type UnmarshalUnknown = codec.UnmarshalUnknown
 
 // MarshalUnknowns is implemented by an encode target that holds members captured
@@ -370,7 +380,7 @@ type UnmarshalUnknown = codec.UnmarshalUnknown
 //
 // A target satisfies MarshalUnknowns through a value receiver or a pointer
 // receiver; it is discovered by a type assertion on the encode target, so no
-// reflection is involved.
+// reflection is involved. Its method is MarshalUnknowns.
 type MarshalUnknowns = codec.MarshalUnknowns
 
 // String binds a JSON string member to a *string field of T. A JSON null leaves
@@ -508,7 +518,7 @@ func Raw[T any](name string, field func(*T) *[]byte) Field[T] {
 // carries both directions; build one with NewCodec. A Codec is a plain pair of
 // functions with no state of its own: its concurrency is that of the target the
 // functions read and write, so a Codec is safe to share only when the values it
-// touches are not shared.
+// touches are not shared. Its methods are none.
 type Codec[E any] = codec.Codec[E]
 
 // NewCodec returns a Codec pairing a decoder and an encoder for element type E.
@@ -525,7 +535,7 @@ func NewCodec[E any](decode func(*Reader) (E, error), encode func(*Writer, E) er
 // example, a JSON null sets a pointer field to nil.
 //
 // A Kind returned by Reader.Peek is identical to the syntax engine's, so it
-// compares equal to the Kind constants below.
+// compares equal to the Kind constants below. Its method is String.
 type Kind = scanner.Kind
 
 const (
@@ -557,17 +567,17 @@ const (
 // null, a bool for true or false, a Number for a number, a string for a string
 // value or object key, and a Delim for an object or array delimiter. It is an
 // alias of the syntax engine's token union, so a token produced by Token and
-// type-asserted here is identical to the engine's.
+// type-asserted here is identical to the engine's. Its methods are none.
 type Token = scanner.Token
 
 // Number is a JSON number literal, held as its raw bytes exactly as they appear
 // in the input. Token returns a Number rather than a float64 so the literal is
 // preserved with full precision; convert it with strconv when a numeric value is
-// needed.
+// needed. Its methods are none.
 type Number = scanner.Number
 
 // Delim is a JSON delimiter: one of '{', '}', '[' or ']'. Token returns it to
-// mark the opening and closing of an object or array.
+// mark the opening and closing of an object or array. Its methods are none.
 type Delim = scanner.Delim
 
 // Valid reports whether data is a syntactically valid JSON text. It is a single
@@ -585,7 +595,7 @@ func Valid(data []byte) bool {
 // analyzer that walks arbitrary documents. Construct one with NewTokenizer for a
 // byte slice or NewDecoder for an io.Reader; the zero value is not ready to use.
 //
-// The methods are pull-based: Peek reports the kind of the next value token
+// The read surface is pull-based: Peek reports the kind of the next value token
 // without consuming it, and the Read*/Begin*/End* methods consume it. Token is
 // the single-call alternative: it returns the next token as a Token (nil, bool,
 // Number, string or Delim) and io.EOF at the end of the stream.
@@ -605,7 +615,9 @@ func Valid(data []byte) bool {
 // safe to retain.
 //
 // A Tokenizer must not be copied after first use, and it is not safe for
-// concurrent use: give each goroutine its own.
+// concurrent use: give each goroutine its own. Its methods are Peek, ReadNull,
+// ReadBool, ReadString, ReadNumber, ReadRaw, BeginObject, EndObject, BeginArray,
+// EndArray, Skip, Token, Offset and Err.
 type Tokenizer = scanner.Tokenizer
 
 // NewTokenizer returns a Tokenizer positioned at the start of data. The

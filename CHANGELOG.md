@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `qijson`: the decoder enforces a fixed maximum container nesting depth of
+  10000 levels. A document that nests deeper fails with a `*Error` of `Kind`
+  `KindDepth`, whose `Offset` points at the delimiter that would have crossed
+  the limit, so recursion over hostile input cannot grow the path stack without
+  bound. The syntax-only surface (`Valid` and the tokenizer) is unchanged and
+  stays unlimited. (Task Q012.)
+- Developer tooling: `make fuzz` now fuzzes the codec entry points
+  (`FuzzUnmarshal`, `FuzzUnmarshalMatchesValid`, `FuzzMarshalRoundTrip`) in
+  addition to the scanner's `FuzzValid`, driving the whole semantic layer over
+  arbitrary input. (Task Q013.)
+
+### Changed
+
+- Documentation: every exported type alias in the facade now ends its type-level
+  doc comment with an accurate "Its methods are ..." sentence, so the method
+  names are visible through `go doc` even though it does not follow aliases for
+  method sets. Docs only; no API change. (Task Q014.)
+
 ## [0.5.5] - 2026-11-28
 
 ### Changed

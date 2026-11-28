@@ -23,7 +23,10 @@ const (
 	// in strict mode.
 	KindDuplicateField
 
-	// KindDepth reports input that nests deeper than the configured limit.
+	// KindDepth reports input that nests deeper than the decoder's fixed
+	// nesting limit. The limit matches the Go standard library: encoding/json
+	// defines maxNestingDepth = 10000 and rejects deeper input with "exceeded
+	// max depth".
 	KindDepth
 )
 
@@ -132,3 +135,9 @@ var errBadEscape = errors.New("qijson: invalid string escape")
 // syntax-only and accepts it; the decoder is stricter and rejects it as a
 // syntax error, since RFC 8259 requires a JSON text to be UTF-8.
 var errInvalidUTF8 = errors.New("invalid UTF-8 in string")
+
+// errDepthExceeded reports input whose containers nest deeper than the decoder's
+// fixed limit. It is the cause of a *Error of Kind KindDepth. It carries no
+// "qijson:" prefix because *Error.Error prepends the package prefix and the path;
+// the numeric wording tracks maxDepth.
+var errDepthExceeded = errors.New("nesting depth exceeds 10000")

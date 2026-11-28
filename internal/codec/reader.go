@@ -16,6 +16,13 @@ import (
 // grows it.
 const compsInline = 8
 
+// maxDepth is the fixed maximum nesting depth the decoder accepts: the number
+// of containers that may be open at once. Opening one more than this is a depth
+// error reported before the overflowing delimiter is consumed, so decoding
+// arbitrary input cannot grow the path stack without bound. The syntax layer
+// stays unlimited by design; this bound belongs to the decoder alone.
+const maxDepth = 10000
+
 // Reader decodes typed values from a JSON document, tracking the JSON path of
 // the value being decoded so that errors point at the offending member. It reads
 // from the pull tokenizer: whitespace,
@@ -37,6 +44,11 @@ type Reader struct {
 	// returned as a zero-copy substring of src. Because src is the library's
 	// own copy, a decoded string never aliases the caller's input buffer.
 	src string
+
+	// depth is the number of containers currently open. It is incremented when
+	// a container is entered and decremented when it closes, and is bounded by
+	// maxDepth so recursion over hostile input cannot exhaust the stack.
+	depth int
 
 	// comps is the stack of path components from the document root to the value
 	// being decoded. inline backs the common case so descending does not
@@ -256,9 +268,13 @@ func (r *Reader) beginObject() error {
 	if k != scanner.KindObject {
 		return r.mismatch("object", k)
 	}
+	if r.depth >= maxDepth {
+		return r.depthError()
+	}
 	if err := r.tok.BeginObject(); err != nil {
 		return r.syntaxError(err)
 	}
+	r.depth++
 	return nil
 }
 
@@ -272,9 +288,13 @@ func (r *Reader) beginArray() error {
 	if k != scanner.KindArray {
 		return r.mismatch("array", k)
 	}
+	if r.depth >= maxDepth {
+		return r.depthError()
+	}
 	if err := r.tok.BeginArray(); err != nil {
 		return r.syntaxError(err)
 	}
+	r.depth++
 	return nil
 }
 
@@ -317,6 +337,7 @@ func (r *Reader) Object(fn func(key string) error) error {
 	if err := r.tok.EndObject(); err != nil {
 		return r.syntaxError(err)
 	}
+	r.depth--
 	return nil
 }
 
@@ -352,6 +373,7 @@ func (r *Reader) objectRaw(fn func(raw []byte) error) error {
 	if err := r.tok.EndObject(); err != nil {
 		return r.syntaxError(err)
 	}
+	r.depth--
 	return nil
 }
 
@@ -382,6 +404,7 @@ func (r *Reader) Array(fn func(index int) error) error {
 	if err := r.tok.EndArray(); err != nil {
 		return r.syntaxError(err)
 	}
+	r.depth--
 	return nil
 }
 
@@ -590,6 +613,18 @@ func (r *Reader) typeMismatch(want, got string) error {
 		Offset: r.tok.Offset(),
 		Kind:   KindType,
 		Err:    &TypeError{Want: want, Got: got},
+	}
+}
+
+// depthError reports that the next container would open one level deeper than
+// the decoder's fixed limit. The tokenizer has not consumed the overflowing
+// delimiter, so the offset points at it.
+func (r *Reader) depthError() error {
+	return &Error{
+		Path:   r.Path(),
+		Offset: r.tok.Offset(),
+		Kind:   KindDepth,
+		Err:    errDepthExceeded,
 	}
 }
 
