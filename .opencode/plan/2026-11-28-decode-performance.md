@@ -4,7 +4,8 @@ Date: 2026-11-28
 Status: active
 Tasks: `Q015` (benchmark harness integrity) and `D013` (decoder allocation
 elimination — established as Reader/tokenizer reuse, not container
-pre-sizing). Later phases are described but not yet tasked.
+pre-sizing), with the follow-on phases tasked as `M018`, `D014`, `D015`,
+`E005` and `G012`.
 
 ## Goal
 
@@ -62,14 +63,18 @@ measurement artifact and a genuine ergonomic gap.
   Measured (Apple M1, Go 1.27.3, n=10): `Unmarshal1/qijson` 1536 B / 5 allocs →
   352 B / 3 allocs; `Unmarshal100/qijson` 66.09 KiB / 212 → 64.95 KiB / 210
   allocs.
+- **Phase 1b — top-level container pre-sizing.** A hand-written top-level
+  container decoder still cannot pre-size (the ~61% cost). This needs a public
+  length hint — an **Article VI amendment** (task `M018`) — and then a decoder
+  change to use it (task `D014`).
 - **Phase 2 — decode CPU hot path.** Drop the per-value `cachedKind` offset/err
   checks, flatten the tokenizer↔Reader boundary, inline scalar dispatch,
-  length-first key matching. *(not yet tasked)*
+  length-first key matching. (task `D015`)
 - **Phase 3 — encoder tightening.** Fewer allocations, inlined writes.
-  *(not yet tasked)*
+  (task `E005`)
 - **Phase 4 — generated fast path.** `qi-json-gen` emits straight-line
   decode/encode that bypasses `Reader`/`Writer` — the only route to
-  `easyjson`-class speed. *(not yet tasked)*
+  `easyjson`-class speed. (task `G012`)
 
 ## Decisions
 
@@ -85,8 +90,7 @@ measurement artifact and a genuine ergonomic gap.
 
 ## Open questions
 
-- Closing the decode gap for a hand-written top-level container needs a public
-  length hint (Article VI amendment); nested containers already pre-size
-  internally. The amendment decision is open.
+- Top-level container pre-sizing is now tasked (`M018` amendment, then
+  `D014`); the amendment decision is pending.
 - Is the Go standard library's `encoding/json/v2` (in the toolchain) a moving
   target we accept, and does it change the Phase 4 calculus?

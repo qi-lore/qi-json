@@ -156,6 +156,21 @@ never renumber, never reuse a retired identifier.
 
 ### Decoder
 
+- [ ] D014 - Pre-size top-level containers from a public length hint (after M018)
+- [ ] D015 - Decode CPU hot path: drop per-value `cachedKind` checks, flatten the tokenizer↔Reader boundary, inline scalar dispatch, length-first key matching
+
+### Encoder
+
+- [ ] E005 - Encoder tightening: fewer allocations, inlined writes
+
+### Code generator
+
+- [ ] G012 - Generated fast path: `qi-json-gen` emits straight-line decode/encode that bypasses `Reader`/`Writer`
+
+### Module, packaging and governance
+
+- [ ] M018 - Constitution amendment (Article VI): public length hint for top-level container pre-sizing
+
 ### API parity
 
 - [ ] A001 - `encoding/json`-parity surface: `any`-based entry points, tag binding, `Marshaler`/`Unmarshaler`, concrete error types (declined under M010; revisit only on proven demand)
