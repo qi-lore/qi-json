@@ -8,7 +8,7 @@ import "github.com/qi-lore/qi-json"
 
 Requires Go 1.24+.
 
-## Version `v0.5.4`
+## Version `v0.5.5`
 
 ## Why
 
@@ -120,7 +120,7 @@ make bench    # benchmarks
 ```
 
 ## Status
-Current release: `v0.5.4`. The decoder and encoder are complete and benchmarked, but the API may still change before `1.0`.
+Current release: `v0.5.5`. The decoder and encoder are complete and benchmarked, but the API may still change before `1.0`.
 
 ## License
 
