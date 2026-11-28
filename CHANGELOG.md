@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `qijson`: the decoder enforces a fixed maximum container nesting depth of
+  10000 levels. A document that nests deeper fails with a `*Error` of `Kind`
+  `KindDepth`, whose `Offset` points at the delimiter that would have crossed
+  the limit, so recursion over hostile input cannot grow the path stack without
+  bound. The syntax-only surface (`Valid` and the tokenizer) is unchanged and
+  stays unlimited. (Task Q012.)
+
 ## [0.5.5] - 2026-11-28
 
 ### Changed

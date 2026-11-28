@@ -56,7 +56,10 @@ const (
 	// in strict mode.
 	KindDuplicateField = codec.KindDuplicateField
 
-	// KindDepth reports input that nests deeper than the configured limit.
+	// KindDepth reports input that nests deeper than the decoder's fixed
+	// nesting limit. The limit matches the Go standard library: encoding/json
+	// defines maxNestingDepth = 10000 and rejects deeper input with "exceeded
+	// max depth".
 	KindDepth = codec.KindDepth
 )
 
