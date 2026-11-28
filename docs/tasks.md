@@ -113,6 +113,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q010 - External comparative benchmark harness (qi-json vs stdlib vs easyjson)
 - [X] Q011 - Raise test coverage across all packages
 - [X] Q012 - Enforce a fixed decoder nesting-depth limit reported as `KindDepth`
+- [X] Q013 - Extend `make fuzz` to the codec entry points
 
 ### Module, packaging and governance
 

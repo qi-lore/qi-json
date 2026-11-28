@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the limit, so recursion over hostile input cannot grow the path stack without
   bound. The syntax-only surface (`Valid` and the tokenizer) is unchanged and
   stays unlimited. (Task Q012.)
+- Developer tooling: `make fuzz` now fuzzes the codec entry points
+  (`FuzzUnmarshal`, `FuzzUnmarshalMatchesValid`, `FuzzMarshalRoundTrip`) in
+  addition to the scanner's `FuzzValid`, driving the whole semantic layer over
+  arbitrary input. (Task Q013.)
 
 ## [0.5.5] - 2026-11-28
 
