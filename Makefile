@@ -8,7 +8,13 @@ GO            ?= go
 GOLANGCI_LINT ?= golangci-lint
 PKG           ?= ./...
 SCANNER       ?= ./internal/scanner
+CODEC         ?= ./internal/codec
 FUZZ_TIME     ?= 10s
+# go test -fuzz accepts a single target per run, so fuzz runs one process per
+# entry point, each for FUZZ_TIME.
+FUZZ_TARGETS  ?= $(SCANNER):FuzzValid \
+                 $(CODEC):FuzzUnmarshal $(CODEC):FuzzUnmarshalMatchesValid \
+                 $(CODEC):FuzzMarshalRoundTrip
 BENCH_TIME    ?= 1s
 COVER_PROFILE ?= cover.out
 
@@ -52,8 +58,12 @@ lint: ## Run golangci-lint (v2, default linters)
 	@command -v $(GOLANGCI_LINT) >/dev/null || { echo "$(GOLANGCI_LINT) is not installed"; exit 1; }
 	$(GOLANGCI_LINT) run
 
-fuzz: ## Fuzz the validator for FUZZ_TIME (default 10s)
-	$(GO) test -run=^$$ -fuzz=FuzzValid -fuzztime=$(FUZZ_TIME) $(SCANNER)
+fuzz: ## Fuzz the scanner and codec entry points, each for FUZZ_TIME (default 10s)
+	@for pt in $(FUZZ_TARGETS); do \
+		pkg="$${pt%%:*}"; target="$${pt##*:}"; \
+		echo "$(GO) test -run=^$$ -fuzz=^$$target$$ -fuzztime=$(FUZZ_TIME) $$pkg"; \
+		$(GO) test -run=^$$ -fuzz=^$$target$$ -fuzztime=$(FUZZ_TIME) $$pkg || exit 1; \
+	done
 
 bench: ## Run benchmarks for BENCH_TIME (default 1s), with memory stats
 	$(GO) test -run=^$$ -bench=. -benchmem -benchtime=$(BENCH_TIME) $(PKG)
