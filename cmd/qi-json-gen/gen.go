@@ -103,6 +103,13 @@ type gen struct {
 
 	// strict makes every generated schema reject unknown and duplicate members.
 	strict bool
+
+	// omitEmpty is the omitempty decision for the field currently being built.
+	// The runtime consults a Field's Empty closure only when the field is
+	// omitempty (see Schema.Encode), so a codec builder emits Empty only then; a
+	// non-omitempty field must not carry the dead closure. fieldCodecs and
+	// renderForeignSchema set it before each field's codec is built.
+	omitEmpty bool
 }
 
 // generate parses dir and returns non-strict generated source for types.
@@ -404,6 +411,9 @@ func (g *gen) fieldCodecs(owner string, field *ast.Field) ([]codec, error) {
 		return nil, fmt.Errorf("%s: a json tag on a multi-name field is not supported", owner)
 	}
 
+	// The codec builders consult g.omitEmpty to decide whether to emit the
+	// Empty closure; it is only meaningful for an omitempty field.
+	g.omitEmpty = omitEmpty
 	out := make([]codec, 0, len(field.Names))
 	for _, ident := range field.Names {
 		if !ast.IsExported(ident.Name) || skip {
@@ -599,14 +609,16 @@ func (g *gen) scalarClosure(owner, fname, jname, goType, kind string, ptr bool) 
 	}
 	b.WriteString("\t},\n")
 
-	switch {
-	case ptr:
-		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == nil },\n", owner, fname)
-	case kind == "string":
-		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == \"\" },\n", owner, fname)
-	default:
-		// Unary ! keeps the named boolean type, so compare instead.
-		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == false },\n", owner, fname)
+	if g.omitEmpty {
+		switch {
+		case ptr:
+			fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == nil },\n", owner, fname)
+		case kind == "string":
+			fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == \"\" },\n", owner, fname)
+		default:
+			// Unary ! keeps the named boolean type, so compare instead.
+			fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == false },\n", owner, fname)
+		}
 	}
 	b.WriteString("}")
 	return b.String()
@@ -657,7 +669,9 @@ func (g *gen) numericCodec(owner, fname, jname, goType, basic string, ptr bool) 
 	}
 	b.WriteString("\treturn nil\n\t},\n")
 	g.writeNumericEncode(&b, owner, fname, basic, ptr)
-	g.writeEmpty(&b, owner, fname, ptr)
+	if g.omitEmpty {
+		g.writeEmpty(&b, owner, fname, ptr)
+	}
 	b.WriteString("}")
 	return b.String()
 }

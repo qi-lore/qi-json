@@ -111,6 +111,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q008 - Return a sentinel instead of panicking on a nil nested `Schema` in `Object`
 - [X] Q009 - Enforce unique field names in `Struct`
 - [X] Q010 - External comparative benchmark harness (qi-json vs stdlib vs easyjson)
+- [X] Q011 - Raise test coverage across all packages
 
 ### Module, packaging and governance
 
