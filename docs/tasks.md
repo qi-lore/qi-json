@@ -112,6 +112,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q009 - Enforce unique field names in `Struct`
 - [X] Q010 - External comparative benchmark harness (qi-json vs stdlib vs easyjson)
 - [X] Q011 - Raise test coverage across all packages
+- [X] Q015 - Benchmark harness integrity: representative binding, reproducible methodology, broader shapes
 
 ### Module, packaging and governance
 
@@ -151,6 +152,10 @@ never renumber, never reuse a retired identifier.
 - [X] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
 
 ## Planned
+
+### Decoder
+
+- [ ] D013 - Decoder allocation elimination: pre-size containers and cut the whole-document input copy
 
 ### API parity
 
