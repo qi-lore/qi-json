@@ -38,7 +38,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteInt(int64(v.Level))
 		},
-		Empty: func(v *Config) bool { return v.Level == 0 },
 	},
 	qijson.Field[Config]{Name: "count", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
@@ -61,7 +60,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteUint(uint64(v.Count))
 		},
-		Empty: func(v *Config) bool { return v.Count == 0 },
 	},
 	qijson.Field[Config]{Name: "ratio", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
@@ -84,7 +82,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteFloat(float64(v.Ratio))
 		},
-		Empty: func(v *Config) bool { return v.Ratio == 0 },
 	},
 	qijson.Field[Config]{Name: "size", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
@@ -107,7 +104,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteInt(int64(v.Size))
 		},
-		Empty: func(v *Config) bool { return v.Size == 0 },
 	},
 	qijson.Field[Config]{Name: "limit", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
@@ -138,7 +134,6 @@ var configSchema = qijson.Struct[Config](
 			}
 			return w.WriteInt(int64(*v.Limit))
 		},
-		Empty: func(v *Config) bool { return v.Limit == nil },
 	},
 	qijson.Slice[Config, string]("tags", func(v *Config) *[]string { return &v.Tags }, qijson.NewCodec((*qijson.Reader).ReadString, (*qijson.Writer).WriteString)),
 	qijson.Array[Config, int]("matrix", func(v *Config) []int { return v.Matrix[:] }, qijson.NewCodec(qiDecodeInt, qiEncodeInt)),
@@ -170,7 +165,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteInt(int64(v.Timeout))
 		},
-		Empty: func(v *Config) bool { return v.Timeout == 0 },
 	},
 	qijson.Field[Config]{Name: "deadline", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
@@ -201,7 +195,6 @@ var configSchema = qijson.Struct[Config](
 			}
 			return w.WriteInt(int64(*v.Deadline))
 		},
-		Empty: func(v *Config) bool { return v.Deadline == nil },
 	},
 	qijson.Slice[Config, time.Duration]("durations", func(v *Config) *[]time.Duration { return &v.Durations }, qijson.NewCodec(qiDecodeTimeDuration, qiEncodeTimeDuration)),
 	qijson.Field[Config]{Name: "label", Decode: func(r *qijson.Reader, v *Config) error {
@@ -222,7 +215,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteString(string(v.Label))
 		},
-		Empty: func(v *Config) bool { return v.Label == "" },
 	},
 	qijson.Map[Config, xtypes.Label]("labels", func(v *Config) *map[string]xtypes.Label { return &v.Labels }, qijson.NewCodec(qiDecodeXtypesLabel, qiEncodeXtypesLabel)),
 	qijson.Field[Config]{Name: "flag", Decode: func(r *qijson.Reader, v *Config) error {
@@ -243,7 +235,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteBool(bool(v.Flag))
 		},
-		Empty: func(v *Config) bool { return v.Flag == false },
 	},
 	qijson.Field[Config]{Name: "status", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
@@ -263,7 +254,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteString(string(v.Status))
 		},
-		Empty: func(v *Config) bool { return v.Status == "" },
 	},
 	qijson.Field[Config]{Name: "prev", Decode: func(r *qijson.Reader, v *Config) error {
 		k, err := r.Peek()
@@ -291,7 +281,6 @@ var configSchema = qijson.Struct[Config](
 			}
 			return w.WriteString(string(*v.Prev))
 		},
-		Empty: func(v *Config) bool { return v.Prev == nil },
 	},
 	qijson.Slice[Config, Status]("statuses", func(v *Config) *[]Status { return &v.Statuses }, qijson.NewCodec(qiDecodeStatus, qiEncodeStatus)),
 	qijson.Field[Config]{Name: "mode", Decode: func(r *qijson.Reader, v *Config) error {
@@ -312,7 +301,6 @@ var configSchema = qijson.Struct[Config](
 		Encode: func(w *qijson.Writer, v *Config) error {
 			return w.WriteBool(bool(v.Mode))
 		},
-		Empty: func(v *Config) bool { return v.Mode == false },
 	},
 	qijson.Map[Config, Mode]("modes", func(v *Config) *map[string]Mode { return &v.Modes }, qijson.NewCodec(qiDecodeMode, qiEncodeMode)),
 	qijson.Object[Config, xtypes.Thing]("thing", func(v *Config) *xtypes.Thing { return &v.Thing }, xtypesThingSchema),
@@ -379,7 +367,6 @@ var pointSchema = qijson.Struct[Point](
 		Encode: func(w *qijson.Writer, v *Point) error {
 			return w.WriteInt(int64(v.X))
 		},
-		Empty: func(v *Point) bool { return v.X == 0 },
 	},
 	qijson.Field[Point]{Name: "y", Decode: func(r *qijson.Reader, v *Point) error {
 		k, err := r.Peek()
@@ -402,7 +389,6 @@ var pointSchema = qijson.Struct[Point](
 		Encode: func(w *qijson.Writer, v *Point) error {
 			return w.WriteInt(int64(v.Y))
 		},
-		Empty: func(v *Point) bool { return v.Y == 0 },
 	},
 )
 
@@ -494,7 +480,6 @@ var hooksSchema = qijson.Struct[Hooks](
 		Encode: func(w *qijson.Writer, v *Hooks) error {
 			return w.WriteInt(int64(v.Keep))
 		},
-		Empty: func(v *Hooks) bool { return v.Keep == 0 },
 	},
 )
 

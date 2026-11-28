@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/qi-lore/qi-json"
@@ -46,15 +47,37 @@ func roundTrip(doc []byte) (User, []byte, error) {
 	return user, out, nil
 }
 
-func main() {
-	const doc = `{"name":"Ada Lovelace","age":36,"verified":true,"rating":4.5}`
+// exampleDoc is the document the example decodes and re-encodes. It is a
+// variable so a test can drive the failure path through main.
+var exampleDoc = `{"name":"Ada Lovelace","age":36,"verified":true,"rating":4.5}`
 
+// stdout and stderr are the process streams the example writes to. osExit maps a
+// failure to the process exit status. They are variables so a test can capture
+// the output and observe the exit status without terminating the test process.
+var (
+	stdout io.Writer = os.Stdout
+	stderr io.Writer = os.Stderr
+	osExit           = os.Exit
+)
+
+// main runs the example against the process streams and maps a failure to a
+// non-zero exit status.
+func main() {
+	if err := run(exampleDoc, stdout, stderr); err != nil {
+		osExit(1)
+	}
+}
+
+// run performs the example's round-trip on doc and prints the decoded value and
+// the canonical JSON to stdout. It is the testable shell around roundTrip.
+func run(doc string, stdout, stderr io.Writer) error {
 	user, out, err := roundTrip([]byte(doc))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "example:", err)
-		os.Exit(1)
+		_, _ = fmt.Fprintln(stderr, "example:", err)
+		return err
 	}
 
-	fmt.Printf("decoded:  name=%s age=%d verified=%t rating=%g\n", user.Name, user.Age, user.Verified, user.Rating)
-	fmt.Printf("encoded:  %s\n", out)
+	_, _ = fmt.Fprintf(stdout, "decoded:  name=%s age=%d verified=%t rating=%g\n", user.Name, user.Age, user.Verified, user.Rating)
+	_, _ = fmt.Fprintf(stdout, "encoded:  %s\n", out)
+	return nil
 }

@@ -115,6 +115,7 @@ func (g *gen) renderForeignSchema(buf *bytes.Buffer, ft *foreignType) error {
 		if name == "" {
 			name = v.Name()
 		}
+		g.omitEmpty = omitEmpty
 		code, err := g.foreignFieldCodec(ft.goType, v.Name(), name, v.Type())
 		if err != nil {
 			return err
@@ -297,7 +298,9 @@ func (g *gen) schemaPtrCodec(owner, fname, jname, goType, schema string) string 
 	fmt.Fprintf(&b, "\tEncode: func(w *qijson.Writer, v *%s) error {\n", owner)
 	fmt.Fprintf(&b, "\t\tif v.%s == nil {\n\t\t\treturn w.WriteNull()\n\t\t}\n", fname)
 	fmt.Fprintf(&b, "\t\treturn %s.Encode(w, v.%s)\n\t},\n", schema, fname)
-	fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == nil },\n", owner, fname)
+	if g.omitEmpty {
+		fmt.Fprintf(&b, "\tEmpty: func(v *%s) bool { return v.%s == nil },\n", owner, fname)
+	}
 	b.WriteString("}")
 	return b.String()
 }

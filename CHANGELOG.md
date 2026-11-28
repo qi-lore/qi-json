@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-28
+
+### Changed
+
+- `cmd/qi-json-gen`: generated output no longer carries the `Empty:` closure on
+  a field that is not `omitempty`. The runtime reads a field's `Empty` closure
+  only when the field is `omitempty` (see `Schema.Encode`), so it was dead code
+  on any other field; it is now emitted only for `omitempty` fields, and the
+  output for `omitempty` fields is byte-identical. Regenerating changes only
+  non-`omitempty` fields. (Task Q011.)
+- Tests: statement coverage is raised across the whole module — the reflection
+  facade wrappers, the decoder and encoder error and constructor paths, the
+  scanner tokenizer typed-read mismatches, the generator's type-resolution
+  branches, its `gentest` fixtures and the example. The generator CLI and the
+  example `main()` bodies are reduced to thin wrappers over a testable `run(...)`;
+  behavior is unchanged. No public API change. (Task Q011.)
+
 ## [0.5.4] - 2026-11-27
 
 ### Changed

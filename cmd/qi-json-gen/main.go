@@ -31,9 +31,11 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"go/token"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,48 +55,77 @@ func (s *stringList) Set(v string) error {
 	return nil
 }
 
+// errUsage marks a command-line usage problem; main exits with status 2. The
+// diagnostic has already been written to stderr when it is returned.
+var errUsage = errors.New("usage error")
+
+// main runs the generator over os.Args and maps a failure to the process exit
+// status: 2 for a usage problem, 1 for a generation or write failure.
 func main() {
+	switch err := run(os.Args[1:], os.Stdout, os.Stderr); {
+	case err == nil:
+	case errors.Is(err, errUsage):
+		os.Exit(2)
+	default:
+		os.Exit(1)
+	}
+}
+
+// run parses args, generates source and writes it, reporting every diagnostic to
+// stderr. A usage problem returns errUsage; any other failure returns a plain
+// error. stdout is reserved for future use and is currently unused.
+func run(args []string, stdout, stderr io.Writer) error {
+	_ = stdout
+
+	fs := flag.NewFlagSet("qi-json-gen", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+
 	var types stringList
 	var foreign stringList
 	var out string
 	var strict bool
-	flag.Var(&types, "type", "type name to generate for; repeatable or comma-separated")
-	flag.Var(&foreign, "foreign", "pkg.T=ident: bind a foreign struct to a caller-supplied Schema; repeatable")
-	flag.StringVar(&out, "o", "", "output file (default <dir>/"+defaultOutput+")")
-	flag.BoolVar(&strict, "strict", false, "generated schemas reject unknown and duplicate members")
-	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: qi-json-gen [-type=T[,T...]] [-foreign=pkg.T=ident] [-strict] [-o file] [dir]")
-		flag.PrintDefaults()
+	fs.Var(&types, "type", "type name to generate for; repeatable or comma-separated")
+	fs.Var(&foreign, "foreign", "pkg.T=ident: bind a foreign struct to a caller-supplied Schema; repeatable")
+	fs.StringVar(&out, "o", "", "output file (default <dir>/"+defaultOutput+")")
+	fs.BoolVar(&strict, "strict", false, "generated schemas reject unknown and duplicate members")
+	fs.Usage = func() {
+		_, _ = fmt.Fprintln(stderr, "usage: qi-json-gen [-type=T[,T...]] [-foreign=pkg.T=ident] [-strict] [-o file] [dir]")
+		fs.PrintDefaults()
 	}
-	flag.Parse()
 
-	if flag.NArg() > 1 {
-		fmt.Fprintln(os.Stderr, "qi-json-gen: at most one directory argument")
-		os.Exit(2)
+	if err := fs.Parse(args); err != nil {
+		// The flag package has already written the error and usage to stderr.
+		return errUsage
+	}
+
+	if fs.NArg() > 1 {
+		_, _ = fmt.Fprintln(stderr, "qi-json-gen: at most one directory argument")
+		return errUsage
 	}
 	dir := "."
-	if flag.NArg() == 1 {
-		dir = flag.Arg(0)
+	if fs.NArg() == 1 {
+		dir = fs.Arg(0)
 	}
 
 	overrides, err := parseForeign(foreign)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "qi-json-gen: %v\n", err)
-		os.Exit(2)
+		_, _ = fmt.Fprintf(stderr, "qi-json-gen: %v\n", err)
+		return errUsage
 	}
 
 	src, err := generateOptions(dir, types, strict, overrides)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "qi-json-gen: %v\n", err)
-		os.Exit(1)
+		_, _ = fmt.Fprintf(stderr, "qi-json-gen: %v\n", err)
+		return err
 	}
 	if out == "" {
 		out = filepath.Join(dir, defaultOutput)
 	}
 	if err := os.WriteFile(out, src, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "qi-json-gen: %v\n", err)
-		os.Exit(1)
+		_, _ = fmt.Fprintf(stderr, "qi-json-gen: %v\n", err)
+		return err
 	}
+	return nil
 }
 
 // parseForeign builds the override map from -foreign entries of the form
