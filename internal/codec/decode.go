@@ -1,10 +1,6 @@
 package codec
 
-import (
-	"errors"
-
-	"github.com/qi-lore/qi-json/internal/scanner"
-)
+import "errors"
 
 // Decoder is implemented by types that decode themselves from JSON. A decoder
 // reads exactly one JSON value from r. The usual way to implement it is to bind a
@@ -83,13 +79,14 @@ func Decode(data []byte, v Decoder) error {
 		return errNilTarget
 	}
 
-	r := newReader(scanner.NewTokenizer(data), string(data))
-	if err := v.DecodeJSON(r); err != nil {
-		return err
+	r := newReader(data)
+	err := v.DecodeJSON(r)
+	if err == nil {
+		// The document must hold exactly one value; Peek reports trailing content.
+		if _, perr := r.Peek(); perr != nil {
+			err = perr
+		}
 	}
-	// The document must hold exactly one value; Peek reports trailing content.
-	if _, err := r.Peek(); err != nil {
-		return err
-	}
-	return nil
+	r.release()
+	return err
 }

@@ -56,6 +56,7 @@ never renumber, never reuse a retired identifier.
 - [X] D010 - Decoder UTF-8 policy and pinned semantic defaults
 - [X] D011 - Decode fast path: avoid copying clean strings; bounded UTF-8 path
 - [X] D012 - Preallocate slice and map capacity from a length hint
+- [X] D013 - Decoder allocation elimination: pre-size containers and cut the whole-document input copy
 
 ### Encoder
 
@@ -154,8 +155,6 @@ never renumber, never reuse a retired identifier.
 ## Planned
 
 ### Decoder
-
-- [ ] D013 - Decoder allocation elimination: pre-size containers and cut the whole-document input copy
 
 ### API parity
 

@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-
-	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 func TestStructDecode(t *testing.T) {
@@ -381,8 +379,7 @@ func TestSchemaNilTarget(t *testing.T) {
 	)
 
 	t.Run("Decode", func(t *testing.T) {
-		const doc = `{"name":"x"}`
-		r := newReader(scanner.NewTokenizer([]byte(doc)), doc)
+		r := newReader([]byte(`{"name":"x"}`))
 		if err := schema.Decode(r, nil); !errors.Is(err, errNilTarget) {
 			t.Fatalf("Decode(nil) error = %v, want %v", err, errNilTarget)
 		}
@@ -412,26 +409,29 @@ func TestStructNoAllocs(t *testing.T) {
 	)
 
 	data := []byte(`{"x":1,"y":2,"on":true}`)
-	r := newReader(scanner.NewTokenizer(data), string(data))
 
 	// p is hoisted so that taking its address inside the measured region does
-	// not itself allocate; the decode machinery must not allocate at all.
+	// not itself allocate; the decode machinery must allocate only the document
+	// copy the reader owns.
 	var p point
 
+	// Baseline: constructing a Reader (and so the document copy) and nothing
+	// else.
 	base := testing.AllocsPerRun(100, func() {
-		r.tok = scanner.NewTokenizer(data)
+		newReader(data).release()
 	})
 
 	full := testing.AllocsPerRun(100, func() {
-		r.tok = scanner.NewTokenizer(data)
+		r := newReader(data)
 		p = point{}
 		if err := schema.Decode(r, &p); err != nil {
 			panic(err)
 		}
+		r.release()
 	})
 
 	if full != base {
-		t.Errorf("struct decode allocated %v times per run, baseline %v; want equal (no allocations)", full, base)
+		t.Errorf("struct decode allocated %v times per run, baseline %v; want equal (no allocations beyond the document copy)", full, base)
 	}
 }
 

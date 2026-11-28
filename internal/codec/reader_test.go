@@ -6,13 +6,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // newTestReader returns a Reader positioned at the start of doc.
 func newTestReader(doc string) *Reader {
-	return newReader(scanner.NewTokenizer([]byte(doc)), doc)
+	return newReader([]byte(doc))
 }
 
 func TestReadStringUnescapes(t *testing.T) {
@@ -396,21 +394,22 @@ func TestPrimitiveNoAllocs(t *testing.T) {
 		t.Skip("allocation test is skipped in short mode")
 	}
 
-	// Reading numbers, booleans and null must not allocate; only the tokenizer
-	// construction does. (Strings allocate once for the decoded result, so they
-	// are covered elsewhere.)
+	// Reading numbers, booleans and null must not allocate, and the Reader and
+	// its tokenizer are reused from the pool, so a decode of scalars allocates
+	// only the private copy of the document the reader owns. (Strings allocate
+	// once for the decoded result, so they are covered elsewhere.)
 	const doc = `[123,1.5e3,true,null]`
 
 	data := []byte(doc)
-	r := newReader(scanner.NewTokenizer(data), doc)
 
-	// Baseline: constructing a tokenizer and nothing else.
+	// Baseline: constructing a Reader (and so the document copy) and nothing
+	// else.
 	base := testing.AllocsPerRun(100, func() {
-		r.tok = scanner.NewTokenizer(data)
+		newReader(data).release()
 	})
 
 	full := testing.AllocsPerRun(100, func() {
-		r.tok = scanner.NewTokenizer(data)
+		r := newReader(data)
 		err := r.Array(func(i int) error {
 			switch i {
 			case 0:
@@ -429,9 +428,47 @@ func TestPrimitiveNoAllocs(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+		r.release()
 	})
 
 	if full != base {
-		t.Errorf("primitive read path allocated %v times per run, baseline %v; want equal (no allocations)", full, base)
+		t.Errorf("primitive read path allocated %v times per run, baseline %v; want equal (no allocations beyond the document copy)", full, base)
+	}
+}
+
+// TestDecodeAllocationsReused guards the decoder's per-call fixed overhead: the
+// Reader and its tokenizer must be reused rather than freshly allocated, so a
+// flat decode allocates only the private copy of the document the reader owns
+// (which lets a decoded string be a zero-copy substring of it). Before the
+// reuse, every decode allocated a fresh Reader and tokenizer as well, so this
+// guard failed with three allocations.
+func TestDecodeAllocationsReused(t *testing.T) {
+	if testing.Short() {
+		t.Skip("allocation test is skipped in short mode")
+	}
+
+	type point struct {
+		X  int64
+		Y  int64
+		On bool
+	}
+	schema := Struct(
+		Int[point]("x", func(p *point) *int64 { return &p.X }),
+		Int[point]("y", func(p *point) *int64 { return &p.Y }),
+		Bool[point]("on", func(p *point) *bool { return &p.On }),
+	)
+	data := []byte(`{"x":1,"y":2,"on":true}`)
+
+	// p is hoisted so taking its address inside the measured region does not
+	// itself allocate; the decode machinery must allocate only the document copy.
+	var p point
+	allocs := testing.AllocsPerRun(100, func() {
+		p = point{}
+		if err := schema.UnmarshalInto(data, &p); err != nil {
+			panic(err)
+		}
+	})
+	if allocs > 1 {
+		t.Errorf("flat decode allocated %v times per run, want at most 1 (only the document copy); the Reader and its tokenizer must be reused", allocs)
 	}
 }

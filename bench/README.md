@@ -126,6 +126,29 @@ beats it on the unicode and 100-record shapes; qi-json decode trails both
 The decode gap is the target of the decode-performance work; see the roadmap
 record referenced below.
 
+### Decode allocation improvement (D013)
+
+Task D013 removed the per-call `*Reader` and its `*Tokenizer` allocation: the
+decode entry points now hold the tokenizer by value inside `Reader` and recycle
+the `Reader` through a `sync.Pool`. The remaining fixed cost is the deliberate
+whole-document `string(data)` copy, which is retained. Measured 2026-11-28 on an
+Apple M1, Go 1.27.3, `GOMAXPROCS=8`, `-count=10`, machine otherwise idle;
+`benchstat` was not installed, so the raw before/after means are shown (lower is
+better):
+
+| bench | metric | before | after | delta |
+|---|---|---|---|---|
+| Unmarshal1/qijson | sec/op | 1062.5 ns | 949.6 ns | −10.6% |
+| Unmarshal1/qijson | B/op | 1536 | 352 | −77.1% |
+| Unmarshal1/qijson | allocs/op | 5 | 3 | −40.0% |
+| Unmarshal100/qijson | sec/op | 93.21 µs | 92.29 µs | −1.0% |
+| Unmarshal100/qijson | B/op | 66.09 KiB | 64.95 KiB | −1.7% |
+| Unmarshal100/qijson | allocs/op | 212 | 210 | −0.9% |
+
+The two allocations removed per call are the `*Reader` and its `*Tokenizer`. The
+~61% of `Unmarshal100` bytes that come from the bench-side top-level slice growth
+(see the caveat below) is unchanged and out of scope for D013.
+
 ## Known caveat: the qi-json top-level array decoder does not pre-size
 
 A `pprof` allocation profile of `BenchmarkUnmarshal100/qijson` attributes the
