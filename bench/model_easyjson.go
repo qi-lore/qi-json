@@ -17,7 +17,91 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench(in *jlexer.Lexer, out *Records) {
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench(in *jlexer.Lexer, out *UnicodeDoc) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ID = int64(in.Int64())
+			}
+		case "text":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Text = string(in.String())
+			}
+		case "escaped":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Escaped = string(in.String())
+			}
+		case "mixed":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Mixed = string(in.String())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench(out *jwriter.Writer, in UnicodeDoc) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"id\":"
+		out.RawString(prefix[1:])
+		out.Int64(int64(in.ID))
+	}
+	{
+		const prefix string = ",\"text\":"
+		out.RawString(prefix)
+		out.String(string(in.Text))
+	}
+	{
+		const prefix string = ",\"escaped\":"
+		out.RawString(prefix)
+		out.String(string(in.Escaped))
+	}
+	{
+		const prefix string = ",\"mixed\":"
+		out.RawString(prefix)
+		out.String(string(in.Mixed))
+	}
+	out.RawByte('}')
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v UnicodeDoc) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench(w, v)
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *UnicodeDoc) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench(l, v)
+}
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench1(in *jlexer.Lexer, out *Records) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		in.Skip()
@@ -49,7 +133,7 @@ func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench(in *jlexer.Lexer, out *Rec
 		in.Consumed()
 	}
 }
-func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench(out *jwriter.Writer, in Records) {
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench1(out *jwriter.Writer, in Records) {
 	if in == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 		out.RawString("null")
 	} else {
@@ -66,14 +150,14 @@ func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench(out *jwriter.Writer, in Re
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Records) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench(w, v)
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench1(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Records) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench(l, v)
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench1(l, v)
 }
-func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench1(in *jlexer.Lexer, out *Record) {
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench2(in *jlexer.Lexer, out *Record) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -160,7 +244,7 @@ func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench1(in *jlexer.Lexer, out *Re
 		in.Consumed()
 	}
 }
-func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench1(out *jwriter.Writer, in Record) {
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench2(out *jwriter.Writer, in Record) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -215,10 +299,402 @@ func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench1(out *jwriter.Writer, in R
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Record) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench1(w, v)
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench2(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Record) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench1(l, v)
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench2(l, v)
+}
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench3(in *jlexer.Lexer, out *Nested) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ID = int64(in.Int64())
+			}
+		case "company":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				(out.Company).UnmarshalEasyJSON(in)
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench3(out *jwriter.Writer, in Nested) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"id\":"
+		out.RawString(prefix[1:])
+		out.Int64(int64(in.ID))
+	}
+	{
+		const prefix string = ",\"company\":"
+		out.RawString(prefix)
+		(in.Company).MarshalEasyJSON(out)
+	}
+	out.RawByte('}')
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Nested) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench3(w, v)
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Nested) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench3(l, v)
+}
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench4(in *jlexer.Lexer, out *MapDoc) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ID = int64(in.Int64())
+			}
+		case "labels":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				out.Labels = make(map[string]string)
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v7 string
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v7 = string(in.String())
+					}
+					(out.Labels)[key] = v7
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
+		case "counters":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				out.Counters = make(map[string]int64)
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v8 int64
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v8 = int64(in.Int64())
+					}
+					(out.Counters)[key] = v8
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench4(out *jwriter.Writer, in MapDoc) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"id\":"
+		out.RawString(prefix[1:])
+		out.Int64(int64(in.ID))
+	}
+	{
+		const prefix string = ",\"labels\":"
+		out.RawString(prefix)
+		if in.Labels == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
+			out.RawString(`null`)
+		} else {
+			out.RawByte('{')
+			v9First := true
+			for v9Name, v9Value := range in.Labels {
+				if v9First {
+					v9First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v9Name))
+				out.RawByte(':')
+				out.String(string(v9Value))
+			}
+			out.RawByte('}')
+		}
+	}
+	{
+		const prefix string = ",\"counters\":"
+		out.RawString(prefix)
+		if in.Counters == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
+			out.RawString(`null`)
+		} else {
+			out.RawByte('{')
+			v10First := true
+			for v10Name, v10Value := range in.Counters {
+				if v10First {
+					v10First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v10Name))
+				out.RawByte(':')
+				out.Int64(int64(v10Value))
+			}
+			out.RawByte('}')
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v MapDoc) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench4(w, v)
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *MapDoc) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench4(l, v)
+}
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench5(in *jlexer.Lexer, out *Geo) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "lat":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Lat = float64(in.Float64())
+			}
+		case "lon":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Lon = float64(in.Float64())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench5(out *jwriter.Writer, in Geo) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"lat\":"
+		out.RawString(prefix[1:])
+		out.Float64(float64(in.Lat))
+	}
+	{
+		const prefix string = ",\"lon\":"
+		out.RawString(prefix)
+		out.Float64(float64(in.Lon))
+	}
+	out.RawByte('}')
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Geo) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench5(w, v)
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Geo) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench5(l, v)
+}
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench6(in *jlexer.Lexer, out *Company) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "name":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Name = string(in.String())
+			}
+		case "address":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				(out.Address).UnmarshalEasyJSON(in)
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench6(out *jwriter.Writer, in Company) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"name\":"
+		out.RawString(prefix[1:])
+		out.String(string(in.Name))
+	}
+	{
+		const prefix string = ",\"address\":"
+		out.RawString(prefix)
+		(in.Address).MarshalEasyJSON(out)
+	}
+	out.RawByte('}')
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Company) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench6(w, v)
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Company) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench6(l, v)
+}
+func easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench7(in *jlexer.Lexer, out *Address) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "street":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Street = string(in.String())
+			}
+		case "city":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.City = string(in.String())
+			}
+		case "geo":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				(out.Geo).UnmarshalEasyJSON(in)
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench7(out *jwriter.Writer, in Address) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"street\":"
+		out.RawString(prefix[1:])
+		out.String(string(in.Street))
+	}
+	{
+		const prefix string = ",\"city\":"
+		out.RawString(prefix)
+		out.String(string(in.City))
+	}
+	{
+		const prefix string = ",\"geo\":"
+		out.RawString(prefix)
+		(in.Geo).MarshalEasyJSON(out)
+	}
+	out.RawByte('}')
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Address) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonC80ae7adEncodeGithubComQiLoreQiJsonBench7(w, v)
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Address) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonC80ae7adDecodeGithubComQiLoreQiJsonBench7(l, v)
 }
