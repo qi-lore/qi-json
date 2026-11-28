@@ -2,8 +2,9 @@
 
 Date: 2026-11-28
 Status: active
-Tasks: `Q015` (benchmark harness integrity), `D013` (decoder allocation
-elimination). Later phases are described but not yet tasked.
+Tasks: `Q015` (benchmark harness integrity) and `D013` (decoder allocation
+elimination — established as Reader/tokenizer reuse, not container
+pre-sizing). Later phases are described but not yet tasked.
 
 ## Goal
 
@@ -51,8 +52,16 @@ measurement artifact and a genuine ergonomic gap.
 - **Phase 0 — `Q015` benchmark integrity.** Broader shapes, a reproducible
   methodology, an honest binding, and a written record of the top-level
   pre-size gap.
-- **Phase 1 — `D013` decoder allocation elimination.** Pre-size every container
-  on the hot path and cut the whole-document copy.
+- **Phase 1 — `D013` decoder allocation elimination.** The per-call fixed cost
+  proved to be the `*Reader` and its `*Tokenizer`; the change holds the
+  tokenizer by value inside `Reader` and recycles the `Reader` through a
+  `sync.Pool`. It did **not** pre-size containers or cut the whole-document
+  copy: the top-level container slice growth is bench-side and needs a public
+  length hint (an **Article VI amendment**), and the whole-document
+  `string(data)` copy is a deliberate zero-copy optimisation that is retained.
+  Measured (Apple M1, Go 1.27.3, n=10): `Unmarshal1/qijson` 1536 B / 5 allocs →
+  352 B / 3 allocs; `Unmarshal100/qijson` 66.09 KiB / 212 → 64.95 KiB / 210
+  allocs.
 - **Phase 2 — decode CPU hot path.** Drop the per-value `cachedKind` offset/err
   checks, flatten the tokenizer↔Reader boundary, inline scalar dispatch,
   length-first key matching. *(not yet tasked)*
@@ -66,15 +75,18 @@ measurement artifact and a genuine ergonomic gap.
 
 - Speed is the explicit goal; **measure before optimizing** (Phase 0 precedes
   Phase 1).
-- The top-level container codec question — a new export would need an
-  **Article VI amendment** — is **deferred** until Phase 1 data shows whether
-  pre-sizing nested containers alone closes most of the gap.
+- Phase 1 data (2026-11-28) shows internal pre-sizing alone does **not** close
+  the decode gap: ~61% of `Unmarshal100` bytes is bench-side top-level slice
+  growth that only a public length hint (an **Article VI amendment**) can
+  remove, and the ~27% whole-document copy is retained by design. The
+  amendment decision therefore remains open.
 - Rough estimate: **~1 week** for Phases 0–1; **~1–2 months** for
   `easyjson`-class.
 
 ## Open questions
 
-- Does closing the decode gap require a new exported top-level array codec
-  (Article VI amendment), or can internal pre-sizing suffice?
+- Closing the decode gap for a hand-written top-level container needs a public
+  length hint (Article VI amendment); nested containers already pre-size
+  internally. The amendment decision is open.
 - Is the Go standard library's `encoding/json/v2` (in the toolchain) a moving
   target we accept, and does it change the Phase 4 calculus?
