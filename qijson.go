@@ -261,10 +261,12 @@ func Encode(w *Writer, v Encoder) error {
 // needs it, so a successful decode never formats the path.
 //
 // A Reader is created by the decoder entry points and passed to Decoder
-// implementations. It is not safe for concurrent use and must not be copied
-// after first use (its component stack points into itself). Its methods are
-// Peek, ReadNull, ReadBool, ReadString, ReadInt, ReadFloat, Object, Array, Skip,
-// Path and Offset.
+// implementations for the duration of one decode: the entry points return it to
+// a pool when the decode ends, so a Decoder must not retain it or use it after
+// DecodeJSON returns. It is not safe for concurrent use and must not be copied
+// after first use (its component stack and tokenizer point into itself). Its
+// methods are Peek, ReadNull, ReadBool, ReadString, ReadInt, ReadFloat, Object,
+// Array, Skip, Path and Offset.
 type Reader = codec.Reader
 
 // Writer builds a JSON document in memory. The zero value is ready to use; call

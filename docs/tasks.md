@@ -56,6 +56,7 @@ never renumber, never reuse a retired identifier.
 - [X] D010 - Decoder UTF-8 policy and pinned semantic defaults
 - [X] D011 - Decode fast path: avoid copying clean strings; bounded UTF-8 path
 - [X] D012 - Preallocate slice and map capacity from a length hint
+- [X] D013 - Decoder allocation elimination: pre-size containers and cut the whole-document input copy
 
 ### Encoder
 
@@ -115,6 +116,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q012 - Enforce a fixed decoder nesting-depth limit reported as `KindDepth`
 - [X] Q013 - Extend `make fuzz` to the codec entry points
 - [X] Q014 - Document each facade type's method set in its doc comment
+- [X] Q015 - Benchmark harness integrity: representative binding, reproducible methodology, broader shapes
 
 ### Module, packaging and governance
 
@@ -154,6 +156,23 @@ never renumber, never reuse a retired identifier.
 - [X] H002 - Unknown-fields proxy (`UnmarshalUnknown`/`MarshalUnknowns`)
 
 ## Planned
+
+### Decoder
+
+- [ ] D014 - Pre-size top-level containers from a public length hint (after M018)
+- [ ] D015 - Decode CPU hot path: drop per-value `cachedKind` checks, flatten the tokenizer↔Reader boundary, inline scalar dispatch, length-first key matching
+
+### Encoder
+
+- [ ] E005 - Encoder tightening: fewer allocations, inlined writes
+
+### Code generator
+
+- [ ] G012 - Generated fast path: `qi-json-gen` emits straight-line decode/encode that bypasses `Reader`/`Writer`
+
+### Module, packaging and governance
+
+- [ ] M018 - Constitution amendment (Article VI): public length hint for top-level container pre-sizing
 
 ### API parity
 

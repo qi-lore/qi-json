@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"strconv"
+	"sync"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -34,10 +35,17 @@ const maxDepth = 10000
 // needs it, so a successful decode never formats the path.
 //
 // A Reader is created by the decoder entry points and passed to Decoder
-// implementations. It is not safe for concurrent use and must not be copied
-// after first use (its component stack points into itself).
+// implementations for the duration of one decode: the entry points return it to
+// a pool when the decode ends, so a Decoder must not retain it or use it after
+// DecodeJSON returns. A Reader is not safe for concurrent use and must not be
+// copied after first use (its component stack and tokenizer point into itself).
 type Reader struct {
-	tok *scanner.Tokenizer
+	// tok is the tokenizer, held by value so that a Reader and its tokenizer are
+	// one allocation. The decode entry points reuse a Reader from readerPool, so
+	// neither the Reader nor its tokenizer is allocated per call; newReader
+	// re-initializes tok from the document at the start of each decode. The zero
+	// value is not ready to use.
+	tok scanner.Tokenizer
 
 	// src is the document as a string the library owns: the decoder entry
 	// points copy the caller's bytes once, so a clean string value can be
@@ -47,7 +55,9 @@ type Reader struct {
 
 	// depth is the number of containers currently open. It is incremented when
 	// a container is entered and decremented when it closes, and is bounded by
-	// maxDepth so recursion over hostile input cannot exhaust the stack.
+	// maxDepth so recursion over hostile input cannot exhaust the stack. Because
+	// a decode that fails inside a container does not unwind the counter,
+	// newReader resets it so a pooled Reader never starts a decode above zero.
 	depth int
 
 	// comps is the stack of path components from the document root to the value
@@ -56,14 +66,15 @@ type Reader struct {
 	comps  []pathComp
 	inline [compsInline]pathComp
 
-	// peekKind, peekOff and peekTok memoize the kind of the token at the
-	// tokenizer's current offset. A Peek followed by a read would otherwise
-	// peek twice; the cache makes the read reuse the Peek. It stays valid only
-	// while the same tokenizer has neither advanced nor failed since the kind
-	// was recorded.
-	peekKind scanner.Kind
-	peekOff  int64
-	peekTok  *scanner.Tokenizer
+	// peekKind and peekOff memoize the kind of the token at the tokenizer's
+	// current offset, and peekValid marks the memo usable. A Peek followed by a
+	// read would otherwise peek twice; the cache makes the read reuse the Peek.
+	// It stays valid only while the tokenizer has neither advanced nor failed
+	// since the kind was recorded, and newReader clears it so a reused Reader
+	// never serves a stale kind.
+	peekKind  scanner.Kind
+	peekOff   int64
+	peekValid bool
 }
 
 // pathComp is one step in the JSON path: a member name or an array index.
@@ -75,13 +86,38 @@ type pathComp struct {
 	index int
 }
 
-// newReader returns a Reader that decodes from tok, slicing zero-copy string
-// values out of src. src must be the document bytes as a string the library
-// owns; callers pass string(data), never a view of the caller's buffer.
-func newReader(tok *scanner.Tokenizer, src string) *Reader {
-	r := &Reader{tok: tok, src: src}
+// readerPool recycles Readers across decodes. A Reader holds its tokenizer by
+// value, so reusing the Reader reuses the tokenizer too and removes both
+// per-call allocations from the decode path. sync.Pool may drop a stored Reader
+// under memory pressure; that only costs a fresh allocation, never correctness.
+var readerPool = sync.Pool{
+	New: func() any { return &Reader{} },
+}
+
+// newReader returns a Reader that decodes the single JSON document in data,
+// slicing zero-copy string values out of a private copy of it. It reuses a
+// pooled Reader when one is available, so neither the Reader nor its tokenizer
+// is allocated per call. The caller must call release when the decode is done;
+// the Reader must not be retained or used after that.
+func newReader(data []byte) *Reader {
+	r := readerPool.Get().(*Reader)
+	r.tok = *scanner.NewTokenizer(data)
+	r.src = string(data)
 	r.comps = r.inline[:0]
+	r.depth = 0
+	r.peekValid = false
 	return r
+}
+
+// release returns r to readerPool for reuse by a later decode, clearing the
+// references it holds so a pooled Reader does not keep a document alive. The
+// caller must not use r afterwards.
+func (r *Reader) release() {
+	r.tok = scanner.Tokenizer{}
+	r.src = ""
+	r.comps = r.inline[:0]
+	r.peekKind, r.peekOff, r.peekValid = 0, 0, false
+	readerPool.Put(r)
 }
 
 // pushKey records that the value about to be read is the member name of the
@@ -111,16 +147,17 @@ func (r *Reader) Peek() (scanner.Kind, error) {
 	if err != nil {
 		return k, r.syntaxError(err)
 	}
-	r.peekKind, r.peekOff, r.peekTok = k, r.tok.Offset(), r.tok
+	r.peekKind, r.peekOff, r.peekValid = k, r.tok.Offset(), true
 	return k, nil
 }
 
 // cachedKind returns the memorized kind of the token at the tokenizer's current
-// offset, or false when there is none. The entry is used only while the same
-// tokenizer has neither advanced nor failed since it was recorded, so it never
-// hides a consumed token or a sticky error.
+// offset, or false when there is none. The entry is used only while the
+// tokenizer has neither advanced nor failed since it was recorded, and while the
+// Reader has not been re-initialized for another document, so it never hides a
+// consumed token or a sticky error.
 func (r *Reader) cachedKind() (scanner.Kind, bool) {
-	if r.peekTok == r.tok && r.peekTok != nil && r.tok.Offset() == r.peekOff && r.tok.Err() == nil {
+	if r.peekValid && r.tok.Offset() == r.peekOff && r.tok.Err() == nil {
 		return r.peekKind, true
 	}
 	return 0, false

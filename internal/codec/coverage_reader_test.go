@@ -3,8 +3,6 @@ package codec
 import (
 	"errors"
 	"testing"
-
-	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // TestCovReaderTypedMismatches drives ReadNull, ReadBool and ReadString when the
@@ -85,12 +83,12 @@ func TestCovReaderBeginMismatches(t *testing.T) {
 func TestCovReaderInvalidUTF8Key(t *testing.T) {
 	data := append([]byte(`{"`), 0xff, '"', ':', '1', '}')
 
-	r := newReader(scanner.NewTokenizer(data), string(data))
+	r := newReader(data)
 	if err := r.Object(func(string) error { return nil }); err == nil {
 		t.Error("Object with an invalid UTF-8 key: want a syntax error")
 	}
 
-	r = newReader(scanner.NewTokenizer(data), string(data))
+	r = newReader(data)
 	if err := r.objectRaw(func([]byte) error { return nil }); err == nil {
 		t.Error("objectRaw with an invalid UTF-8 key: want a syntax error")
 	}

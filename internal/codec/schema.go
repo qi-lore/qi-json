@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-
-	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // errNoFieldEncoder reports a Field whose Encode is nil, reached by
@@ -207,15 +205,16 @@ func (s *Schema[T]) UnmarshalInto(data []byte, v *T) error {
 		return errNilTarget
 	}
 
-	r := newReader(scanner.NewTokenizer(data), string(data))
-	if err := s.Decode(r, v); err != nil {
-		return err
+	r := newReader(data)
+	err := s.Decode(r, v)
+	if err == nil {
+		// The document must hold exactly one object; Peek reports trailing content.
+		if _, perr := r.Peek(); perr != nil {
+			err = perr
+		}
 	}
-	// The document must hold exactly one object; Peek reports trailing content.
-	if _, err := r.Peek(); err != nil {
-		return err
-	}
-	return nil
+	r.release()
+	return err
 }
 
 // lookup returns the index and field whose Name matches raw, or (-1, nil). raw

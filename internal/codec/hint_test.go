@@ -3,15 +3,13 @@ package codec
 import (
 	"errors"
 	"testing"
-
-	"github.com/qi-lore/qi-json/internal/scanner"
 )
 
 // newHintReader returns a Reader at the document root whose tokenizer and
 // library-owned source string cover the same bytes, matching production
 // construction.
 func newHintReader(doc string) *Reader {
-	return newReader(scanner.NewTokenizer([]byte(doc)), doc)
+	return newReader([]byte(doc))
 }
 
 func TestArrayLenHint(t *testing.T) {
