@@ -114,6 +114,7 @@ never renumber, never reuse a retired identifier.
 - [X] Q011 - Raise test coverage across all packages
 - [X] Q012 - Enforce a fixed decoder nesting-depth limit reported as `KindDepth`
 - [X] Q013 - Extend `make fuzz` to the codec entry points
+- [X] Q014 - Document each facade type's method set in its doc comment
 
 ### Module, packaging and governance
 

@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   addition to the scanner's `FuzzValid`, driving the whole semantic layer over
   arbitrary input. (Task Q013.)
 
+### Changed
+
+- Documentation: every exported type alias in the facade now ends its type-level
+  doc comment with an accurate "Its methods are ..." sentence, so the method
+  names are visible through `go doc` even though it does not follow aliases for
+  method sets. Docs only; no API change. (Task Q014.)
+
 ## [0.5.5] - 2026-11-28
 
 ### Changed
